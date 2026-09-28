@@ -9,6 +9,8 @@
      .is-active           bouton JOUER / onglet courant
      .is-selected         carte de mode choisie (+ aria-checked="true")
      .is-me               bannière du joueur local
+     .is-owner            bannière du chef du salon
+     .is-pending          emplacement avec invitation en attente
      .is-disconnected     joueur en reconnexion
      .is-drop-target      bannière vide pendant un glisser d'ami
      .is-drag-over        bannière survolée pendant le glisser
@@ -66,22 +68,22 @@
   --gold-border: linear-gradient(180deg, var(--gold-2) 0%, var(--gold-4) 100%);
   --gold-border-bright: linear-gradient(180deg, var(--gold-1) 0%, var(--gold-2) 50%, var(--gold-3) 100%);
   --blue-border: linear-gradient(180deg, var(--blue-2) 0%, var(--blue-4) 100%);
+  --avatar: radial-gradient(circle at 35% 30%, #d9774b, #6a1f22 70%);
 
   /* Typographie */
   --font-display: 'Cinzel', 'Beaufort for LOL', 'Times New Roman', serif;
-  --font-body: 'Inter', 'Spiegel', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Barlow', 'Spiegel', 'Segoe UI', system-ui, sans-serif;
 
   /* Mise en page */
-  --topbar-h: 82px;
-  --social-w: 224px;
+  --topbar-h: 80px;
+  --social-w: 240px;
   --ease: cubic-bezier(0.25, 0.8, 0.25, 1);
 
-  /* Images de fond facultatives (frontend/assets/). Absentes : repli dégradé. */
-  --home-image: url('../assets/home.jpg');
-  --rift-image: url('../assets/summoners-rift.jpg');
+  /* Fonds (frontend/assets/) : remplace-les par une vraie image si tu veux */
+  --home-image: url('../assets/home-bg.svg');
+  --rift-image: url('../assets/rift-bg.svg');
 
   /* Montagnes de repli pour l'écran d'accueil */
-  --mountains: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 900' preserveAspectRatio='none'%3E%3Cpath fill='%23163a4d' fill-opacity='.55' d='M0 470 180 330l120 70 180-200 140 150 140-100 140 120 180-220 160 180 160-80 200 120V900H0z'/%3E%3Cpath fill='%230f2b3b' d='M0 600 200 440l160 90 200-140 160 140 180-90 200 130 200-140 300 140V900H0z'/%3E%3Cpath fill='%230a1f2c' d='M0 720 260 570l220 110 220-100 260 140 240-120 400 120V900H0z'/%3E%3Cpath fill='%23061520' d='M0 820 300 700l260 80 300-60 300 90 440-80v170H0z'/%3E%3C/svg%3E");
 }
 
 /* --------------------------------------------------------------------------
@@ -263,8 +265,8 @@ p {
 .icon-btn {
   display: inline-grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   color: var(--cream);
   transition: color 0.15s;
 }
@@ -417,7 +419,7 @@ p {
   height: 100%;
   border-radius: 50%;
   object-fit: cover;
-  background: radial-gradient(circle at 35% 30%, #1d5a78, var(--blue-7) 70%);
+  background: var(--avatar);
 }
 /* Pas encore d'image : on cache l'<img> (sinon icône « image cassée ») et
    le conteneur peint lui-même le fond bleu à l'intérieur de l'anneau doré. */
@@ -428,18 +430,18 @@ p {
 .summoner-icon:has(> .summoner-icon__img:not([src])),
 .summoner-icon:has(> .summoner-icon__img[src='']) {
   background:
-    radial-gradient(circle at 35% 30%, #1d5a78, var(--blue-7) 70%) content-box,
+    var(--avatar) content-box,
     var(--gold-border) border-box;
   background-clip: content-box, border-box;
 }
 .summoner-icon--profile:has(> .summoner-icon__img[src='']) {
   background:
-    radial-gradient(circle at 35% 30%, #1d5a78, var(--blue-7) 70%) content-box,
+    var(--avatar) content-box,
     conic-gradient(from 200deg, var(--gold-4), var(--gold-1), var(--gold-3), var(--gold-4)) border-box;
 }
 
 .summoner-icon--friend {
-  --size: 32px;
+  --size: 34px;
   padding: 1px;
 }
 .summoner-icon--profile {
@@ -448,9 +450,9 @@ p {
   background: conic-gradient(from 200deg, var(--gold-4), var(--gold-1), var(--gold-3), var(--gold-4));
 }
 .summoner-icon--banner {
-  --size: 96px;
+  --size: 100px;
   padding: 3px;
-  box-shadow: 0 0 0 3px var(--black), 0 0 18px rgba(200, 170, 110, 0.35);
+  box-shadow: 0 0 0 3px var(--black), 0 0 20px rgba(200, 170, 110, 0.35);
 }
 
 .summoner-icon__level {
@@ -487,8 +489,8 @@ p {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--status-offline);
 }
 .presence::before {
@@ -512,8 +514,8 @@ p {
 .round-btn {
   position: relative;
   flex: none;
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   background:
     radial-gradient(circle, #1e2328 60%, #0b0f13) padding-box,
@@ -548,8 +550,8 @@ p {
   position: relative;
   display: grid;
   place-items: center;
-  width: 200px;
-  height: 40px;
+  width: 212px;
+  height: 42px;
   padding: 2px;
   background: var(--blue-border);
   clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%);
@@ -560,20 +562,20 @@ p {
   position: absolute;
   inset: 2px;
   clip-path: polygon(0 0, calc(100% - 15px) 0, 100% 50%, calc(100% - 15px) 100%, 0 100%);
-  background: linear-gradient(180deg, #1e2328 0%, #121619 100%);
+  background: linear-gradient(180deg, #1e2a30 0%, #111619 100%);
   transition: background 0.15s;
 }
 .confirm-btn__label {
   position: relative;
   padding-right: 10px;
   font-weight: 700;
-  font-size: 14px;
-  letter-spacing: 0.08em;
+  font-size: 15px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--cream);
 }
 .confirm-btn:hover:not(:disabled) {
-  filter: drop-shadow(0 0 8px rgba(10, 200, 185, 0.45));
+  filter: drop-shadow(0 0 10px rgba(10, 200, 185, 0.55));
 }
 .confirm-btn:hover:not(:disabled)::before {
   background: linear-gradient(180deg, #1b3942 0%, #10222a 100%);
@@ -597,10 +599,11 @@ p {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px 6px 6px;
+  padding: 6px 12px 6px 6px;
   transform: translateX(-50%);
   background: rgba(1, 10, 19, 0.92);
-  border: 1px solid var(--line-soft);
+  border: 1px solid rgba(70, 55, 20, 0.9);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
 }
 
 /* --------------------------------------------------------------------------
@@ -615,8 +618,8 @@ p {
   overflow-y: auto;
   background:
     radial-gradient(ellipse at 50% 30%, rgba(10, 50, 60, 0.45), transparent 60%),
-    var(--mountains) bottom / 100% 70% no-repeat,
-    linear-gradient(180deg, #0b2233 0%, #06141f 60%, var(--black) 100%);
+    var(--home-image) center bottom / cover no-repeat,
+    var(--black);
 }
 
 .login-card {
@@ -706,7 +709,7 @@ p {
   height: 100%;
   border-radius: 50%;
   object-fit: cover;
-  background: radial-gradient(circle at 35% 30%, #1d5a78, var(--blue-7) 70%);
+  background: var(--avatar);
 }
 .icon-option img:not([src]),
 .icon-option img[src=''] {
@@ -715,12 +718,12 @@ p {
 .icon-option:has(img[src='']),
 .icon-option:has(img:not([src])) {
   background:
-    radial-gradient(circle at 35% 30%, #1d5a78, var(--blue-7) 70%) content-box,
+    var(--avatar) content-box,
     var(--grey-3) border-box;
 }
 .icon-option:has(img[src='']):has(input:checked) {
   background:
-    radial-gradient(circle at 35% 30%, #1d5a78, var(--blue-7) 70%) content-box,
+    var(--avatar) content-box,
     var(--gold-border-bright) border-box;
 }
 .icon-option:hover {
@@ -769,9 +772,9 @@ p {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 32px;
+  gap: 28px;
   min-width: 0;
-  padding: 0 24px 0 22px;
+  padding: 0 20px 0 22px;
 }
 
 /* Logo + JOUER */
@@ -784,8 +787,8 @@ p {
 .play-button__logo {
   position: relative;
   z-index: 1;
-  width: 54px;
-  height: 54px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   background:
     radial-gradient(circle, #0b1a26 0 57%, transparent 59%),
@@ -800,9 +803,9 @@ p {
 .play-button__label {
   display: grid;
   place-items: center;
-  width: 128px;
+  width: 132px;
   height: 36px;
-  margin-left: -6px;
+  margin-left: -8px;
   font-weight: 700;
   font-size: 15px;
   letter-spacing: 0.1em;
@@ -838,7 +841,7 @@ p {
 .topbar__tab {
   position: relative;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 15px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--cream);
@@ -868,7 +871,7 @@ p {
   height: 42px;
 }
 .topbar__icon {
-  width: 50px;
+  width: 46px;
   height: 100%;
   background: var(--cream);
   opacity: 0.9;
@@ -908,15 +911,27 @@ p {
   align-items: center;
   gap: 8px;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--gold-1);
 }
 .wallet__row:first-child {
-  min-width: 120px;
-  padding: 3px 12px 3px 8px;
+  min-width: 128px;
+  padding: 3px 10px 3px 7px;
   border: 1px solid var(--grey-3);
   border-radius: 14px;
   background: rgba(1, 10, 19, 0.6);
+}
+.wallet__label {
+  margin-left: auto;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--grey-1);
+}
+.wallet__row:last-child {
+  padding-left: 7px;
+}
+.wallet__row:last-child .wallet__label {
+  margin-left: 0;
 }
 .wallet__icon {
   flex: none;
@@ -940,15 +955,16 @@ p {
   display: flex;
   align-items: center;
   width: var(--social-w);
-  padding: 0 12px;
+  padding: 0 14px;
   border-left: 1px solid var(--line);
 }
 
 .profile {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
+  margin-top: 6px; /* laisse la place aux boutons de fenêtre */
 }
 .profile__identity {
   display: flex;
@@ -958,7 +974,7 @@ p {
 }
 .profile__name {
   font-weight: 700;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--gold-1);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1042,25 +1058,14 @@ button.window-controls__btn:hover {
 /* Accueil : montagnes nocturnes (image facultative par-dessus) */
 .view__background--home {
   background:
-    linear-gradient(180deg, rgba(1, 10, 19, 0.35) 0%, transparent 30%, rgba(1, 10, 19, 0.4) 100%),
-    var(--home-image) center / cover no-repeat,
-    radial-gradient(ellipse at 15% 35%, rgba(120, 170, 200, 0.18), transparent 35%),
-    var(--mountains) bottom / 100% 72% no-repeat,
-    linear-gradient(180deg, #0d2536 0%, #0a1e2c 45%, #061520 100%);
+    linear-gradient(180deg, rgba(1, 10, 19, 0.3) 0%, transparent 25%),
+    var(--home-image) center bottom / cover no-repeat,
+    #0a1c2a;
 }
 
 /* Salon : Faille de l'Invocateur */
 .view__background--rift {
-  background:
-    radial-gradient(ellipse at 50% 45%, transparent 30%, rgba(1, 10, 19, 0.85) 100%),
-    linear-gradient(180deg, rgba(1, 10, 19, 0.55) 0%, rgba(1, 10, 19, 0.2) 35%, rgba(1, 10, 19, 0.9) 100%),
-    var(--rift-image) center / cover no-repeat,
-    radial-gradient(circle at 8% 92%, rgba(10, 200, 185, 0.3), transparent 14%),
-    radial-gradient(circle at 92% 8%, rgba(209, 54, 57, 0.25), transparent 14%),
-    linear-gradient(135deg, transparent 46%, rgba(3, 151, 171, 0.3) 49%, rgba(3, 151, 171, 0.3) 51%, transparent 54%),
-    radial-gradient(ellipse at 30% 30%, #173524 0%, transparent 45%),
-    radial-gradient(ellipse at 70% 70%, #173524 0%, transparent 45%),
-    linear-gradient(135deg, #0c2019 0%, #0a1a1f 50%, #0c2019 100%);
+  background: var(--rift-image) center / cover no-repeat, #0b1c17;
 }
 
 /* --------------------------------------------------------------------------
@@ -1068,7 +1073,7 @@ button.window-controls__btn:hover {
    -------------------------------------------------------------------------- */
 .view--home {
   display: grid;
-  grid-template-columns: 196px 1fr;
+  grid-template-columns: 228px 1fr;
   grid-template-rows: auto auto 1fr;
   grid-template-areas:
     'subnav subnav'
@@ -1082,10 +1087,10 @@ button.window-controls__btn:hover {
   display: flex;
   align-items: center;
   gap: 24px;
-  height: 38px;
+  height: 40px;
   padding: 0 16px 0 28px;
-  background: linear-gradient(180deg, rgba(1, 10, 19, 0.9), rgba(1, 10, 19, 0.55));
-  border-bottom: 1px solid var(--line-soft);
+  background: linear-gradient(180deg, rgba(1, 10, 19, 0.92), rgba(1, 10, 19, 0.6));
+  border-bottom: 1px solid rgba(70, 55, 20, 0.8);
 }
 .subnav__tab {
   position: relative;
@@ -1093,7 +1098,7 @@ button.window-controls__btn:hover {
   align-items: center;
   height: 100%;
   font-weight: 700;
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--cream);
@@ -1146,9 +1151,9 @@ button.window-controls__btn:hover {
 .modes {
   grid-area: modes;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 212px));
+  grid-template-columns: repeat(4, minmax(0, 224px));
   margin: 0 16px;
-  padding-top: 34px;
+  padding-top: 38px;
   border-bottom: 1px solid rgba(160, 155, 140, 0.35);
 }
 
@@ -1157,7 +1162,7 @@ button.window-controls__btn:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 0 8px 40px;
+  padding: 0 8px 36px;
   text-align: center;
   isolation: isolate;
 }
@@ -1166,12 +1171,12 @@ button.window-controls__btn:hover {
 .mode-card::after {
   content: '';
   position: absolute;
-  left: 10%;
-  right: 10%;
+  left: 6%;
+  right: 6%;
   bottom: -1px;
   z-index: -1;
-  height: 70px;
-  background: radial-gradient(ellipse at 50% 100%, rgba(240, 230, 210, 0.35), rgba(160, 190, 210, 0.08) 45%, transparent 70%);
+  height: 110px;
+  background: radial-gradient(ellipse at 50% 100%, rgba(240, 230, 210, 0.34), rgba(130, 180, 210, 0.08) 45%, transparent 72%);
   opacity: 0;
   transition: opacity 0.25s;
 }
@@ -1201,15 +1206,15 @@ button.window-controls__btn:hover {
 }
 .mode-card--separated {
   border-left: 1px solid rgba(160, 155, 140, 0.35);
-  margin-top: -34px;
-  padding-top: 34px;
+  margin-top: -38px;
+  padding-top: 38px;
 }
 
 /* Emblème SVG */
 .emblem {
-  width: 76px;
-  height: 76px;
-  margin-bottom: 18px;
+  width: 84px;
+  height: 84px;
+  margin-bottom: 20px;
   overflow: visible;
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6));
   transition: transform 0.25s var(--ease), filter 0.25s;
@@ -1233,15 +1238,15 @@ button.window-controls__btn:hover {
   fill: url(#g-blue);
 }
 .mode-card.is-selected .emblem__glyph {
-  fill: #e8fbff;
+  fill: #eafcff;
 }
 .mode-card.is-selected .emblem {
-  filter: drop-shadow(0 0 12px rgba(10, 200, 185, 0.35));
+  filter: drop-shadow(0 0 14px rgba(10, 200, 185, 0.45));
 }
 
 .mode-card__tag {
   font-weight: 700;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--gold-1);
 }
 
@@ -1249,8 +1254,8 @@ button.window-controls__btn:hover {
   margin-top: 6px;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 21px;
-  line-height: 1.3;
+  font-size: 23px;
+  line-height: 1.25;
   letter-spacing: 0.02em;
   text-transform: uppercase;
   color: var(--cream);
@@ -1261,7 +1266,7 @@ button.window-controls__btn:hover {
 }
 .mode-card.is-selected .mode-card__title {
   color: #fff;
-  text-shadow: 0 0 12px rgba(240, 230, 210, 0.35);
+  text-shadow: 0 0 14px rgba(240, 230, 210, 0.35);
 }
 
 /* Détails du mode (colonne gauche) */
@@ -1277,7 +1282,7 @@ button.window-controls__btn:hover {
 .mode-details__text {
   padding-bottom: 16px;
   font-weight: 500;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.55;
   color: var(--gold-1);
   border-bottom: 1px solid rgba(160, 155, 140, 0.35);
@@ -1313,7 +1318,7 @@ button.window-controls__btn:hover {
 }
 .variant__title {
   font-weight: 700;
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--cream);
@@ -1344,10 +1349,10 @@ button.window-controls__btn:hover {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  height: 38px;
+  height: 40px;
   padding: 0 16px 0 28px;
-  background: linear-gradient(180deg, rgba(1, 10, 19, 0.9), rgba(1, 10, 19, 0.55));
-  border-bottom: 1px solid var(--line-soft);
+  background: linear-gradient(180deg, rgba(1, 10, 19, 0.92), rgba(1, 10, 19, 0.6));
+  border-bottom: 1px solid rgba(70, 55, 20, 0.8);
 }
 
 .breadcrumb__list {
@@ -1355,7 +1360,7 @@ button.window-controls__btn:hover {
   align-items: center;
   gap: 10px;
   font-weight: 700;
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0.08em;
 }
 .breadcrumb__item {
@@ -1401,18 +1406,19 @@ button.window-controls__btn:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: clamp(10px, 1.6vw, 22px);
+  align-items: flex-start;
+  gap: clamp(10px, 1.6vw, 20px);
   min-height: 0;
-  padding: 18px 24px 8px;
+  padding: 22px 24px 8px;
 }
 
 .banner {
-  --banner-w: clamp(128px, 12vw, 176px);
+  --banner-w: clamp(132px, 13vw, 176px);
   --notch: 22px;
   position: relative;
   flex: none;
   width: var(--banner-w);
-  height: min(100%, 430px);
+  height: min(100%, 400px);
   min-height: 280px;
   /* forme de fanion : pointe en bas */
   clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--notch)), 50% 100%, 0 calc(100% - var(--notch)));
@@ -1449,11 +1455,11 @@ button.window-controls__btn:hover {
 
 .banner__plus {
   position: relative;
-  width: 56px;
-  height: 56px;
+  width: 58px;
+  height: 58px;
   border-radius: 50%;
   background:
-    radial-gradient(circle, rgba(1, 10, 19, 0.9) 60%, rgba(1, 10, 19, 0.6)) padding-box,
+    radial-gradient(circle, rgba(1, 10, 19, 0.95) 60%, rgba(1, 10, 19, 0.6)) padding-box,
     var(--gold-border) border-box;
   border: 2px solid transparent;
   transition: box-shadow 0.2s, transform 0.2s var(--ease);
@@ -1483,26 +1489,61 @@ button.window-controls__btn:hover {
   background: var(--gold-1);
 }
 
+.banner.is-pending {
+  background: linear-gradient(180deg, rgba(10, 200, 185, 0.55), rgba(0, 90, 130, 0.25));
+}
+.banner.is-pending::before {
+  background: linear-gradient(180deg, rgba(1, 18, 26, 0.82), rgba(1, 10, 19, 0.55));
+}
+.banner.is-pending .banner__invite {
+  display: none;
+}
 .banner__pending {
   position: absolute;
-  z-index: 2;
-  left: 8px;
-  right: 8px;
-  bottom: calc(var(--notch) + 40px);
-  font-size: 11px;
-  font-style: italic;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 0 10px;
   text-align: center;
-  color: var(--blue-2);
   pointer-events: none;
+}
+.banner__pending-icon {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: 2px dashed var(--blue-2);
+  animation: spin 12s linear infinite;
+}
+.banner__pending-icon::before {
+  /* aiguilles d'horloge */
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 14px;
+  width: 8px;
+  height: 13px;
+  border-left: 2px solid var(--blue-2);
+  border-bottom: 2px solid var(--blue-2);
+}
+.banner__pending-label {
+  display: block;
+  font-size: 12px;
+  color: var(--grey-1);
+}
+.banner__pending-name {
+  display: block;
+  max-width: 100%;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--status-game);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  animation: pulse 1.6s ease-in-out infinite;
-}
-.banner__pending::before {
-  content: 'Invité : ';
-  font-style: normal;
-  color: var(--grey-1);
 }
 
 /* Drag & drop */
@@ -1550,7 +1591,7 @@ button.window-controls__btn:hover {
   flex-direction: column;
   align-items: center;
   height: 100%;
-  padding: 44px 12px calc(var(--notch) + 14px);
+  padding: 46px 12px calc(var(--notch) + 12px);
   text-align: center;
 }
 
@@ -1568,16 +1609,19 @@ button.window-controls__btn:hover {
   max-width: 100%;
   margin-top: 16px;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 16px;
   color: var(--gold-1);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .banner__status {
-  margin-top: 3px;
-  font-size: 11px;
-  color: var(--grey-1);
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--success);
+}
+.banner.is-owner .banner__status {
+  color: var(--gold-2);
 }
 .banner.is-disconnected .banner__status {
   color: var(--danger);
@@ -1605,8 +1649,8 @@ button.window-controls__btn:hover {
 }
 .role-picker__label {
   font-weight: 700;
-  font-size: 11px;
-  letter-spacing: 0.08em;
+  font-size: 12px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--cream);
 }
@@ -1653,8 +1697,8 @@ button.window-controls__btn:hover {
 /* Icônes de rôle (glyphes géométriques façon client) */
 .role-icon {
   display: block;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   background: var(--gold-2);
   -webkit-mask: var(--role) center / contain no-repeat;
   mask: var(--role) center / contain no-repeat;
@@ -1688,19 +1732,19 @@ button.window-controls__btn:hover {
 .lobby__footer {
   flex: none;
   position: relative;
-  height: 200px;
+  height: 180px;
 }
 
 .chat {
   position: absolute;
-  left: 12px;
-  bottom: 12px;
+  left: 14px;
+  bottom: 14px;
   display: flex;
   flex-direction: column;
-  width: min(34%, 340px);
-  height: 184px;
-  background: linear-gradient(180deg, rgba(1, 10, 19, 0.35), rgba(1, 10, 19, 0.85));
-  border: 1px solid var(--line-soft);
+  width: min(34%, 330px);
+  height: 150px;
+  background: linear-gradient(180deg, rgba(1, 10, 19, 0.45), rgba(1, 10, 19, 0.9));
+  border: 1px solid rgba(70, 55, 20, 0.9);
 }
 
 .chat__messages {
@@ -1713,8 +1757,8 @@ button.window-controls__btn:hover {
   user-select: text;
 }
 .chat__message {
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: 13px;
+  line-height: 1.4;
   color: var(--gold-1);
   overflow-wrap: anywhere;
   animation: fade-in 0.2s ease-out;
@@ -1753,10 +1797,11 @@ button.window-controls__btn:hover {
 }
 .chat__input {
   width: 100%;
-  padding: 8px 10px;
+  height: 34px;
+  padding: 0 10px;
   border: 0;
   outline: none;
-  font-size: 12px;
+  font-size: 13px;
   background: rgba(1, 10, 19, 0.85);
   user-select: text;
 }
@@ -1772,7 +1817,16 @@ button.window-controls__btn:hover {
   justify-content: center;
 }
 .confirm-btn--find {
-  width: 220px;
+  width: 236px;
+  height: 44px;
+}
+.confirm-btn--find .confirm-btn__label {
+  font-size: 16px;
+  letter-spacing: 0.12em;
+  color: #e6fbfb;
+}
+.confirm-btn--find.is-searching::before {
+  background: linear-gradient(180deg, #0f4b5a, #0a323c);
 }
 .confirm-btn--find.is-searching::after {
   content: '';
@@ -1787,13 +1841,14 @@ button.window-controls__btn:hover {
   top: calc(100% + 2px);
   left: 0;
   right: 0;
-  font-size: 10px;
+  top: calc(100% + 6px);
+  font-size: 11px;
   text-align: center;
   color: var(--grey-1);
   white-space: nowrap;
 }
 .confirm-bar--lobby {
-  bottom: 26px;
+  bottom: 30px;
 }
 
 /* --------------------------------------------------------------------------
@@ -1814,13 +1869,13 @@ button.window-controls__btn:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 38px;
-  padding: 0 6px 0 12px;
+  height: 40px;
+  padding: 0 6px 0 14px;
   border-bottom: 1px solid var(--line-soft);
 }
 .social__heading {
   font-weight: 700;
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--cream);
@@ -1839,9 +1894,9 @@ button.window-controls__btn:hover {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px 6px;
+  padding: 12px 14px 6px;
   font-weight: 700;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--cream);
@@ -1870,9 +1925,9 @@ button.window-controls__btn:hover {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
-  height: 48px;
-  padding: 0 10px 0 8px;
+  gap: 11px;
+  height: 50px;
+  padding: 0 10px;
   border-left: 2px solid transparent;
   cursor: grab;
   transition: background 0.12s, border-color 0.12s;
@@ -1895,15 +1950,16 @@ button.window-controls__btn:hover {
   min-width: 0;
 }
 .friend__name {
-  font-weight: 500;
-  font-size: 13px;
-  color: #d8d4c8;
+  font-weight: 600;
+  font-size: 14px;
+  color: #dcd6c8;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .friend__status {
-  font-size: 11px;
+  font-weight: 500;
+  font-size: 12px;
   color: var(--grey-1);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1961,6 +2017,14 @@ button.window-controls__btn:hover {
 }
 .social__empty strong {
   color: var(--cream);
+}
+.social__hint {
+  margin: 14px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--grey-1);
+  border: 1px dashed rgba(120, 90, 40, 0.7);
 }
 
 /* Barre du bas du panneau social */

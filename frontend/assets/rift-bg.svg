@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 640" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <radialGradient id="vig" cx=".5" cy=".45" r=".75">
+      <stop offset=".35" stop-color="#010a13" stop-opacity=".15"/>
+      <stop offset="1" stop-color="#010a13" stop-opacity=".92"/>
+    </radialGradient>
+    <linearGradient id="river" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a6b7a"/>
+      <stop offset="1" stop-color="#0a3d52"/>
+    </linearGradient>
+  </defs>
+  <rect width="1040" height="640" fill="#0b1c17"/>
+  <!-- jungles -->
+  <ellipse cx="300" cy="200" rx="260" ry="150" fill="#12301f" fill-opacity=".8"/>
+  <ellipse cx="760" cy="450" rx="260" ry="150" fill="#12301f" fill-opacity=".8"/>
+  <ellipse cx="260" cy="470" rx="180" ry="110" fill="#0f271a"/>
+  <ellipse cx="800" cy="170" rx="180" ry="110" fill="#0f271a"/>
+  <!-- rivière -->
+  <path d="M-40 60C220 180 380 260 520 320s300 140 560 280" fill="none" stroke="url(#river)" stroke-width="70" stroke-opacity=".55"/>
+  <!-- voies : mid, top, bot -->
+  <path d="M30 610 1010 30" stroke="#c8aa6e" stroke-opacity=".1" stroke-width="26"/>
+  <path d="M40 600V60h940" fill="none" stroke="#c8aa6e" stroke-opacity=".08" stroke-width="24"/>
+  <path d="M60 610h940V70" fill="none" stroke="#c8aa6e" stroke-opacity=".08" stroke-width="24"/>
+  <!-- bases -->
+  <circle cx="60" cy="590" r="70" fill="#0ac8b9" fill-opacity=".12"/>
+  <circle cx="990" cy="50" r="70" fill="#d13639" fill-opacity=".12"/>
+  <rect width="1040" height="640" fill="url(#vig)"/>
+  <rect width="1040" height="640" fill="#010a13" fill-opacity=".35"/>
+</svg>

@@ -8,8 +8,8 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <!-- Beaufort for LoL / Spiegel ne sont pas libres : Cinzel + Inter en remplacement -->
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Beaufort for LoL / Spiegel ne sont pas libres : Cinzel + Barlow en remplacement -->
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/board.css">
@@ -87,7 +87,6 @@
 
         <div class="topbar__icons" aria-hidden="true">
           <span class="topbar__icon topbar__icon--missions"></span>
-          <span class="topbar__icon topbar__icon--profile"></span>
           <span class="topbar__icon topbar__icon--collection"></span>
           <span class="topbar__icon topbar__icon--loot"></span>
           <span class="topbar__icon topbar__icon--store"></span>
@@ -97,10 +96,12 @@
           <span class="wallet__row" title="Or">
             <span class="wallet__icon wallet__icon--gold" aria-hidden="true"></span>
             <span class="wallet__value" id="gold-balance">1500</span>
+            <span class="wallet__label">OR</span>
           </span>
           <span class="wallet__row" title="Victoires">
             <span class="wallet__icon wallet__icon--wins" aria-hidden="true"></span>
             <span class="wallet__value" id="wins-count">0</span>
+            <span class="wallet__label">VICTOIRES</span>
           </span>
         </div>
       </div>
@@ -354,6 +355,7 @@
               Aucun ami pour l'instant.<br>Clique sur <strong>+</strong> pour en ajouter.
             </p>
           </details>
+          <p class="social__hint">Glisse un ami sur un emplacement vide du salon, ou clic droit › Inviter.</p>
         </div>
 
         <footer class="social__footer">
@@ -505,13 +507,20 @@
     </div>
   </template>
 
-  <!-- Emplacement vide (avec éventuelle invitation en attente) -->
+  <!-- Emplacement vide. Invitation en attente : ajouter .is-pending sur .banner,
+       retirer [hidden] de .banner__pending et remplir .banner__pending-name -->
   <template id="tpl-banner-empty">
     <div class="banner banner--empty" data-slot="" data-dropzone="true" role="listitem">
       <button class="banner__invite" type="button" data-invite-slot="" aria-label="Inviter un ami">
         <span class="banner__plus" aria-hidden="true"></span>
       </button>
-      <span class="banner__pending" hidden></span>
+      <div class="banner__pending" hidden>
+        <span class="banner__pending-icon" aria-hidden="true"></span>
+        <span>
+          <span class="banner__pending-label">Invitation envoyée</span>
+          <span class="banner__pending-name"></span>
+        </span>
+      </div>
     </div>
   </template>
 
