@@ -1151,7 +1151,7 @@ button.window-controls__btn:hover {
 .modes {
   grid-area: modes;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 224px));
+  grid-template-columns: repeat(5, minmax(0, 201px));
   margin: 0 16px;
   padding-top: 38px;
   border-bottom: 1px solid rgba(160, 155, 140, 0.35);
@@ -1334,6 +1334,123 @@ button.window-controls__btn:hover {
 
 .join-form {
   padding-top: 16px;
+}
+
+
+/* Boutique : catégories (colonne gauche) */
+.shop-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 16px;
+}
+.shop-category {
+  display: flex;
+  flex-direction: column;
+  padding-left: 18px;
+  position: relative;
+}
+.shop-category::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 6px;
+  width: 7px;
+  height: 7px;
+  background: var(--gold-3);
+  transform: rotate(45deg);
+}
+.shop-category__title {
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gold-1);
+}
+.shop-category__text {
+  font-size: 12px;
+  color: var(--grey-1);
+}
+
+/* Boutique : fenêtre */
+.shop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--grey-3);
+}
+.shop-tabs {
+  display: flex;
+  gap: 22px;
+}
+.shop-tabs__tab {
+  position: relative;
+  padding: 8px 0;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cream);
+}
+.shop-tabs__tab:hover,
+.shop-tabs__tab.is-active {
+  color: var(--gold-1);
+}
+.shop-tabs__tab.is-active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 3px;
+  background: var(--gold-3);
+}
+.shop-balance {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: var(--gold-1);
+}
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  min-height: 180px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+/* Carte d'article (générée à l'Étape 4) */
+.shop-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px 10px;
+  text-align: center;
+  background: #0d1318;
+  border: 1px solid var(--grey-4);
+  transition: border-color 0.15s;
+}
+.shop-item:hover {
+  border-color: var(--gold-4);
+}
+.shop-item__name {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--gold-1);
+}
+.shop-item__price {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--gold-2);
+}
+.shop-item.is-owned .shop-item__price {
+  color: var(--success);
 }
 
 /* --------------------------------------------------------------------------

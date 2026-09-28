@@ -187,6 +187,16 @@
               <span class="mode-card__tag">Options</span>
               <span class="mode-card__title">Paramètres</span>
             </button>
+
+            <button class="mode-card" type="button" role="radio" aria-checked="false" data-mode="shop">
+              <svg class="emblem" viewBox="0 0 80 80" aria-hidden="true">
+                <path class="emblem__frame" d="M8 30 20 10h40l12 20v40H8z"/>
+                <path class="emblem__fill" d="M15 33 24 17h32l9 16v31H15z"/>
+                <path class="emblem__glyph" d="M40 31l10 12-10 12-10-12zM15 41h12v4H15zM53 41h12v4H53z"/>
+              </svg>
+              <span class="mode-card__tag">Or</span>
+              <span class="mode-card__title">Boutique</span>
+            </button>
           </div>
 
           <!-- Détails du mode sélectionné (colonne gauche, sous les cartes) -->
@@ -232,6 +242,17 @@
               <p class="mode-details__text">
                 Son, affichage du chat, animations et déconnexion.
               </p>
+            </div>
+
+            <div class="mode-details__panel" data-panel="shop" hidden>
+              <p class="mode-details__text">
+                Dépense l'or gagné en partie pour débloquer de nouveaux pions, icônes et bannières.
+              </p>
+              <ul class="shop-categories">
+                <li class="shop-category"><span class="shop-category__title">Pions</span><span class="shop-category__text">Ton champion sur le plateau</span></li>
+                <li class="shop-category"><span class="shop-category__title">Icônes</span><span class="shop-category__text">Ton avatar d'invocateur</span></li>
+                <li class="shop-category"><span class="shop-category__title">Bannières</span><span class="shop-category__text">La couleur de ta place au salon</span></li>
+              </ul>
             </div>
           </div>
 
@@ -488,6 +509,26 @@
         <button class="btn btn--primary" type="submit" value="confirm">Enregistrer</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- Boutique -->
+  <dialog class="modal modal--wide hextech-frame" id="modal-shop" aria-labelledby="modal-shop-title">
+    <div class="modal__body">
+      <h2 class="modal__title" id="modal-shop-title">Boutique</h2>
+      <div class="shop-head">
+        <div class="shop-tabs" role="tablist">
+          <button class="shop-tabs__tab is-active" type="button" role="tab" aria-selected="true" data-shop-tab="tokens">Pions</button>
+          <button class="shop-tabs__tab" type="button" role="tab" aria-selected="false" data-shop-tab="icons">Icônes</button>
+          <button class="shop-tabs__tab" type="button" role="tab" aria-selected="false" data-shop-tab="banners">Bannières</button>
+        </div>
+        <span class="shop-balance"><span class="wallet__icon wallet__icon--gold" aria-hidden="true"></span><span id="shop-balance">1500</span></span>
+      </div>
+      <!-- Rempli à l'Étape 4 : <li class="shop-item"> (image, nom, prix, bouton Acheter) -->
+      <ul class="shop-grid" id="shop-items"></ul>
+      <div class="modal__actions">
+        <button class="btn btn--secondary" type="button" data-close-modal>Fermer</button>
+      </div>
+    </div>
   </dialog>
 
   <!-- Paramètres -->
