@@ -1319,18 +1319,15 @@ button.window-controls__btn:hover {
   position: absolute;
   inset: 0;
   clip-path: polygon(40% 14.4%, 82.75% 14.4%, 59.75% 85.6%, 17% 85.6%);
-  background: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/spell/SummonerTeleport.png') center / 72% no-repeat;
-  opacity: 0.8;
-  filter: saturate(0.75) brightness(0.85);
-  transition: opacity 0.2s, filter 0.2s;
+  background: url('../assets/teleport.png') center / cover no-repeat;
+  filter: saturate(0.7) brightness(0.72);
+  transition: filter 0.2s;
 }
 .mode-card:hover .emblem__spell {
-  opacity: 0.95;
-  filter: none;
+  filter: saturate(0.9) brightness(0.9);
 }
 .mode-card.is-selected .emblem__spell {
-  opacity: 1;
-  filter: saturate(1.1) brightness(1.1);
+  filter: saturate(1.15) brightness(1.1);
 }
 .emblem__swirl {
   transform-box: view-box;
