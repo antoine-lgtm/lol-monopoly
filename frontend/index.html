@@ -9,17 +9,38 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <!-- Beaufort for LoL / Spiegel ne sont pas libres : Cinzel + Inter en remplacement -->
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/board.css">
 </head>
-<body class="client" data-view="lobby">
+<body class="client">
+
+  <!-- Dégradés partagés par les emblèmes SVG -->
+  <svg class="svg-defs" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="g-gold" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#f0e6d2"/>
+        <stop offset=".45" stop-color="#c8aa6e"/>
+        <stop offset="1" stop-color="#785a28"/>
+      </linearGradient>
+      <linearGradient id="g-dark" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#1e2a3a"/>
+        <stop offset="1" stop-color="#0a1428"/>
+      </linearGradient>
+      <linearGradient id="g-blue" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#5fd6e8"/>
+        <stop offset=".5" stop-color="#0397ab"/>
+        <stop offset="1" stop-color="#005a82"/>
+      </linearGradient>
+    </defs>
+  </svg>
 
   <!-- =====================================================================
-       ÉCRAN DE CONNEXION (pseudo + icône d'invocateur)
+       ÉCRAN DE CONNEXION — masqué par défaut, affiché par main.js
+       tant que le joueur n'a pas choisi de pseudo.
        ===================================================================== -->
-  <div class="login-screen" id="login-screen" role="dialog" aria-modal="true" aria-labelledby="login-title">
+  <div class="login-screen" id="login-screen" role="dialog" aria-modal="true" aria-labelledby="login-title" hidden>
     <form class="login-card hextech-frame" id="login-form" autocomplete="off">
       <div class="login-card__logo" aria-hidden="true"></div>
       <h1 class="login-card__title" id="login-title">Connexion</h1>
@@ -32,224 +53,316 @@
 
       <fieldset class="icon-picker">
         <legend class="field__label">Icône d'invocateur</legend>
-        <!-- Rempli par main.js (ICON_COUNT icônes, radio name="icon") -->
+        <!-- Rempli par main.js : <label class="icon-option"><input type="radio" name="icon"><img></label> -->
         <div class="icon-picker__grid" id="login-icons"></div>
       </fieldset>
 
       <p class="form-error" id="login-error" role="alert" hidden></p>
 
-      <button class="btn btn--primary login-card__submit" type="submit">
-        <span>Se connecter</span>
-      </button>
+      <button class="btn btn--primary login-card__submit" type="submit">Se connecter</button>
     </form>
   </div>
 
   <!-- =====================================================================
        CLIENT
        ===================================================================== -->
-  <div class="client-shell" id="client-shell" hidden>
+  <div class="client-shell" id="client-shell">
 
     <!-- ----------------------------------------------------------------
          BARRE SUPÉRIEURE
          ---------------------------------------------------------------- -->
     <header class="topbar">
-      <div class="topbar__left">
-        <!-- Bouton "PLAY" : ouvre le menu déroulant de navigation -->
-        <div class="play-menu" id="play-menu">
-          <button class="play-button" id="play-menu-toggle" type="button"
-                  aria-haspopup="menu" aria-expanded="false" aria-controls="play-menu-list">
-            <span class="play-button__logo" aria-hidden="true"></span>
-            <span class="play-button__label">JOUER</span>
-            <span class="play-button__caret" aria-hidden="true"></span>
-          </button>
+      <div class="topbar__main">
+        <!-- JOUER : ramène à l'écran de sélection de mode -->
+        <button class="play-button is-active" id="play-button" type="button" data-nav="home">
+          <span class="play-button__logo" aria-hidden="true"></span>
+          <span class="play-button__label">JOUER</span>
+        </button>
 
-          <ul class="dropdown" id="play-menu-list" role="menu" hidden>
-            <li role="none">
-              <button class="dropdown__item" type="button" role="menuitem" data-action="create-lobby">
-                <span class="dropdown__icon dropdown__icon--create" aria-hidden="true"></span>
-                Créer un lobby
-              </button>
-            </li>
-            <li role="none">
-              <button class="dropdown__item" type="button" role="menuitem" data-action="join-lobby">
-                <span class="dropdown__icon dropdown__icon--join" aria-hidden="true"></span>
-                Rejoindre un lobby
-              </button>
-            </li>
-            <li role="none">
-              <button class="dropdown__item" type="button" role="menuitem" data-action="add-friend">
-                <span class="dropdown__icon dropdown__icon--friend" aria-hidden="true"></span>
-                Ajouter des amis
-              </button>
-            </li>
-            <li class="dropdown__separator" role="separator"></li>
-            <li role="none">
-              <button class="dropdown__item" type="button" role="menuitem" data-action="settings">
-                <span class="dropdown__icon dropdown__icon--settings" aria-hidden="true"></span>
-                Paramètres
-              </button>
-            </li>
-          </ul>
+        <nav class="topbar__nav" aria-label="Navigation principale">
+          <a class="topbar__tab is-active" href="#" data-nav="home" aria-current="page">Monopoly<span class="topbar__dot" aria-hidden="true"></span></a>
+          <a class="topbar__tab" href="#" data-nav="rules">Règles</a>
+          <a class="topbar__tab" href="#" data-nav="collection">Collection</a>
+        </nav>
+
+        <div class="topbar__icons" aria-hidden="true">
+          <span class="topbar__icon topbar__icon--missions"></span>
+          <span class="topbar__icon topbar__icon--profile"></span>
+          <span class="topbar__icon topbar__icon--collection"></span>
+          <span class="topbar__icon topbar__icon--loot"></span>
+          <span class="topbar__icon topbar__icon--store"></span>
         </div>
 
-        <!-- Onglets décoratifs façon client -->
-        <nav class="topbar__nav" aria-label="Navigation principale">
-          <a class="topbar__tab is-active" href="#" aria-current="page">Accueil</a>
-          <a class="topbar__tab" href="#" aria-disabled="true">Monopoly</a>
-          <a class="topbar__tab" href="#" aria-disabled="true">Règles</a>
-        </nav>
+        <div class="wallet">
+          <span class="wallet__row" title="Or">
+            <span class="wallet__icon wallet__icon--gold" aria-hidden="true"></span>
+            <span class="wallet__value" id="gold-balance">1500</span>
+          </span>
+          <span class="wallet__row" title="Victoires">
+            <span class="wallet__icon wallet__icon--wins" aria-hidden="true"></span>
+            <span class="wallet__value" id="wins-count">0</span>
+          </span>
+        </div>
       </div>
 
-      <div class="topbar__right">
-        <div class="currency" title="Or">
-          <span class="currency__icon currency__icon--gold" aria-hidden="true"></span>
-          <span class="currency__value" id="gold-balance">1500</span>
+      <!-- Profil (au-dessus du panneau social, comme dans le client) -->
+      <div class="topbar__profile">
+        <div class="profile">
+          <div class="summoner-icon summoner-icon--profile" id="profile-icon">
+            <img class="summoner-icon__img" id="profile-icon-img" src="" alt="">
+            <span class="summoner-icon__level" id="profile-level">1</span>
+          </div>
+          <div class="profile__identity">
+            <span class="profile__name" id="profile-name">Invocateur</span>
+            <span class="presence" data-status="online" id="profile-status">En ligne</span>
+          </div>
         </div>
-        <div class="window-controls" aria-hidden="true">
-          <span class="window-controls__btn window-controls__btn--min"></span>
-          <span class="window-controls__btn window-controls__btn--close"></span>
+        <div class="window-controls">
+          <button class="window-controls__btn window-controls__btn--help" type="button" title="Aide">?</button>
+          <span class="window-controls__btn window-controls__btn--min" aria-hidden="true"></span>
+          <button class="window-controls__btn window-controls__btn--settings" type="button" data-action="settings" title="Paramètres"></button>
+          <span class="window-controls__btn window-controls__btn--close" aria-hidden="true"></span>
         </div>
       </div>
     </header>
 
-    <!-- ----------------------------------------------------------------
-         CONTENU PRINCIPAL
-         ---------------------------------------------------------------- -->
     <div class="client-body">
+      <main class="client-main">
 
-      <main class="lobby" id="lobby" aria-label="Salon">
-        <!-- Fond : Faille de l'Invocateur -->
-        <div class="lobby__background" aria-hidden="true"></div>
+        <!-- ==============================================================
+             VUE 1 — SÉLECTION DU MODE (écran d'arrivée)
+             ============================================================== -->
+        <section class="view view--home" id="view-home" aria-label="Choisir un mode">
+          <div class="view__background view__background--home" aria-hidden="true"></div>
 
-        <!-- En-tête : fil d'Ariane + actions -->
-        <div class="lobby__header">
-          <nav class="breadcrumb" aria-label="Fil d'Ariane">
-            <ol class="breadcrumb__list">
-              <li class="breadcrumb__item">INTRO</li>
-              <li class="breadcrumb__sep" aria-hidden="true">&gt;</li>
-              <li class="breadcrumb__item">BLIND</li>
-              <li class="breadcrumb__sep" aria-hidden="true">&gt;</li>
-              <li class="breadcrumb__item breadcrumb__item--current" aria-current="page">MONOPOLY</li>
-            </ol>
+          <nav class="subnav" aria-label="Type de partie">
+            <a class="subnav__tab is-active" href="#" aria-current="page">Privée</a>
+            <a class="subnav__tab" href="#" aria-disabled="true">Contre l'IA</a>
+            <a class="subnav__tab" href="#" aria-disabled="true">Entraînement</a>
+            <span class="subnav__sep" aria-hidden="true"></span>
+            <a class="subnav__tab" href="#" data-mode-shortcut="create">Créer une partie perso.</a>
+            <a class="subnav__tab" href="#" data-mode-shortcut="join">Rejoindre une partie perso.</a>
+            <button class="subnav__trophy" type="button" title="Classement" aria-label="Classement"></button>
           </nav>
 
-          <div class="lobby__meta">
-            <button class="lobby-code" id="lobby-code" type="button" title="Copier le code du salon">
-              <span class="lobby-code__label">Code du salon</span>
-              <span class="lobby-code__value" id="lobby-code-value">------</span>
+          <!-- Cartes de mode : radio (une seule sélectionnée) -->
+          <div class="modes" id="modes" role="radiogroup" aria-label="Mode">
+            <button class="mode-card is-selected" type="button" role="radio" aria-checked="true" data-mode="create">
+              <svg class="emblem" viewBox="0 0 80 80" aria-hidden="true">
+                <path class="emblem__frame" d="M22 6h36l16 16v36L58 74H22L6 58V22z"/>
+                <path class="emblem__fill" d="M25 13h30l12 12v30L55 67H25L13 55V25z"/>
+                <path class="emblem__glyph" d="M36.5 25h7v11.5H55v7H43.5V55h-7V43.5H25v-7h11.5z"/>
+              </svg>
+              <span class="mode-card__tag">2 à 5 joueurs</span>
+              <span class="mode-card__title">Créer une partie</span>
             </button>
-            <button class="icon-btn icon-btn--leave" id="leave-lobby" type="button" title="Quitter le salon">
-              <span class="visually-hidden">Quitter le salon</span>
-            </button>
-          </div>
-        </div>
 
-        <!-- Bannières des joueurs (5 emplacements = 5 rôles) -->
-        <section class="banners" id="banners" role="list" aria-label="Joueurs du salon">
-          <!-- Chaque emplacement est une zone de dépôt (drag & drop depuis la liste d'amis).
-               lobby.js remplace le contenu à chaque `lobby:state`. -->
-          <div class="banner banner--empty" data-slot="0" data-dropzone="true" role="listitem">
-            <button class="banner__invite" type="button" data-invite-slot="0" aria-label="Inviter un ami dans l'emplacement 1">
-              <span class="banner__plus" aria-hidden="true">+</span>
+            <button class="mode-card" type="button" role="radio" aria-checked="false" data-mode="join">
+              <svg class="emblem" viewBox="0 0 80 80" aria-hidden="true">
+                <path class="emblem__frame" d="M26 4h50L54 76H4z"/>
+                <path class="emblem__fill" d="M31 12h34L49 68H15z"/>
+                <path class="emblem__glyph" d="M24 36h16v-8l14 12-14 12v-8H24z"/>
+              </svg>
+              <span class="mode-card__tag">Code</span>
+              <span class="mode-card__title">Rejoindre une partie</span>
+            </button>
+
+            <button class="mode-card" type="button" role="radio" aria-checked="false" data-mode="skin">
+              <svg class="emblem" viewBox="0 0 80 80" aria-hidden="true">
+                <path class="emblem__frame" d="M40 3l32 11v26c0 20-14 32-32 37C22 72 8 60 8 40V14z"/>
+                <path class="emblem__fill" d="M40 12l24 8v20c0 14-10 24-24 28-14-4-24-14-24-28V20z"/>
+                <path class="emblem__glyph" d="M40 24l4.5 11.5L56 40l-11.5 4.5L40 56l-4.5-11.5L24 40l11.5-4.5z"/>
+              </svg>
+              <span class="mode-card__tag">Collection</span>
+              <span class="mode-card__title">Skin</span>
+            </button>
+
+            <button class="mode-card mode-card--separated" type="button" role="radio" aria-checked="false" data-mode="settings">
+              <svg class="emblem" viewBox="0 0 80 80" aria-hidden="true">
+                <circle class="emblem__frame" cx="40" cy="40" r="35"/>
+                <circle class="emblem__fill" cx="40" cy="40" r="27"/>
+                <path class="emblem__glyph" fill-rule="evenodd" transform="translate(24 24) scale(2)" d="M6.8 0h2.4l.4 2.1 1.4.6 1.8-1.2 1.7 1.7-1.2 1.8.6 1.4 2.1.4v2.4l-2.1.4-.6 1.4 1.2 1.8-1.7 1.7-1.8-1.2-1.4.6-.4 2.1H6.8l-.4-2.1-1.4-.6-1.8 1.2-1.7-1.7 1.2-1.8-.6-1.4L0 9.2V6.8l2.1-.4.6-1.4-1.2-1.8 1.7-1.7 1.8 1.2 1.4-.6zM8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/>
+              </svg>
+              <span class="mode-card__tag">Options</span>
+              <span class="mode-card__title">Paramètres</span>
             </button>
           </div>
-          <div class="banner banner--empty" data-slot="1" data-dropzone="true" role="listitem">
-            <button class="banner__invite" type="button" data-invite-slot="1" aria-label="Inviter un ami dans l'emplacement 2">
-              <span class="banner__plus" aria-hidden="true">+</span>
-            </button>
+
+          <!-- Détails du mode sélectionné (colonne gauche, sous les cartes) -->
+          <div class="mode-details" id="mode-details">
+            <div class="mode-details__panel" data-panel="create">
+              <p class="mode-details__text">
+                Crée un salon privé, invite tes amis depuis la liste sociale et lance la partie
+                quand tout le monde est prêt. Seul le créateur peut lancer.
+              </p>
+              <div class="variants" role="radiogroup" aria-label="Variante">
+                <label class="variant">
+                  <input type="radio" name="variant" value="classic" checked>
+                  <span class="variant__title">Partie classique</span>
+                  <span class="variant__text">Règles complètes, Baron Nashor au 3ᵉ tour</span>
+                </label>
+                <label class="variant">
+                  <input type="radio" name="variant" value="quick">
+                  <span class="variant__title">Partie rapide</span>
+                  <span class="variant__text">Or de départ doublé, parties plus courtes</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="mode-details__panel" data-panel="join" hidden>
+              <p class="mode-details__text">
+                Entre le code à 6 caractères donné par le chef du salon pour rejoindre sa partie.
+              </p>
+              <form class="join-form" id="join-lobby-form" autocomplete="off">
+                <label class="visually-hidden" for="join-lobby-code">Code du salon</label>
+                <input class="field__input field__input--code" id="join-lobby-code" name="code" type="text"
+                       maxlength="6" placeholder="CODE" spellcheck="false">
+                <p class="form-error" role="alert" hidden></p>
+              </form>
+            </div>
+
+            <div class="mode-details__panel" data-panel="skin" hidden>
+              <p class="mode-details__text">
+                Choisis ton icône d'invocateur et le pion qui te représentera sur le plateau.
+              </p>
+            </div>
+
+            <div class="mode-details__panel" data-panel="settings" hidden>
+              <p class="mode-details__text">
+                Son, affichage du chat, animations et déconnexion.
+              </p>
+            </div>
           </div>
-          <div class="banner banner--empty" data-slot="2" data-dropzone="true" role="listitem">
-            <button class="banner__invite" type="button" data-invite-slot="2" aria-label="Inviter un ami dans l'emplacement 3">
-              <span class="banner__plus" aria-hidden="true">+</span>
+
+          <!-- Barre de confirmation (bas centre) -->
+          <div class="confirm-bar">
+            <button class="round-btn round-btn--close" type="button" id="home-cancel" title="Annuler">
+              <span class="visually-hidden">Annuler</span>
             </button>
-          </div>
-          <div class="banner banner--empty" data-slot="3" data-dropzone="true" role="listitem">
-            <button class="banner__invite" type="button" data-invite-slot="3" aria-label="Inviter un ami dans l'emplacement 4">
-              <span class="banner__plus" aria-hidden="true">+</span>
-            </button>
-          </div>
-          <div class="banner banner--empty" data-slot="4" data-dropzone="true" role="listitem">
-            <button class="banner__invite" type="button" data-invite-slot="4" aria-label="Inviter un ami dans l'emplacement 5">
-              <span class="banner__plus" aria-hidden="true">+</span>
+            <button class="confirm-btn" type="button" id="home-confirm">
+              <span class="confirm-btn__label">Confirmer</span>
             </button>
           </div>
         </section>
 
-        <!-- Bas de l'écran : chat (gauche) + FIND MATCH (centre) -->
-        <div class="lobby__footer">
+        <!-- ==============================================================
+             VUE 2 — SALON (après « Créer » ou « Rejoindre »)
+             ============================================================== -->
+        <section class="view view--lobby" id="view-lobby" aria-label="Salon" hidden>
+          <div class="view__background view__background--rift" aria-hidden="true"></div>
 
-          <section class="chat" id="chat" aria-label="Chat du salon">
-            <header class="chat__header">
-              <span class="chat__title">Salon</span>
-              <span class="chat__count" id="chat-count">1/5</span>
-            </header>
-            <ol class="chat__messages" id="chat-messages" aria-live="polite"></ol>
-            <form class="chat__form" id="chat-form" autocomplete="off">
-              <label class="visually-hidden" for="chat-input">Message</label>
-              <input class="chat__input" id="chat-input" type="text" maxlength="300"
-                     placeholder="Tapez votre message ici…">
-            </form>
-          </section>
+          <div class="lobby__header">
+            <nav class="breadcrumb" aria-label="Fil d'Ariane">
+              <ol class="breadcrumb__list">
+                <li class="breadcrumb__item">INTRO</li>
+                <li class="breadcrumb__sep" aria-hidden="true">&gt;</li>
+                <li class="breadcrumb__item">BLIND</li>
+                <li class="breadcrumb__sep" aria-hidden="true">&gt;</li>
+                <li class="breadcrumb__item breadcrumb__item--current" aria-current="page">MONOPOLY</li>
+              </ol>
+            </nav>
 
-          <div class="find-match">
-            <button class="find-match__btn" id="find-match" type="button" disabled
-                    aria-describedby="find-match-hint">
-              <span class="find-match__label">FIND MATCH</span>
+            <button class="lobby-code" id="lobby-code" type="button" title="Copier le code du salon">
+              <span class="lobby-code__label">Code du salon</span>
+              <span class="lobby-code__value" id="lobby-code-value">------</span>
             </button>
-            <p class="find-match__hint" id="find-match-hint">Seul le chef du salon peut lancer la partie.</p>
           </div>
 
-          <div class="lobby__footer-spacer" aria-hidden="true"></div>
-        </div>
+          <!-- 5 emplacements = 5 rôles. Zones de dépôt pour le drag & drop depuis la liste d'amis.
+               lobby.js reconstruit ce contenu à chaque `lobby:state`. -->
+          <div class="banners" id="banners" role="list" aria-label="Joueurs du salon">
+            <div class="banner banner--empty" data-slot="0" data-dropzone="true" role="listitem">
+              <button class="banner__invite" type="button" data-invite-slot="0" aria-label="Inviter un ami dans l'emplacement 1"><span class="banner__plus" aria-hidden="true"></span></button>
+            </div>
+            <div class="banner banner--empty" data-slot="1" data-dropzone="true" role="listitem">
+              <button class="banner__invite" type="button" data-invite-slot="1" aria-label="Inviter un ami dans l'emplacement 2"><span class="banner__plus" aria-hidden="true"></span></button>
+            </div>
+            <div class="banner banner--empty" data-slot="2" data-dropzone="true" role="listitem">
+              <button class="banner__invite" type="button" data-invite-slot="2" aria-label="Inviter un ami dans l'emplacement 3"><span class="banner__plus" aria-hidden="true"></span></button>
+            </div>
+            <div class="banner banner--empty" data-slot="3" data-dropzone="true" role="listitem">
+              <button class="banner__invite" type="button" data-invite-slot="3" aria-label="Inviter un ami dans l'emplacement 4"><span class="banner__plus" aria-hidden="true"></span></button>
+            </div>
+            <div class="banner banner--empty" data-slot="4" data-dropzone="true" role="listitem">
+              <button class="banner__invite" type="button" data-invite-slot="4" aria-label="Inviter un ami dans l'emplacement 5"><span class="banner__plus" aria-hidden="true"></span></button>
+            </div>
+          </div>
+
+          <div class="lobby__footer">
+            <section class="chat" id="chat" aria-label="Chat du salon">
+              <ol class="chat__messages" id="chat-messages" aria-live="polite"></ol>
+              <form class="chat__form" id="chat-form" autocomplete="off">
+                <label class="visually-hidden" for="chat-input">Message</label>
+                <input class="chat__input" id="chat-input" type="text" maxlength="300"
+                       placeholder="Tapez votre message ici…">
+              </form>
+            </section>
+
+            <div class="confirm-bar confirm-bar--lobby">
+              <button class="round-btn round-btn--close" type="button" id="leave-lobby" title="Quitter le salon">
+                <span class="visually-hidden">Quitter le salon</span>
+              </button>
+              <button class="confirm-btn confirm-btn--find" id="find-match" type="button" disabled
+                      aria-describedby="find-match-hint">
+                <span class="confirm-btn__label">FIND MATCH</span>
+              </button>
+              <p class="confirm-bar__hint" id="find-match-hint">Seul le chef du salon peut lancer la partie.</p>
+            </div>
+          </div>
+        </section>
       </main>
 
       <!-- ----------------------------------------------------------------
            PANNEAU SOCIAL (droite)
            ---------------------------------------------------------------- -->
-      <aside class="social" id="social" aria-label="Amis">
-        <div class="social__profile">
-          <div class="summoner-icon summoner-icon--lg" id="profile-icon">
-            <img class="summoner-icon__img" id="profile-icon-img" src="" alt="">
-          </div>
-          <div class="social__identity">
-            <span class="social__name" id="profile-name">Invocateur</span>
-            <span class="presence presence--online" id="profile-status">En ligne</span>
-          </div>
-        </div>
-
-        <div class="social__toolbar">
+      <aside class="social" id="social" aria-label="Social">
+        <header class="social__header">
           <span class="social__heading">Social</span>
-          <button class="icon-btn icon-btn--add-friend" type="button" data-action="add-friend" title="Ajouter un ami">
-            <span class="visually-hidden">Ajouter un ami</span>
-          </button>
+          <div class="social__tools">
+            <button class="icon-btn icon-btn--add-friend" type="button" data-action="add-friend" title="Ajouter des amis">
+              <span class="visually-hidden">Ajouter des amis</span>
+            </button>
+            <button class="icon-btn icon-btn--folder" type="button" title="Nouveau dossier" disabled>
+              <span class="visually-hidden">Nouveau dossier</span>
+            </button>
+            <button class="icon-btn icon-btn--sort" type="button" title="Trier" disabled>
+              <span class="visually-hidden">Trier</span>
+            </button>
+            <button class="icon-btn icon-btn--search" type="button" title="Rechercher" disabled>
+              <span class="visually-hidden">Rechercher</span>
+            </button>
+          </div>
+        </header>
+
+        <div class="social__scroll">
+          <!-- Demandes d'ami entrantes -->
+          <details class="friend-group" id="friend-requests-group" open hidden>
+            <summary class="friend-group__title">
+              <span>Demandes d'ami (<span id="friend-requests-count">0</span>)</span>
+            </summary>
+            <ul class="friend-list" id="friend-requests"></ul>
+          </details>
+
+          <details class="friend-group" open>
+            <summary class="friend-group__title">
+              <span>Général (<span id="friends-online-count">0</span>/<span id="friends-total-count">0</span>)</span>
+            </summary>
+            <!-- En ligne d'abord, puis hors ligne. Les <li> sont draggable="true" et portent data-name. -->
+            <ul class="friend-list" id="friends-online"></ul>
+            <ul class="friend-list" id="friends-offline"></ul>
+            <p class="social__empty" id="friends-empty">
+              Aucun ami pour l'instant.<br>Clique sur <strong>+</strong> pour en ajouter.
+            </p>
+          </details>
         </div>
 
-        <!-- Demandes d'ami entrantes -->
-        <details class="friend-group" id="friend-requests-group" open hidden>
-          <summary class="friend-group__title">
-            Demandes d'ami <span class="friend-group__count" id="friend-requests-count">0</span>
-          </summary>
-          <ul class="friend-list" id="friend-requests"></ul>
-        </details>
-
-        <details class="friend-group" open>
-          <summary class="friend-group__title">
-            En ligne <span class="friend-group__count" id="friends-online-count">0</span>
-          </summary>
-          <!-- Les <li> amis sont draggable="true" et portent data-name -->
-          <ul class="friend-list" id="friends-online"></ul>
-        </details>
-
-        <details class="friend-group" open>
-          <summary class="friend-group__title">
-            Hors ligne <span class="friend-group__count" id="friends-offline-count">0</span>
-          </summary>
-          <ul class="friend-list" id="friends-offline"></ul>
-        </details>
-
-        <p class="social__empty" id="friends-empty">
-          Aucun ami pour l'instant.<br>Utilise « Ajouter des amis » pour commencer.
-        </p>
+        <footer class="social__footer">
+          <button class="social__footer-btn social__footer-btn--chat" type="button" title="Discussions" disabled></button>
+          <button class="social__footer-btn social__footer-btn--missions" type="button" title="Missions" disabled></button>
+          <button class="social__footer-btn social__footer-btn--voice" type="button" title="Vocal" disabled></button>
+          <span class="social__version">v0.1</span>
+          <button class="social__footer-btn social__footer-btn--bug" type="button" title="Signaler un bug" disabled></button>
+        </footer>
       </aside>
     </div>
   </div>
@@ -266,24 +379,6 @@
   <!-- =====================================================================
        MODALES
        ===================================================================== -->
-  <div class="modal-backdrop" id="modal-backdrop" hidden></div>
-
-  <!-- Rejoindre un lobby -->
-  <dialog class="modal hextech-frame" id="modal-join-lobby" aria-labelledby="modal-join-title">
-    <form method="dialog" class="modal__body" id="join-lobby-form">
-      <h2 class="modal__title" id="modal-join-title">Rejoindre un lobby</h2>
-      <label class="field">
-        <span class="field__label">Code du salon</span>
-        <input class="field__input field__input--code" id="join-lobby-code" name="code" type="text"
-               maxlength="6" required placeholder="EX : K7QX2M" autocomplete="off">
-      </label>
-      <p class="form-error" role="alert" hidden></p>
-      <div class="modal__actions">
-        <button class="btn btn--secondary" type="button" data-close-modal>Annuler</button>
-        <button class="btn btn--primary" type="submit" value="confirm">Rejoindre</button>
-      </div>
-    </form>
-  </dialog>
 
   <!-- Ajouter des amis -->
   <dialog class="modal hextech-frame" id="modal-add-friend" aria-labelledby="modal-friend-title">
@@ -302,17 +397,37 @@
     </form>
   </dialog>
 
-  <!-- Inviter (clic sur "+") -->
+  <!-- Inviter (clic sur "+" d'une bannière) -->
   <dialog class="modal hextech-frame" id="modal-invite" aria-labelledby="modal-invite-title">
     <div class="modal__body">
       <h2 class="modal__title" id="modal-invite-title">Inviter des amis</h2>
-      <!-- Rempli par lobby.js avec les amis en ligne ; data-slot = emplacement ciblé -->
+      <!-- Rempli par lobby.js : <li class="invite-item"> -->
       <ul class="invite-list" id="invite-list"></ul>
       <p class="social__empty" id="invite-empty" hidden>Aucun ami en ligne.</p>
       <div class="modal__actions">
         <button class="btn btn--secondary" type="button" data-close-modal>Fermer</button>
       </div>
     </div>
+  </dialog>
+
+  <!-- Skin (icône d'invocateur + pion) -->
+  <dialog class="modal modal--wide hextech-frame" id="modal-skin" aria-labelledby="modal-skin-title">
+    <form method="dialog" class="modal__body" id="skin-form">
+      <h2 class="modal__title" id="modal-skin-title">Skin</h2>
+      <fieldset class="icon-picker">
+        <legend class="field__label">Icône d'invocateur</legend>
+        <div class="icon-picker__grid icon-picker__grid--tall" id="skin-icons"></div>
+      </fieldset>
+      <fieldset class="icon-picker">
+        <legend class="field__label">Pion sur le plateau</legend>
+        <!-- Rempli à l'Étape 4 -->
+        <div class="icon-picker__grid" id="skin-tokens"></div>
+      </fieldset>
+      <div class="modal__actions">
+        <button class="btn btn--secondary" type="button" data-close-modal>Annuler</button>
+        <button class="btn btn--primary" type="submit" value="confirm">Enregistrer</button>
+      </div>
+    </form>
   </dialog>
 
   <!-- Paramètres -->
@@ -345,11 +460,10 @@
   </dialog>
 
   <!-- =====================================================================
-       NOTIFICATIONS (invitations, toasts)
+       NOTIFICATIONS / PARTIE TROUVÉE / PLATEAU
        ===================================================================== -->
   <div class="notifications" id="notifications" aria-live="assertive"></div>
 
-  <!-- Écran "Partie trouvée" -->
   <div class="match-found" id="match-found" hidden>
     <div class="match-found__ring" aria-hidden="true"></div>
     <p class="match-found__title">PARTIE TROUVÉE</p>
@@ -395,7 +509,7 @@
   <template id="tpl-banner-empty">
     <div class="banner banner--empty" data-slot="" data-dropzone="true" role="listitem">
       <button class="banner__invite" type="button" data-invite-slot="" aria-label="Inviter un ami">
-        <span class="banner__plus" aria-hidden="true">+</span>
+        <span class="banner__plus" aria-hidden="true"></span>
       </button>
       <span class="banner__pending" hidden></span>
     </div>
@@ -403,8 +517,8 @@
 
   <!-- Ami dans le panneau social -->
   <template id="tpl-friend">
-    <li class="friend" draggable="true" data-name="" tabindex="0">
-      <div class="summoner-icon summoner-icon--sm">
+    <li class="friend" draggable="true" data-name="" data-status="online" tabindex="0">
+      <div class="summoner-icon summoner-icon--friend">
         <img class="summoner-icon__img" src="" alt="">
         <span class="presence-dot"></span>
       </div>
@@ -418,10 +532,13 @@
   <!-- Demande d'ami entrante -->
   <template id="tpl-friend-request">
     <li class="friend friend--request" data-name="">
-      <div class="summoner-icon summoner-icon--sm">
+      <div class="summoner-icon summoner-icon--friend">
         <img class="summoner-icon__img" src="" alt="">
       </div>
-      <span class="friend__name"></span>
+      <div class="friend__info">
+        <span class="friend__name"></span>
+        <span class="friend__status">Demande d'ami</span>
+      </div>
       <div class="friend__actions">
         <button class="icon-btn icon-btn--accept" type="button" data-respond="accept" title="Accepter"></button>
         <button class="icon-btn icon-btn--decline" type="button" data-respond="decline" title="Refuser"></button>
@@ -441,7 +558,7 @@
   <!-- Invitation reçue -->
   <template id="tpl-invite-toast">
     <div class="toast toast--invite hextech-frame" role="alertdialog">
-      <div class="summoner-icon summoner-icon--sm">
+      <div class="summoner-icon summoner-icon--friend">
         <img class="summoner-icon__img" src="" alt="">
       </div>
       <div class="toast__content">
