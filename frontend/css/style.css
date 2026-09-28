@@ -1224,6 +1224,12 @@ button.window-controls__btn:hover {
 .emblem__frame {
   fill: url(#g-gold);
 }
+.emblem__bevel {
+  fill: none;
+  stroke: url(#g-bevel);
+  stroke-width: 1.1;
+  pointer-events: none;
+}
 .emblem__gap {
   fill: #070c12;
 }
@@ -1241,10 +1247,11 @@ button.window-controls__btn:hover {
   opacity: 0;
   transition: opacity 0.2s;
 }
+/* Symbole gravé : fond sombre cerné d'or, comme le « L » de Faille Classic */
 .emblem__glyph {
-  fill: none;
-  stroke: #b8975a;
-  stroke-width: 1.3;
+  fill: #101c2a;
+  stroke: #c3a468;
+  stroke-width: 1.4;
   stroke-linejoin: round;
   transition: fill 0.2s, stroke 0.2s;
 }
@@ -1252,6 +1259,8 @@ button.window-controls__btn:hover {
 /* Logos pleins, sans cadre (comme TFT, après la ligne de séparation) */
 .emblem__solid {
   fill: url(#g-flat);
+  stroke: #6e5226;
+  stroke-width: 0.8;
   transition: fill 0.2s;
 }
 
@@ -1268,6 +1277,7 @@ button.window-controls__btn:hover {
 }
 .mode-card.is-selected .emblem__sheen {
   opacity: 0.3;
+  animation: emblem-sheen 6s ease-in-out infinite;
 }
 .mode-card.is-selected .emblem__sheen--thin {
   opacity: 0.18;
@@ -2973,6 +2983,13 @@ button.window-controls__btn:hover {
 /* --------------------------------------------------------------------------
    13. Animations
    -------------------------------------------------------------------------- */
+/* Reflet qui glisse de temps en temps sur le verre sélectionné */
+@keyframes emblem-sheen {
+  0%, 55% { transform: translate(0, 0); }
+  80% { transform: translate(34px, 34px); }
+  80.01% { transform: translate(-34px, -34px); }
+  100% { transform: translate(0, 0); }
+}
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
