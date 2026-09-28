@@ -1151,7 +1151,7 @@ button.window-controls__btn:hover {
 .modes {
   grid-area: modes;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 201px));
+  grid-template-columns: repeat(5, minmax(0, 1fr)); /* les 5 cartes se partagent toute la largeur */
   margin: 0 16px;
   padding-top: 38px;
   border-bottom: 1px solid rgba(160, 155, 140, 0.35);
@@ -1212,8 +1212,8 @@ button.window-controls__btn:hover {
 
 /* Emblème SVG */
 .emblem {
-  width: 84px;
-  height: 84px;
+  width: clamp(84px, 6.6vw, 124px);
+  height: clamp(84px, 6.6vw, 124px);
   margin-bottom: 20px;
   overflow: visible;
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6));
@@ -1254,7 +1254,7 @@ button.window-controls__btn:hover {
   margin-top: 6px;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 23px;
+  font-size: clamp(23px, 1.8vw, 30px);
   line-height: 1.25;
   letter-spacing: 0.02em;
   text-transform: uppercase;
