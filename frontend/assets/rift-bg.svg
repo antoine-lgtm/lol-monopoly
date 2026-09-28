@@ -1,29 +1,68 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 640" preserveAspectRatio="xMidYMid slice">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1040 640" preserveAspectRatio="xMidYMid slice">
+  <!-- Jungle de la Faille, de nuit : trois rangées de sapins dans la brume -->
   <defs>
-    <radialGradient id="vig" cx=".5" cy=".45" r=".75">
-      <stop offset=".35" stop-color="#010a13" stop-opacity=".15"/>
-      <stop offset="1" stop-color="#010a13" stop-opacity=".92"/>
-    </radialGradient>
-    <linearGradient id="river" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0a6b7a"/>
-      <stop offset="1" stop-color="#0a3d52"/>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0d1f1c"/>
+      <stop offset=".55" stop-color="#132a22"/>
+      <stop offset="1" stop-color="#0a1612"/>
     </linearGradient>
+    <radialGradient id="clearing" cx=".5" cy=".62" r=".45">
+      <stop offset="0" stop-color="#2c4a3a" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#2c4a3a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fog" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8fb3a6" stop-opacity="0"/>
+      <stop offset=".5" stop-color="#8fb3a6" stop-opacity=".09"/>
+      <stop offset="1" stop-color="#8fb3a6" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="vig" cx=".5" cy=".45" r=".8">
+      <stop offset=".4" stop-color="#010a13" stop-opacity="0"/>
+      <stop offset="1" stop-color="#010a13" stop-opacity=".85"/>
+    </radialGradient>
+    <path id="pine" d="M0-120 9-92h-5l14 30h-7l17 34h-8l20 38H-20l20-38h-8l17-34h-7l14-30h-5zM-3 10h6v14h-6z"/>
   </defs>
-  <rect width="1040" height="640" fill="#0b1c17"/>
-  <!-- jungles -->
-  <ellipse cx="300" cy="200" rx="260" ry="150" fill="#12301f" fill-opacity=".8"/>
-  <ellipse cx="760" cy="450" rx="260" ry="150" fill="#12301f" fill-opacity=".8"/>
-  <ellipse cx="260" cy="470" rx="180" ry="110" fill="#0f271a"/>
-  <ellipse cx="800" cy="170" rx="180" ry="110" fill="#0f271a"/>
-  <!-- rivière -->
-  <path d="M-40 60C220 180 380 260 520 320s300 140 560 280" fill="none" stroke="url(#river)" stroke-width="70" stroke-opacity=".55"/>
-  <!-- voies : mid, top, bot -->
-  <path d="M30 610 1010 30" stroke="#c8aa6e" stroke-opacity=".1" stroke-width="26"/>
-  <path d="M40 600V60h940" fill="none" stroke="#c8aa6e" stroke-opacity=".08" stroke-width="24"/>
-  <path d="M60 610h940V70" fill="none" stroke="#c8aa6e" stroke-opacity=".08" stroke-width="24"/>
-  <!-- bases -->
-  <circle cx="60" cy="590" r="70" fill="#0ac8b9" fill-opacity=".12"/>
-  <circle cx="990" cy="50" r="70" fill="#d13639" fill-opacity=".12"/>
+
+  <rect width="1040" height="640" fill="url(#sky)"/>
+
+  <!-- rangée lointaine -->
+  <g fill="#1d3a30" fill-opacity=".7">
+    <use href="#pine" transform="translate(40 260) scale(.9)"/>
+    <use href="#pine" transform="translate(110 250) scale(1.1)"/>
+    <use href="#pine" transform="translate(190 270) scale(.8)"/>
+    <use href="#pine" transform="translate(270 255) scale(1)"/>
+    <use href="#pine" transform="translate(350 275) scale(.85)"/>
+    <use href="#pine" transform="translate(690 270) scale(.9)"/>
+    <use href="#pine" transform="translate(770 250) scale(1.1)"/>
+    <use href="#pine" transform="translate(850 265) scale(.85)"/>
+    <use href="#pine" transform="translate(930 245) scale(1.05)"/>
+    <use href="#pine" transform="translate(1010 262) scale(.9)"/>
+  </g>
+  <rect y="180" width="1040" height="180" fill="url(#fog)"/>
+
+  <!-- clairière au centre -->
+  <ellipse cx="520" cy="430" rx="420" ry="170" fill="url(#clearing)"/>
+
+  <!-- rangée du milieu -->
+  <g fill="#122820">
+    <use href="#pine" transform="translate(-10 380) scale(1.6)"/>
+    <use href="#pine" transform="translate(90 400) scale(1.3)"/>
+    <use href="#pine" transform="translate(180 370) scale(1.5)"/>
+    <use href="#pine" transform="translate(270 410) scale(1.1)"/>
+    <use href="#pine" transform="translate(780 405) scale(1.2)"/>
+    <use href="#pine" transform="translate(860 375) scale(1.5)"/>
+    <use href="#pine" transform="translate(950 395) scale(1.3)"/>
+    <use href="#pine" transform="translate(1040 370) scale(1.6)"/>
+  </g>
+  <rect y="330" width="1040" height="160" fill="url(#fog)"/>
+
+  <!-- premier plan -->
+  <g fill="#08140f">
+    <use href="#pine" transform="translate(20 640) scale(3)"/>
+    <use href="#pine" transform="translate(150 660) scale(2.4)"/>
+    <use href="#pine" transform="translate(900 660) scale(2.5)"/>
+    <use href="#pine" transform="translate(1030 640) scale(3.1)"/>
+  </g>
+  <path d="M0 600c160-30 330-36 520-30s360 14 520 34v36H0z" fill="#07120e"/>
+
   <rect width="1040" height="640" fill="url(#vig)"/>
-  <rect width="1040" height="640" fill="#010a13" fill-opacity=".35"/>
 </svg>

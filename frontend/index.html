@@ -253,6 +253,11 @@
           <div class="view__background view__background--rift" aria-hidden="true"></div>
 
           <div class="lobby__header">
+            <button class="lobby__back" type="button" id="lobby-back" data-nav="home" title="Retour">
+              <span class="visually-hidden">Retour au choix du mode</span>
+            </button>
+            <span class="lobby__divider" aria-hidden="true"></span>
+            <span class="queue-icon" aria-hidden="true"></span>
             <nav class="breadcrumb" aria-label="Fil d'Ariane">
               <ol class="breadcrumb__list">
                 <li class="breadcrumb__item">INTRO</li>
@@ -262,14 +267,30 @@
                 <li class="breadcrumb__item breadcrumb__item--current" aria-current="page">MONOPOLY</li>
               </ol>
             </nav>
-
-            <button class="lobby-code" id="lobby-code" type="button" title="Copier le code du salon">
-              <span class="lobby-code__label">Code du salon</span>
-              <span class="lobby-code__value" id="lobby-code-value">------</span>
+            <button class="info-btn" type="button" data-action="rules" title="Règles de la partie">
+              <span class="visually-hidden">Règles de la partie</span>
             </button>
+
+            <div class="lobby__tools">
+              <button class="round-btn round-btn--icon round-btn--rules" type="button" data-action="rules" title="Règles">
+                <span class="visually-hidden">Règles</span>
+              </button>
+              <button class="square-btn square-btn--stats" type="button" title="Classement" disabled>
+                <span class="visually-hidden">Classement</span>
+              </button>
+              <!-- Salon ouvert : n'importe qui avec le code peut entrer -->
+              <label class="party-toggle" title="Salon ouvert">
+                <input type="checkbox" id="lobby-open" checked>
+                <span class="party-toggle__track" aria-hidden="true"></span>
+                <span class="party-toggle__people" aria-hidden="true"></span>
+                <span class="visually-hidden">Salon ouvert</span>
+              </label>
+            </div>
           </div>
 
-          <!-- 5 emplacements = 5 rôles. Zones de dépôt pour le drag & drop depuis la liste d'amis.
+          <!-- 5 emplacements. Le joueur local est au centre, les autres autour
+               (ordre visuel géré en CSS via data-slot). Emplacements vides = cercles « + »,
+               zones de dépôt pour le glisser-déposer depuis la liste d'amis.
                lobby.js reconstruit ce contenu à chaque `lobby:state`. -->
           <div class="banners" id="banners" role="list" aria-label="Joueurs du salon">
             <div class="banner banner--empty" data-slot="0" data-dropzone="true" role="listitem">
@@ -289,27 +310,50 @@
             </div>
           </div>
 
-          <div class="lobby__footer">
-            <section class="chat" id="chat" aria-label="Chat du salon">
-              <ol class="chat__messages" id="chat-messages" aria-live="polite"></ol>
-              <form class="chat__form" id="chat-form" autocomplete="off">
-                <label class="visually-hidden" for="chat-input">Message</label>
-                <input class="chat__input" id="chat-input" type="text" maxlength="300"
-                       placeholder="Tapez votre message ici…">
-              </form>
-            </section>
+          <!-- Chat : les messages s'empilent au-dessus du champ -->
+          <section class="chat" id="chat" aria-label="Chat du salon">
+            <ol class="chat__messages" id="chat-messages" aria-live="polite"></ol>
+            <form class="chat__form" id="chat-form" autocomplete="off">
+              <label class="visually-hidden" for="chat-input">Message</label>
+              <input class="chat__input" id="chat-input" type="text" maxlength="300"
+                     placeholder="Tapez vos messages ici…">
+            </form>
+          </section>
 
-            <div class="confirm-bar confirm-bar--lobby">
-              <button class="round-btn round-btn--close" type="button" id="leave-lobby" title="Quitter le salon">
-                <span class="visually-hidden">Quitter le salon</span>
-              </button>
-              <button class="confirm-btn confirm-btn--find" id="find-match" type="button" disabled
-                      aria-describedby="find-match-hint">
-                <span class="confirm-btn__label">FIND MATCH</span>
-              </button>
-              <p class="confirm-bar__hint" id="find-match-hint">Seul le chef du salon peut lancer la partie.</p>
-            </div>
+          <!-- ✕ + FIND MATCH (bas centre) -->
+          <div class="match-bar">
+            <button class="round-btn round-btn--close" type="button" id="leave-lobby" title="Quitter le salon">
+              <span class="visually-hidden">Quitter le salon</span>
+            </button>
+            <button class="find-btn" id="find-match" type="button" disabled aria-describedby="find-match-hint">
+              <span class="find-btn__label">FIND MATCH</span>
+            </button>
+            <p class="match-bar__hint" id="find-match-hint">Seul le chef du salon peut lancer la partie.</p>
           </div>
+
+          <!-- Panneau à onglets (bas droite) -->
+          <section class="lobby-panel" aria-label="Infos du salon">
+            <div class="lobby-panel__tabs" role="tablist">
+              <button class="lobby-panel__tab is-active" type="button" role="tab" aria-selected="true" aria-controls="panel-room" id="tab-room">Salon</button>
+              <button class="lobby-panel__tab" type="button" role="tab" aria-selected="false" aria-controls="panel-invites" id="tab-invites">Invités (<span id="invites-count">0</span>)</button>
+            </div>
+            <div class="lobby-panel__body" id="panel-room" role="tabpanel" aria-labelledby="tab-room">
+              <button class="lobby-code" id="lobby-code" type="button" title="Copier le code du salon">
+                <span class="lobby-code__badge" aria-hidden="true"></span>
+                <span class="lobby-code__text">
+                  <span class="lobby-code__label">Code du salon</span>
+                  <span class="lobby-code__value" id="lobby-code-value">------</span>
+                  <span class="lobby-code__hint">Donne-le à tes amis pour qu'ils te rejoignent.</span>
+                </span>
+                <span class="lobby-code__copy" aria-hidden="true"></span>
+              </button>
+            </div>
+            <div class="lobby-panel__body" id="panel-invites" role="tabpanel" aria-labelledby="tab-invites" hidden>
+              <!-- Rempli par lobby.js : <li class="invite-item"> -->
+              <ul class="invite-list" id="pending-invites"></ul>
+              <p class="social__empty">Aucune invitation en attente.</p>
+            </div>
+          </section>
         </section>
       </main>
 
@@ -317,6 +361,19 @@
            PANNEAU SOCIAL (droite)
            ---------------------------------------------------------------- -->
       <aside class="social" id="social" aria-label="Social">
+        <!-- Salon en cours (affiché par lobby.js quand on est dans un salon) -->
+        <div class="party-card" id="party-card" hidden>
+          <span class="party-card__title">Salon ouvert</span>
+          <span class="queue-icon queue-icon--lg" aria-hidden="true"></span>
+          <span class="party-card__members" id="party-members" aria-label="Joueurs dans le salon">
+            <span class="party-card__member is-filled"></span>
+            <span class="party-card__member"></span>
+            <span class="party-card__member"></span>
+            <span class="party-card__member"></span>
+            <span class="party-card__member"></span>
+          </span>
+          <span class="party-card__queue">Monopoly · Blind</span>
+        </div>
         <header class="social__header">
           <span class="social__heading">Social</span>
           <div class="social__tools">
@@ -337,9 +394,10 @@
 
         <div class="social__scroll">
           <!-- Demandes d'ami entrantes -->
-          <details class="friend-group" id="friend-requests-group" open hidden>
-            <summary class="friend-group__title">
-              <span>Demandes d'ami (<span id="friend-requests-count">0</span>)</span>
+          <details class="friend-group friend-group--requests" id="friend-requests-group" open hidden>
+            <summary class="friend-requests__title">
+              <span>Demandes d'ami</span>
+              <span class="count-badge" id="friend-requests-count">0</span>
             </summary>
             <ul class="friend-list" id="friend-requests"></ul>
           </details>
@@ -479,16 +537,28 @@
        TEMPLATES (clonés par lobby.js / main.js)
        ===================================================================== -->
 
-  <!-- Bannière d'un joueur présent -->
+  <!-- Bannière d'un joueur présent (suspendue depuis le haut, comme dans le client).
+       .is-me = joueur local, .is-owner = chef du salon (couronne + pastille). -->
   <template id="tpl-banner-player">
     <div class="banner banner--filled" data-slot="" data-dropzone="false" role="listitem">
-      <div class="banner__frame">
-        <span class="banner__crown" title="Chef du salon" hidden></span>
+      <div class="banner__cloth" aria-hidden="true"></div>
+      <svg class="banner__crest" viewBox="0 0 200 150" aria-hidden="true">
+        <path class="banner__wing" d="M84 124C52 116 18 96 8 60C24 74 38 80 52 82C36 64 26 40 30 6C40 36 56 56 76 68C78 88 82 108 84 124Z"/>
+        <path class="banner__wing" d="M116 124C148 116 182 96 192 60C176 74 162 80 148 82C164 64 174 40 170 6C160 36 144 56 124 68C122 88 118 108 116 124Z"/>
+        <path class="banner__gem" d="M100 116l14 16-14 16-14-16z"/>
+      </svg>
+      <div class="banner__content">
         <div class="summoner-icon summoner-icon--banner">
           <img class="summoner-icon__img" src="" alt="">
         </div>
-        <span class="banner__name"></span>
+        <span class="banner__name"><span class="banner__crown" title="Chef du salon" hidden></span><span class="banner__name-text"></span></span>
         <span class="banner__status"></span>
+
+        <div class="banner__tokens" aria-hidden="true">
+          <span class="banner__token"></span>
+          <span class="banner__token"></span>
+          <span class="banner__token"></span>
+        </div>
 
         <div class="role-picker">
           <button class="role-picker__current" type="button" aria-haspopup="listbox" aria-expanded="false">
@@ -504,6 +574,12 @@
           </ul>
         </div>
       </div>
+      <svg class="banner__tip" viewBox="0 0 250 70" preserveAspectRatio="none" aria-hidden="true">
+        <path class="banner__tip-back" d="M0 0h250v14l-40 18-24-6-61 44-61-44-24 6L0 14z"/>
+        <path class="banner__tip-edge" d="M0 14l40 18 24-6 61 44 61-44 24 6 40-18"/>
+        <path class="banner__tip-gem" d="M125 40l9 12-9 12-9-12z"/>
+      </svg>
+      <span class="banner__badge" hidden>Chef du salon</span>
     </div>
   </template>
 
@@ -516,10 +592,8 @@
       </button>
       <div class="banner__pending" hidden>
         <span class="banner__pending-icon" aria-hidden="true"></span>
-        <span>
-          <span class="banner__pending-label">Invitation envoyée</span>
-          <span class="banner__pending-name"></span>
-        </span>
+        <span class="banner__pending-label">Invitation envoyée</span>
+        <span class="banner__pending-name"></span>
       </div>
     </div>
   </template>
