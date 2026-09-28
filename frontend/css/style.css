@@ -1210,38 +1210,73 @@ button.window-controls__btn:hover {
   padding-top: 38px;
 }
 
-/* Emblème SVG */
+/* Emblème SVG : double cadre doré, verre intérieur avec reflet, symbole gravé */
 .emblem {
-  width: clamp(84px, 6.6vw, 124px);
-  height: clamp(84px, 6.6vw, 124px);
-  margin-bottom: 20px;
+  width: clamp(76px, 5.8vw, 108px);
+  height: clamp(76px, 5.8vw, 108px);
+  margin-bottom: 22px;
   overflow: visible;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6));
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.65));
   transition: transform 0.25s var(--ease), filter 0.25s;
 }
+.emblem__tabs,
 .emblem__frame {
   fill: url(#g-gold);
+}
+.emblem__gap {
+  fill: #070c12;
 }
 .emblem__fill {
   fill: url(#g-dark);
   transition: fill 0.2s;
 }
+.emblem__rim {
+  fill: none;
+  stroke: url(#g-rim);
+  stroke-width: 1.2;
+}
+.emblem__sheen {
+  fill: #fff;
+  opacity: 0.05;
+  transition: opacity 0.2s;
+}
+.emblem__sheen--thin {
+  opacity: 0.035;
+}
 .emblem__glyph {
-  fill: url(#g-gold);
+  fill: #0b1420;
+  stroke: url(#g-rim);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  transition: fill 0.2s, stroke 0.2s;
 }
 
 .mode-card:hover .emblem {
   transform: translateY(-2px);
-  filter: drop-shadow(0 4px 10px rgba(200, 170, 110, 0.3));
+  filter: drop-shadow(0 6px 12px rgba(200, 170, 110, 0.25));
+}
+.mode-card:hover .emblem__sheen {
+  opacity: 0.1;
+}
+
+/* Sélectionné : le verre s'allume en bleu, le symbole devient lumineux */
+.mode-card.is-selected .emblem {
+  filter: drop-shadow(0 0 16px rgba(10, 200, 230, 0.4)) drop-shadow(0 6px 10px rgba(0, 0, 0, 0.6));
 }
 .mode-card.is-selected .emblem__fill {
   fill: url(#g-blue);
 }
-.mode-card.is-selected .emblem__glyph {
-  fill: #eafcff;
+.mode-card.is-selected .emblem__sheen {
+  opacity: 0.32;
 }
-.mode-card.is-selected .emblem {
-  filter: drop-shadow(0 0 14px rgba(10, 200, 185, 0.45));
+.mode-card.is-selected .emblem__sheen--thin {
+  opacity: 0.22;
+}
+.mode-card.is-selected .emblem__glyph {
+  fill: #f2fdff;
+  stroke: #ffffff;
+  stroke-width: 0.8;
+  filter: drop-shadow(0 0 3px rgba(160, 240, 255, 0.9));
 }
 
 .mode-card__tag {
