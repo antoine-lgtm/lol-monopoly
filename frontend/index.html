@@ -194,6 +194,7 @@
             </button>
 
             <button class="mode-card" type="button" role="radio" aria-checked="false" data-mode="join">
+              <span class="emblem-wrap">
               <svg class="emblem emblem--tp" viewBox="0 0 80 80" aria-hidden="true">
                 <defs><clipPath id="emb-join"><path d="M32 11.5h34.2L47.8 68.5H13.6z"/></clipPath></defs>
                 <path class="emblem__tabs" d="M58 1h12l-1.4 4H57.4zM10 75h12l1.4-4H11.4z"/>
@@ -215,6 +216,10 @@
                 </g>
                 <path class="emblem__rim" d="M32 11.5h34.2L47.8 68.5H13.6z"/>
               </svg>
+              <!-- Icône officielle du sort Téléportation (Data Dragon de Riot), en image de fond :
+                   si elle ne charge pas, rien ne s'affiche et le portail dessiné reste visible. -->
+              <span class="emblem__spell" aria-hidden="true"></span>
+              </span>
               <span class="mode-card__tag">Code</span>
               <span class="mode-card__title">Rejoindre une partie</span>
             </button>
@@ -610,6 +615,11 @@
         <input id="setting-reduce-motion" name="reduceMotion" type="checkbox">
         <span>Réduire les animations</span>
       </label>
+
+      <p class="legal">
+        League of Monopoly est un projet de fan non commercial. Il n'est ni approuvé ni soutenu par Riot Games.
+        League of Legends et Riot Games sont des marques de Riot Games, Inc.
+      </p>
 
       <div class="modal__actions">
         <button class="btn btn--danger" type="button" id="logout-btn">Se déconnecter</button>

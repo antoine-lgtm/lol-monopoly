@@ -1298,6 +1298,40 @@ button.window-controls__btn:hover {
   fill: #e9dcff;
   filter: drop-shadow(0 0 3px #e8ccff) drop-shadow(0 0 6px #b06cff);
 }
+/* Icône officielle du sort, posée sur la fenêtre du cadre (même parallélogramme) */
+.emblem-wrap {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 24px;
+  line-height: 0;
+  transition: transform 0.25s var(--ease);
+}
+.emblem-wrap .emblem {
+  margin-bottom: 0;
+}
+.mode-card:hover .emblem-wrap .emblem {
+  transform: none;
+}
+.mode-card:hover .emblem-wrap {
+  transform: translateY(-2px);
+}
+.emblem__spell {
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(40% 14.4%, 82.75% 14.4%, 59.75% 85.6%, 17% 85.6%);
+  background: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/spell/SummonerTeleport.png') center / 72% no-repeat;
+  opacity: 0.8;
+  filter: saturate(0.75) brightness(0.85);
+  transition: opacity 0.2s, filter 0.2s;
+}
+.mode-card:hover .emblem__spell {
+  opacity: 0.95;
+  filter: none;
+}
+.mode-card.is-selected .emblem__spell {
+  opacity: 1;
+  filter: saturate(1.1) brightness(1.1);
+}
 .emblem__swirl {
   transform-box: view-box;
   transform-origin: 40.5px 40px;
@@ -2885,6 +2919,13 @@ button.window-controls__btn:hover {
   height: 1px;
   margin: 12px auto 0;
   background: linear-gradient(90deg, transparent, var(--gold-3), transparent);
+}
+
+.legal {
+  margin: 18px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--grey-2);
 }
 
 .modal__actions {
