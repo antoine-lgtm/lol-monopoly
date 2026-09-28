@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>League of Monopoly</title>
+  <meta name="description" content="Monopoly multijoueur privé aux couleurs de League of Legends.">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Beaufort for LoL / Spiegel ne sont pas libres : Cinzel + Inter en remplacement -->
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/board.css">
+</head>
+<body class="client" data-view="lobby">
+
+  <!-- =====================================================================
+       ÉCRAN DE CONNEXION (pseudo + icône d'invocateur)
+       ===================================================================== -->
+  <div class="login-screen" id="login-screen" role="dialog" aria-modal="true" aria-labelledby="login-title">
+    <form class="login-card hextech-frame" id="login-form" autocomplete="off">
+      <div class="login-card__logo" aria-hidden="true"></div>
+      <h1 class="login-card__title" id="login-title">Connexion</h1>
+
+      <label class="field">
+        <span class="field__label">Nom d'invocateur</span>
+        <input class="field__input" id="login-name" name="name" type="text"
+               minlength="3" maxlength="16" required placeholder="Pseudo" autofocus>
+      </label>
+
+      <fieldset class="icon-picker">
+        <legend class="field__label">Icône d'invocateur</legend>
+        <!-- Rempli par main.js (ICON_COUNT icônes, radio name="icon") -->
+        <div class="icon-picker__grid" id="login-icons"></div>
+      </fieldset>
+
+      <p class="form-error" id="login-error" role="alert" hidden></p>
+
+      <button class="btn btn--primary login-card__submit" type="submit">
+        <span>Se connecter</span>
+      </button>
+    </form>
+  </div>
+
+  <!-- =====================================================================
+       CLIENT
+       ===================================================================== -->
+  <div class="client-shell" id="client-shell" hidden>
+
+    <!-- ----------------------------------------------------------------
+         BARRE SUPÉRIEURE
+         ---------------------------------------------------------------- -->
+    <header class="topbar">
+      <div class="topbar__left">
+        <!-- Bouton "PLAY" : ouvre le menu déroulant de navigation -->
+        <div class="play-menu" id="play-menu">
+          <button class="play-button" id="play-menu-toggle" type="button"
+                  aria-haspopup="menu" aria-expanded="false" aria-controls="play-menu-list">
+            <span class="play-button__logo" aria-hidden="true"></span>
+            <span class="play-button__label">JOUER</span>
+            <span class="play-button__caret" aria-hidden="true"></span>
+          </button>
+
+          <ul class="dropdown" id="play-menu-list" role="menu" hidden>
+            <li role="none">
+              <button class="dropdown__item" type="button" role="menuitem" data-action="create-lobby">
+                <span class="dropdown__icon dropdown__icon--create" aria-hidden="true"></span>
+                Créer un lobby
+              </button>
+            </li>
+            <li role="none">
+              <button class="dropdown__item" type="button" role="menuitem" data-action="join-lobby">
+                <span class="dropdown__icon dropdown__icon--join" aria-hidden="true"></span>
+                Rejoindre un lobby
+              </button>
+            </li>
+            <li role="none">
+              <button class="dropdown__item" type="button" role="menuitem" data-action="add-friend">
+                <span class="dropdown__icon dropdown__icon--friend" aria-hidden="true"></span>
+                Ajouter des amis
+              </button>
+            </li>
+            <li class="dropdown__separator" role="separator"></li>
+            <li role="none">
+              <button class="dropdown__item" type="button" role="menuitem" data-action="settings">
+                <span class="dropdown__icon dropdown__icon--settings" aria-hidden="true"></span>
+                Paramètres
+              </button>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Onglets décoratifs façon client -->
+        <nav class="topbar__nav" aria-label="Navigation principale">
+          <a class="topbar__tab is-active" href="#" aria-current="page">Accueil</a>
+          <a class="topbar__tab" href="#" aria-disabled="true">Monopoly</a>
+          <a class="topbar__tab" href="#" aria-disabled="true">Règles</a>
+        </nav>
+      </div>
+
+      <div class="topbar__right">
+        <div class="currency" title="Or">
+          <span class="currency__icon currency__icon--gold" aria-hidden="true"></span>
+          <span class="currency__value" id="gold-balance">1500</span>
+        </div>
+        <div class="window-controls" aria-hidden="true">
+          <span class="window-controls__btn window-controls__btn--min"></span>
+          <span class="window-controls__btn window-controls__btn--close"></span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ----------------------------------------------------------------
+         CONTENU PRINCIPAL
+         ---------------------------------------------------------------- -->
+    <div class="client-body">
+
+      <main class="lobby" id="lobby" aria-label="Salon">
+        <!-- Fond : Faille de l'Invocateur -->
+        <div class="lobby__background" aria-hidden="true"></div>
+
+        <!-- En-tête : fil d'Ariane + actions -->
+        <div class="lobby__header">
+          <nav class="breadcrumb" aria-label="Fil d'Ariane">
+            <ol class="breadcrumb__list">
+              <li class="breadcrumb__item">INTRO</li>
+              <li class="breadcrumb__sep" aria-hidden="true">&gt;</li>
+              <li class="breadcrumb__item">BLIND</li>
+              <li class="breadcrumb__sep" aria-hidden="true">&gt;</li>
+              <li class="breadcrumb__item breadcrumb__item--current" aria-current="page">MONOPOLY</li>
+            </ol>
+          </nav>
+
+          <div class="lobby__meta">
+            <button class="lobby-code" id="lobby-code" type="button" title="Copier le code du salon">
+              <span class="lobby-code__label">Code du salon</span>
+              <span class="lobby-code__value" id="lobby-code-value">------</span>
+            </button>
+            <button class="icon-btn icon-btn--leave" id="leave-lobby" type="button" title="Quitter le salon">
+              <span class="visually-hidden">Quitter le salon</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Bannières des joueurs (5 emplacements = 5 rôles) -->
+        <section class="banners" id="banners" role="list" aria-label="Joueurs du salon">
+          <!-- Chaque emplacement est une zone de dépôt (drag & drop depuis la liste d'amis).
+               lobby.js remplace le contenu à chaque `lobby:state`. -->
+          <div class="banner banner--empty" data-slot="0" data-dropzone="true" role="listitem">
+            <button class="banner__invite" type="button" data-invite-slot="0" aria-label="Inviter un ami dans l'emplacement 1">
+              <span class="banner__plus" aria-hidden="true">+</span>
+            </button>
+          </div>
+          <div class="banner banner--empty" data-slot="1" data-dropzone="true" role="listitem">
+            <button class="banner__invite" type="button" data-invite-slot="1" aria-label="Inviter un ami dans l'emplacement 2">
+              <span class="banner__plus" aria-hidden="true">+</span>
+            </button>
+          </div>
+          <div class="banner banner--empty" data-slot="2" data-dropzone="true" role="listitem">
+            <button class="banner__invite" type="button" data-invite-slot="2" aria-label="Inviter un ami dans l'emplacement 3">
+              <span class="banner__plus" aria-hidden="true">+</span>
+            </button>
+          </div>
+          <div class="banner banner--empty" data-slot="3" data-dropzone="true" role="listitem">
+            <button class="banner__invite" type="button" data-invite-slot="3" aria-label="Inviter un ami dans l'emplacement 4">
+              <span class="banner__plus" aria-hidden="true">+</span>
+            </button>
+          </div>
+          <div class="banner banner--empty" data-slot="4" data-dropzone="true" role="listitem">
+            <button class="banner__invite" type="button" data-invite-slot="4" aria-label="Inviter un ami dans l'emplacement 5">
+              <span class="banner__plus" aria-hidden="true">+</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- Bas de l'écran : chat (gauche) + FIND MATCH (centre) -->
+        <div class="lobby__footer">
+
+          <section class="chat" id="chat" aria-label="Chat du salon">
+            <header class="chat__header">
+              <span class="chat__title">Salon</span>
+              <span class="chat__count" id="chat-count">1/5</span>
+            </header>
+            <ol class="chat__messages" id="chat-messages" aria-live="polite"></ol>
+            <form class="chat__form" id="chat-form" autocomplete="off">
+              <label class="visually-hidden" for="chat-input">Message</label>
+              <input class="chat__input" id="chat-input" type="text" maxlength="300"
+                     placeholder="Tapez votre message ici…">
+            </form>
+          </section>
+
+          <div class="find-match">
+            <button class="find-match__btn" id="find-match" type="button" disabled
+                    aria-describedby="find-match-hint">
+              <span class="find-match__label">FIND MATCH</span>
+            </button>
+            <p class="find-match__hint" id="find-match-hint">Seul le chef du salon peut lancer la partie.</p>
+          </div>
+
+          <div class="lobby__footer-spacer" aria-hidden="true"></div>
+        </div>
+      </main>
+
+      <!-- ----------------------------------------------------------------
+           PANNEAU SOCIAL (droite)
+           ---------------------------------------------------------------- -->
+      <aside class="social" id="social" aria-label="Amis">
+        <div class="social__profile">
+          <div class="summoner-icon summoner-icon--lg" id="profile-icon">
+            <img class="summoner-icon__img" id="profile-icon-img" src="" alt="">
+          </div>
+          <div class="social__identity">
+            <span class="social__name" id="profile-name">Invocateur</span>
+            <span class="presence presence--online" id="profile-status">En ligne</span>
+          </div>
+        </div>
+
+        <div class="social__toolbar">
+          <span class="social__heading">Social</span>
+          <button class="icon-btn icon-btn--add-friend" type="button" data-action="add-friend" title="Ajouter un ami">
+            <span class="visually-hidden">Ajouter un ami</span>
+          </button>
+        </div>
+
+        <!-- Demandes d'ami entrantes -->
+        <details class="friend-group" id="friend-requests-group" open hidden>
+          <summary class="friend-group__title">
+            Demandes d'ami <span class="friend-group__count" id="friend-requests-count">0</span>
+          </summary>
+          <ul class="friend-list" id="friend-requests"></ul>
+        </details>
+
+        <details class="friend-group" open>
+          <summary class="friend-group__title">
+            En ligne <span class="friend-group__count" id="friends-online-count">0</span>
+          </summary>
+          <!-- Les <li> amis sont draggable="true" et portent data-name -->
+          <ul class="friend-list" id="friends-online"></ul>
+        </details>
+
+        <details class="friend-group" open>
+          <summary class="friend-group__title">
+            Hors ligne <span class="friend-group__count" id="friends-offline-count">0</span>
+          </summary>
+          <ul class="friend-list" id="friends-offline"></ul>
+        </details>
+
+        <p class="social__empty" id="friends-empty">
+          Aucun ami pour l'instant.<br>Utilise « Ajouter des amis » pour commencer.
+        </p>
+      </aside>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MENU CONTEXTUEL (clic droit sur un ami / un joueur)
+       ===================================================================== -->
+  <ul class="context-menu" id="context-menu" role="menu" hidden>
+    <li role="none"><button class="context-menu__item" type="button" role="menuitem" data-ctx="invite">Inviter</button></li>
+    <li role="none"><button class="context-menu__item" type="button" role="menuitem" data-ctx="kick">Exclure du salon</button></li>
+    <li role="none"><button class="context-menu__item context-menu__item--danger" type="button" role="menuitem" data-ctx="remove-friend">Retirer des amis</button></li>
+  </ul>
+
+  <!-- =====================================================================
+       MODALES
+       ===================================================================== -->
+  <div class="modal-backdrop" id="modal-backdrop" hidden></div>
+
+  <!-- Rejoindre un lobby -->
+  <dialog class="modal hextech-frame" id="modal-join-lobby" aria-labelledby="modal-join-title">
+    <form method="dialog" class="modal__body" id="join-lobby-form">
+      <h2 class="modal__title" id="modal-join-title">Rejoindre un lobby</h2>
+      <label class="field">
+        <span class="field__label">Code du salon</span>
+        <input class="field__input field__input--code" id="join-lobby-code" name="code" type="text"
+               maxlength="6" required placeholder="EX : K7QX2M" autocomplete="off">
+      </label>
+      <p class="form-error" role="alert" hidden></p>
+      <div class="modal__actions">
+        <button class="btn btn--secondary" type="button" data-close-modal>Annuler</button>
+        <button class="btn btn--primary" type="submit" value="confirm">Rejoindre</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Ajouter des amis -->
+  <dialog class="modal hextech-frame" id="modal-add-friend" aria-labelledby="modal-friend-title">
+    <form method="dialog" class="modal__body" id="add-friend-form">
+      <h2 class="modal__title" id="modal-friend-title">Ajouter des amis</h2>
+      <label class="field">
+        <span class="field__label">Nom d'invocateur</span>
+        <input class="field__input" id="add-friend-name" name="name" type="text"
+               minlength="3" maxlength="16" required placeholder="Pseudo" autocomplete="off">
+      </label>
+      <p class="form-error" role="alert" hidden></p>
+      <div class="modal__actions">
+        <button class="btn btn--secondary" type="button" data-close-modal>Annuler</button>
+        <button class="btn btn--primary" type="submit" value="confirm">Envoyer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Inviter (clic sur "+") -->
+  <dialog class="modal hextech-frame" id="modal-invite" aria-labelledby="modal-invite-title">
+    <div class="modal__body">
+      <h2 class="modal__title" id="modal-invite-title">Inviter des amis</h2>
+      <!-- Rempli par lobby.js avec les amis en ligne ; data-slot = emplacement ciblé -->
+      <ul class="invite-list" id="invite-list"></ul>
+      <p class="social__empty" id="invite-empty" hidden>Aucun ami en ligne.</p>
+      <div class="modal__actions">
+        <button class="btn btn--secondary" type="button" data-close-modal>Fermer</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Paramètres -->
+  <dialog class="modal hextech-frame" id="modal-settings" aria-labelledby="modal-settings-title">
+    <form method="dialog" class="modal__body" id="settings-form">
+      <h2 class="modal__title" id="modal-settings-title">Paramètres</h2>
+
+      <label class="field field--inline">
+        <span class="field__label">Volume des effets</span>
+        <input class="field__range" id="setting-volume" name="volume" type="range" min="0" max="100" value="60">
+      </label>
+      <label class="field field--checkbox">
+        <input id="setting-chat-timestamps" name="chatTimestamps" type="checkbox" checked>
+        <span>Afficher l'heure dans le chat</span>
+      </label>
+      <label class="field field--checkbox">
+        <input id="setting-invite-sound" name="inviteSound" type="checkbox" checked>
+        <span>Son à la réception d'une invitation</span>
+      </label>
+      <label class="field field--checkbox">
+        <input id="setting-reduce-motion" name="reduceMotion" type="checkbox">
+        <span>Réduire les animations</span>
+      </label>
+
+      <div class="modal__actions">
+        <button class="btn btn--danger" type="button" id="logout-btn">Se déconnecter</button>
+        <button class="btn btn--primary" type="submit" value="confirm">Enregistrer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- =====================================================================
+       NOTIFICATIONS (invitations, toasts)
+       ===================================================================== -->
+  <div class="notifications" id="notifications" aria-live="assertive"></div>
+
+  <!-- Écran "Partie trouvée" -->
+  <div class="match-found" id="match-found" hidden>
+    <div class="match-found__ring" aria-hidden="true"></div>
+    <p class="match-found__title">PARTIE TROUVÉE</p>
+    <p class="match-found__subtitle">Chargement du plateau…</p>
+  </div>
+
+  <!-- Conteneur du plateau (Étape 4) -->
+  <section class="board-view" id="board-view" hidden aria-label="Plateau de jeu"></section>
+
+  <!-- =====================================================================
+       TEMPLATES (clonés par lobby.js / main.js)
+       ===================================================================== -->
+
+  <!-- Bannière d'un joueur présent -->
+  <template id="tpl-banner-player">
+    <div class="banner banner--filled" data-slot="" data-dropzone="false" role="listitem">
+      <div class="banner__frame">
+        <span class="banner__crown" title="Chef du salon" hidden></span>
+        <div class="summoner-icon summoner-icon--banner">
+          <img class="summoner-icon__img" src="" alt="">
+        </div>
+        <span class="banner__name"></span>
+        <span class="banner__status"></span>
+
+        <div class="role-picker">
+          <button class="role-picker__current" type="button" aria-haspopup="listbox" aria-expanded="false">
+            <span class="role-icon" data-role=""></span>
+            <span class="role-picker__label">Choisir un rôle</span>
+          </button>
+          <ul class="role-picker__list" role="listbox" hidden>
+            <li class="role-picker__option" role="option" data-role="TOP"><span class="role-icon" data-role="TOP"></span>Top</li>
+            <li class="role-picker__option" role="option" data-role="JGL"><span class="role-icon" data-role="JGL"></span>Jgl</li>
+            <li class="role-picker__option" role="option" data-role="MID"><span class="role-icon" data-role="MID"></span>Mid</li>
+            <li class="role-picker__option" role="option" data-role="ADC"><span class="role-icon" data-role="ADC"></span>Adc</li>
+            <li class="role-picker__option" role="option" data-role="SUPP"><span class="role-icon" data-role="SUPP"></span>Supp</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- Emplacement vide (avec éventuelle invitation en attente) -->
+  <template id="tpl-banner-empty">
+    <div class="banner banner--empty" data-slot="" data-dropzone="true" role="listitem">
+      <button class="banner__invite" type="button" data-invite-slot="" aria-label="Inviter un ami">
+        <span class="banner__plus" aria-hidden="true">+</span>
+      </button>
+      <span class="banner__pending" hidden></span>
+    </div>
+  </template>
+
+  <!-- Ami dans le panneau social -->
+  <template id="tpl-friend">
+    <li class="friend" draggable="true" data-name="" tabindex="0">
+      <div class="summoner-icon summoner-icon--sm">
+        <img class="summoner-icon__img" src="" alt="">
+        <span class="presence-dot"></span>
+      </div>
+      <div class="friend__info">
+        <span class="friend__name"></span>
+        <span class="friend__status"></span>
+      </div>
+    </li>
+  </template>
+
+  <!-- Demande d'ami entrante -->
+  <template id="tpl-friend-request">
+    <li class="friend friend--request" data-name="">
+      <div class="summoner-icon summoner-icon--sm">
+        <img class="summoner-icon__img" src="" alt="">
+      </div>
+      <span class="friend__name"></span>
+      <div class="friend__actions">
+        <button class="icon-btn icon-btn--accept" type="button" data-respond="accept" title="Accepter"></button>
+        <button class="icon-btn icon-btn--decline" type="button" data-respond="decline" title="Refuser"></button>
+      </div>
+    </li>
+  </template>
+
+  <!-- Message de chat -->
+  <template id="tpl-chat-message">
+    <li class="chat__message">
+      <time class="chat__time"></time>
+      <span class="chat__author"></span>
+      <span class="chat__text"></span>
+    </li>
+  </template>
+
+  <!-- Invitation reçue -->
+  <template id="tpl-invite-toast">
+    <div class="toast toast--invite hextech-frame" role="alertdialog">
+      <div class="summoner-icon summoner-icon--sm">
+        <img class="summoner-icon__img" src="" alt="">
+      </div>
+      <div class="toast__content">
+        <span class="toast__title"></span>
+        <span class="toast__text">t'invite dans son salon Monopoly</span>
+      </div>
+      <div class="toast__actions">
+        <button class="btn btn--primary btn--sm" type="button" data-invite-response="accept">Accepter</button>
+        <button class="btn btn--secondary btn--sm" type="button" data-invite-response="decline">Refuser</button>
+      </div>
+      <div class="toast__timer"></div>
+    </div>
+  </template>
+
+  <!-- =====================================================================
+       SCRIPTS
+       ===================================================================== -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="js/main.js" defer></script>
+  <script src="js/lobby.js" defer></script>
+  <script src="js/game.js" defer></script>
+</body>
+</html>
