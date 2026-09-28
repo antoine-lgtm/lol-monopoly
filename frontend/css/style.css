@@ -1210,13 +1210,14 @@ button.window-controls__btn:hover {
   padding-top: 38px;
 }
 
-/* Emblème SVG : double cadre doré, verre intérieur avec reflet, symbole gravé */
+/* Emblème SVG, comme dans le client : cadre doré mat et intérieur sombre uni ;
+   seul l'emblème sélectionné s'allume (verre bleu + reflet). */
 .emblem {
-  width: clamp(76px, 5.8vw, 108px);
-  height: clamp(76px, 5.8vw, 108px);
-  margin-bottom: 22px;
+  width: clamp(70px, 5.2vw, 96px);
+  height: clamp(70px, 5.2vw, 96px);
+  margin-bottom: 24px;
   overflow: visible;
-  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.65));
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.55));
   transition: transform 0.25s var(--ease), filter 0.25s;
 }
 .emblem__tabs,
@@ -1227,56 +1228,59 @@ button.window-controls__btn:hover {
   fill: #070c12;
 }
 .emblem__fill {
-  fill: url(#g-dark);
+  fill: #0c1622;
   transition: fill 0.2s;
 }
 .emblem__rim {
   fill: none;
-  stroke: url(#g-rim);
-  stroke-width: 1.2;
+  stroke: #9c7f4a;
+  stroke-width: 1;
 }
 .emblem__sheen {
   fill: #fff;
-  opacity: 0.05;
+  opacity: 0;
   transition: opacity 0.2s;
 }
-.emblem__sheen--thin {
-  opacity: 0.035;
-}
 .emblem__glyph {
-  fill: #0b1420;
-  stroke: url(#g-rim);
-  stroke-width: 1.6;
+  fill: none;
+  stroke: #b8975a;
+  stroke-width: 1.3;
   stroke-linejoin: round;
   transition: fill 0.2s, stroke 0.2s;
 }
 
-.mode-card:hover .emblem {
-  transform: translateY(-2px);
-  filter: drop-shadow(0 6px 12px rgba(200, 170, 110, 0.25));
-}
-.mode-card:hover .emblem__sheen {
-  opacity: 0.1;
+/* Logos pleins, sans cadre (comme TFT, après la ligne de séparation) */
+.emblem__solid {
+  fill: url(#g-flat);
+  transition: fill 0.2s;
 }
 
-/* Sélectionné : le verre s'allume en bleu, le symbole devient lumineux */
+.mode-card:hover .emblem {
+  transform: translateY(-2px);
+  filter: drop-shadow(0 4px 10px rgba(200, 170, 110, 0.25));
+}
+
 .mode-card.is-selected .emblem {
-  filter: drop-shadow(0 0 16px rgba(10, 200, 230, 0.4)) drop-shadow(0 6px 10px rgba(0, 0, 0, 0.6));
+  filter: drop-shadow(0 0 14px rgba(10, 200, 230, 0.35)) drop-shadow(0 4px 6px rgba(0, 0, 0, 0.55));
 }
 .mode-card.is-selected .emblem__fill {
   fill: url(#g-blue);
 }
 .mode-card.is-selected .emblem__sheen {
-  opacity: 0.32;
+  opacity: 0.3;
 }
 .mode-card.is-selected .emblem__sheen--thin {
-  opacity: 0.22;
+  opacity: 0.18;
 }
 .mode-card.is-selected .emblem__glyph {
-  fill: #f2fdff;
-  stroke: #ffffff;
-  stroke-width: 0.8;
-  filter: drop-shadow(0 0 3px rgba(160, 240, 255, 0.9));
+  fill: rgba(240, 252, 255, 0.9);
+  stroke: none;
+}
+.mode-card.is-selected .emblem__solid {
+  fill: #f4ecd8;
+}
+.mode-card.is-selected .emblem--flat {
+  filter: drop-shadow(0 0 12px rgba(10, 200, 230, 0.55)) drop-shadow(0 4px 6px rgba(0, 0, 0, 0.55));
 }
 
 .mode-card__tag {

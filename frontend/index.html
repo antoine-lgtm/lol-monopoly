@@ -20,11 +20,14 @@
   <svg class="svg-defs" aria-hidden="true" focusable="false">
     <defs>
       <linearGradient id="g-gold" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stop-color="#f7efdc"/>
-        <stop offset=".3" stop-color="#c8aa6e"/>
-        <stop offset=".62" stop-color="#7a5c2b"/>
-        <stop offset=".82" stop-color="#b8975a"/>
-        <stop offset="1" stop-color="#6b4f22"/>
+        <stop offset="0" stop-color="#dcc697"/>
+        <stop offset=".35" stop-color="#b8975a"/>
+        <stop offset=".7" stop-color="#7a5c2b"/>
+        <stop offset="1" stop-color="#5e451c"/>
+      </linearGradient>
+      <linearGradient id="g-flat" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#ede0c0"/>
+        <stop offset="1" stop-color="#c8aa6e"/>
       </linearGradient>
       <linearGradient id="g-rim" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0" stop-color="#e6d3a8"/>
@@ -211,36 +214,16 @@
             </button>
 
             <button class="mode-card mode-card--separated" type="button" role="radio" aria-checked="false" data-mode="shop">
-              <svg class="emblem" viewBox="0 0 80 80" aria-hidden="true">
-                <defs><clipPath id="emb-shop"><path d="M15.2 31 24.4 15.2h31.2l9.2 15.8v34.8H15.2z"/></clipPath></defs>
-                <path class="emblem__tabs" d="M4 38h4v10H4zM72 38h4v10h-4z"/>
-                <path class="emblem__frame" d="M8 29 20 8h40l12 21v44H8z"/>
-                <path class="emblem__gap" d="M11.6 30 22.2 11.6h35.6L68.4 30v39.4H11.6z"/>
-                <path class="emblem__fill" d="M15.2 31 24.4 15.2h31.2l9.2 15.8v34.8H15.2z"/>
-                <g clip-path="url(#emb-shop)">
-                  <path class="emblem__sheen" d="M-10 58 58-10h14L4 72z"/>
-                  <path class="emblem__sheen emblem__sheen--thin" d="M16 90 90 16h5L21 90z"/>
-                </g>
-                <path class="emblem__rim" d="M15.2 31 24.4 15.2h31.2l9.2 15.8v34.8H15.2z"/>
-                <path class="emblem__glyph" fill-rule="evenodd" d="M15.2 38h17.3l7.5-8 7.5 8h17.3v5H47.5L40 51.5 32.5 43H15.2z"/>
+              <svg class="emblem emblem--flat" viewBox="0 0 80 80" aria-hidden="true">
+                <path class="emblem__solid" fill-rule="evenodd" d="M8 34C8 21 20 13 40 13s32 8 32 21zM6 38h68v32H6zM20 38h5v32h-5zM55 38h5v32h-5zM20 17.6l5-1.6V34h-5zM55 16l5 1.6V34h-5zM34 44h12v12H34z"/>
               </svg>
               <span class="mode-card__tag">Or</span>
               <span class="mode-card__title">Boutique</span>
             </button>
 
             <button class="mode-card" type="button" role="radio" aria-checked="false" data-mode="settings">
-              <svg class="emblem" viewBox="0 0 80 80" aria-hidden="true">
-                <defs><clipPath id="emb-settings"><path d="M40 11.5a28.5 28.5 0 1 1 0 57 28.5 28.5 0 0 1 0-57z"/></clipPath></defs>
-                <path class="emblem__tabs" d="M37 0h6v5h-6zM37 75h6v5h-6zM0 37h5v6H0zM75 37h5v6h-5z"/>
-                <path class="emblem__frame" d="M40 4a36 36 0 1 1 0 72 36 36 0 0 1 0-72z"/>
-                <path class="emblem__gap" d="M40 7.8a32.2 32.2 0 1 1 0 64.4 32.2 32.2 0 0 1 0-64.4z"/>
-                <path class="emblem__fill" d="M40 11.5a28.5 28.5 0 1 1 0 57 28.5 28.5 0 0 1 0-57z"/>
-                <g clip-path="url(#emb-settings)">
-                  <path class="emblem__sheen" d="M-10 58 58-10h14L4 72z"/>
-                  <path class="emblem__sheen emblem__sheen--thin" d="M16 90 90 16h5L21 90z"/>
-                </g>
-                <path class="emblem__rim" d="M40 11.5a28.5 28.5 0 1 1 0 57 28.5 28.5 0 0 1 0-57z"/>
-                <path class="emblem__glyph" fill-rule="evenodd" d="M37.2 22h5.6l.9 4.4 2.9 1.2 3.8-2.5 3.9 3.9-2.5 3.8 1.2 2.9 4.4.9v5.6l-4.4.9-1.2 2.9 2.5 3.8-3.9 3.9-3.8-2.5-2.9 1.2-.9 4.4h-5.6l-.9-4.4-2.9-1.2-3.8 2.5-3.9-3.9 2.5-3.8-1.2-2.9-4.4-.9v-5.6l4.4-.9 1.2-2.9-2.5-3.8 3.9-3.9 3.8 2.5 2.9-1.2zM40 34.2a5.8 5.8 0 1 0 0 11.6 5.8 5.8 0 0 0 0-11.6z"/>
+              <svg class="emblem emblem--flat" viewBox="0 0 80 80" aria-hidden="true">
+                <path class="emblem__solid" fill-rule="evenodd" d="M35.2 8h9.6l1.5 7.6 5 2 6.4-4.3 6.8 6.8-4.3 6.4 2 5 7.6 1.5v9.6l-7.6 1.5-2 5 4.3 6.4-6.8 6.8-6.4-4.3-5 2-1.5 7.6h-9.6l-1.5-7.6-5-2-6.4 4.3-6.8-6.8 4.3-6.4-2-5L8 44.8v-9.6l7.6-1.5 2-5-4.3-6.4 6.8-6.8 6.4 4.3 5-2zM40 29a11 11 0 1 0 0 22 11 11 0 0 0 0-22z"/>
               </svg>
               <span class="mode-card__tag">Options</span>
               <span class="mode-card__title">Paramètres</span>
