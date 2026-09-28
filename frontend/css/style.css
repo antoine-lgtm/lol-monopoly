@@ -1266,6 +1266,59 @@ button.window-controls__btn:hover {
   stroke: #0b6a8a;
 }
 
+/* Carte « Rejoindre » : sort de Téléportation (portail violet vu à travers le cadre) */
+.emblem--tp .emblem__fill,
+.mode-card.is-selected .emblem--tp .emblem__fill {
+  fill: #12072a;
+}
+.emblem__portal-glow {
+  fill: url(#g-tp);
+  opacity: 0.35;
+  transition: opacity 0.25s;
+}
+.emblem__portal-ring {
+  fill: none;
+  stroke: #c9a2ff;
+  stroke-width: 0.8;
+  stroke-dasharray: 3 4;
+  opacity: 0.6;
+}
+.emblem--tp .emblem__glyph {
+  fill: #a987d8;
+  stroke: #cdb4f0;
+  stroke-width: 0.5;
+  filter: drop-shadow(0 0 2px #8a4fd6);
+}
+.mode-card.is-selected .emblem--tp .emblem__glyph {
+  fill: #e2cbff;
+  stroke: #f7eeff;
+  filter: drop-shadow(0 0 3px #b06cff);
+}
+.emblem__portal-core {
+  fill: #e9dcff;
+  filter: drop-shadow(0 0 3px #e8ccff) drop-shadow(0 0 6px #b06cff);
+}
+.emblem__swirl {
+  transform-box: view-box;
+  transform-origin: 40.5px 40px;
+  animation: spin 24s linear infinite reverse;
+}
+.mode-card:hover .emblem__portal-glow {
+  opacity: 0.75;
+}
+.mode-card.is-selected .emblem__portal-glow {
+  opacity: 1;
+}
+.mode-card.is-selected .emblem__portal-core {
+  fill: #fff;
+}
+.mode-card.is-selected .emblem__swirl {
+  animation-duration: 6s;
+}
+.mode-card.is-selected .emblem--tp {
+  filter: drop-shadow(0 0 16px rgba(176, 108, 255, 0.55)) drop-shadow(0 4px 6px rgba(0, 0, 0, 0.55));
+}
+
 /* Logos pleins, sans cadre (comme TFT, après la ligne de séparation) */
 .emblem__solid {
   fill: url(#g-flat);
