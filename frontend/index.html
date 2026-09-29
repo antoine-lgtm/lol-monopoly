@@ -404,7 +404,7 @@
           <!-- Panneau à onglets (bas droite) -->
           <section class="lobby-panel" aria-label="Infos du salon">
             <div class="lobby-panel__tabs" role="tablist">
-              <button class="lobby-panel__tab is-active" type="button" role="tab" aria-selected="true" aria-controls="panel-room" id="tab-room">Salon</button>
+              <button class="lobby-panel__tab is-active" type="button" role="tab" aria-selected="true" aria-controls="panel-room" id="tab-room">Partie</button>
               <button class="lobby-panel__tab" type="button" role="tab" aria-selected="false" aria-controls="panel-invites" id="tab-invites">Invités (<span id="invites-count">0</span>)</button>
             </div>
             <div class="lobby-panel__body" id="panel-room" role="tabpanel" aria-labelledby="tab-room">
@@ -417,6 +417,20 @@
                 </span>
                 <span class="lobby-code__copy" aria-hidden="true"></span>
               </button>
+              <ul class="room-rules" aria-label="Règles de la partie">
+                <li class="room-rules__item room-rules__item--gold">
+                  <span class="room-rules__label">Or de départ</span>
+                  <span class="room-rules__value">1 500</span>
+                </li>
+                <li class="room-rules__item room-rules__item--baron">
+                  <span class="room-rules__label">Baron</span>
+                  <span class="room-rules__value">3ᵉ tour</span>
+                </li>
+                <li class="room-rules__item room-rules__item--players">
+                  <span class="room-rules__label">Joueurs</span>
+                  <span class="room-rules__value" id="room-players">1/5</span>
+                </li>
+              </ul>
             </div>
             <div class="lobby-panel__body" id="panel-invites" role="tabpanel" aria-labelledby="tab-invites" hidden>
               <!-- Rempli par lobby.js : <li class="invite-item"> -->
@@ -670,9 +684,9 @@
         </div>
       </div>
       <svg class="banner__tip" viewBox="0 0 250 70" preserveAspectRatio="none" aria-hidden="true">
-        <path class="banner__tip-back" d="M0 0h250v14l-40 18-24-6-61 44-61-44-24 6L0 14z"/>
-        <path class="banner__tip-edge" d="M0 14l40 18 24-6 61 44 61-44 24 6 40-18"/>
-        <path class="banner__tip-gem" d="M125 40l9 12-9 12-9-12z"/>
+        <path class="banner__tip-back" d="M0 0h250v10C214 18 178 28 150 44c-10 6-18 13-25 22-7-9-15-16-25-22C72 28 36 18 0 10z"/>
+        <path class="banner__tip-edge" d="M0 10C36 18 72 28 100 44c10 6 18 13 25 22 7-9 15-16 25-22 28-16 64-26 100-34"/>
+        <path class="banner__tip-gem" d="M125 38c4 4 7 8 7 12s-3 8-7 12c-4-4-7-8-7-12s3-8 7-12z"/>
       </svg>
       <span class="banner__badge" hidden>Chef du salon</span>
     </div>

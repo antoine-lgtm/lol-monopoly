@@ -127,6 +127,7 @@
 
   function renderTools(lobby) {
     $('#lobby-code-value').textContent = lobby.code;
+    $('#room-players').textContent = `${players(lobby).length}/${lobby.maxPlayers}`;
     const toggle = $('#lobby-open');
     toggle.checked = lobby.open;
     toggle.disabled = !isOwner();
