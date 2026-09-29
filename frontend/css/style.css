@@ -1063,6 +1063,41 @@ button.window-controls__btn:hover {
     #0a1c2a;
 }
 
+/* Poussières lumineuses qui dérivent devant les montagnes (deux couches, deux vitesses) */
+.view__background--home::before,
+.view__background--home::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 -40%;
+  pointer-events: none;
+  background-repeat: repeat;
+  animation: dust-drift 60s linear infinite;
+}
+.view__background--home::before {
+  background-image:
+    radial-gradient(circle at 12% 30%, rgba(200, 225, 240, 0.55) 0, transparent 1.2px),
+    radial-gradient(circle at 47% 72%, rgba(200, 225, 240, 0.4) 0, transparent 1px),
+    radial-gradient(circle at 78% 18%, rgba(240, 230, 210, 0.45) 0, transparent 1.3px),
+    radial-gradient(circle at 63% 48%, rgba(200, 225, 240, 0.35) 0, transparent 1px),
+    radial-gradient(circle at 28% 88%, rgba(240, 230, 210, 0.4) 0, transparent 1.1px);
+  background-size: 420px 380px;
+  opacity: 0.7;
+}
+.view__background--home::after {
+  background-image:
+    radial-gradient(circle at 22% 62%, rgba(220, 235, 245, 0.35) 0, transparent 1.8px),
+    radial-gradient(circle at 70% 26%, rgba(240, 230, 210, 0.3) 0, transparent 2px),
+    radial-gradient(circle at 88% 80%, rgba(220, 235, 245, 0.28) 0, transparent 1.6px);
+  background-size: 640px 560px;
+  filter: blur(0.6px);
+  opacity: 0.6;
+  animation-duration: 38s;
+}
+@keyframes dust-drift {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-60px, -28%, 0); }
+}
+
 /* Salon : Faille de l'Invocateur */
 .view__background--rift {
   background: var(--rift-image) center / cover no-repeat, #0b1c17;
@@ -1463,6 +1498,12 @@ button.window-controls__btn:hover {
 }
 .mode-card:hover .mode-card__title {
   color: var(--gold-1);
+  text-shadow: 0 0 10px rgba(240, 230, 210, 0.2);
+}
+
+/* Survol : un fin trait doré s'allume sur la ligne de séparation */
+.mode-card:not(.is-selected):hover::before {
+  opacity: 0.45;
 }
 .mode-card.is-selected .mode-card__title {
   color: #fff;
