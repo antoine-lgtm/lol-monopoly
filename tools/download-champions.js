@@ -58,9 +58,11 @@ function fetchImage(url, redirects = 3) {
 }
 
 const failures = new Map(); // hôte -> première erreur rencontrée
+let networkDown = false; // connexion coupée (pas une simple image manquante) : on arrête tout
 
 async function downloadOne(kind, id, file) {
   for (const url of sourcesFor(kind, id)) {
+    if (networkDown) return false;
     try {
       const data = await fetchImage(url);
       fs.writeFileSync(file, data);
@@ -68,6 +70,7 @@ async function downloadOne(kind, id, file) {
     } catch (err) {
       const host = new URL(url).host;
       if (!failures.has(host)) failures.set(host, `${err.code || err.message} (${url})`);
+      if (err.code) networkDown = [...failures.values()].length >= 2 || networkDown;
     }
   }
   return false;
@@ -100,6 +103,6 @@ async function downloadOne(kind, id, file) {
     return;
   }
   console.log(`${ok}/${jobs.length} illustrations téléchargées.`);
-  for (const [host, reason] of failures) console.log(`  ${host} : ${reason}`);
-  console.log('Relance avec « npm run images » quand ta connexion le permet.');
+  if (verbose) for (const [host, reason] of failures) console.log(`  ${host} : ${reason}`);
+  console.log('Pas grave : le navigateur chargera les illustrations directement pendant la partie.');
 })().catch((err) => console.log('Téléchargement des illustrations impossible :', err.message));
