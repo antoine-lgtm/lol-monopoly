@@ -483,8 +483,8 @@
     button.disabled = true;
     button.classList.add('is-searching');
     socket.emit('lobby:start', {}, (res) => {
-      if (res?.ok) return;
       button.classList.remove('is-searching');
+      if (res?.ok) return;
       renderFindMatch(App.lobby);
       App.toast(res?.error || 'Impossible de lancer la partie.', 'error');
     });
@@ -493,11 +493,8 @@
   socket.on('lobby:matchFound', () => {
     const overlay = $('#match-found');
     overlay.hidden = false;
-    // Le plateau arrive à l'étape 4 : pour l'instant on referme l'écran après quelques secondes.
-    setTimeout(() => {
-      overlay.hidden = true;
-      App.toast('Partie lancée ! Le plateau arrive à l’étape 4.', 'success', 6000);
-    }, 3500);
+    // Le plateau (game.js) s'ouvre derrière cet écran ; on le révèle après l'animation.
+    setTimeout(() => { overlay.hidden = true; }, 2600);
   });
 
   // ---------------------------------------------------------------------------

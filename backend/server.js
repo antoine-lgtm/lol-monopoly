@@ -5,8 +5,8 @@
  * Express (fichiers statiques) + Socket.io (présences, amis, lobbies, chat).
  *
  * L'état est gardé en mémoire : c'est un jeu privé entre amis, un redémarrage
- * du serveur remet tout à zéro. La logique du plateau (gameLogic.js) sera
- * branchée à l'Étape 4 sur l'événement `lobby:start`.
+ * du serveur remet tout à zéro. La logique du plateau est dans game.js :
+ * une partie est créée sur `lobby:start` et vit dans `lobby.game`.
  */
 
 const path = require('path');
@@ -14,6 +14,7 @@ const http = require('http');
 const crypto = require('crypto');
 const express = require('express');
 const { Server } = require('socket.io');
+const { Game } = require('./game');
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -29,6 +30,7 @@ const CHAT_HISTORY_SIZE = 50;
 const CHAT_RATE_LIMIT = { max: 5, windowMs: 3000 };
 const RECONNECT_GRACE_MS = 30_000; // rafraîchir la page ne fait pas quitter le lobby
 const INVITE_TTL_MS = 60_000;
+const AUTOPLAY_DELAY_MS = 15_000; // un joueur déconnecté joue automatiquement après ce délai
 
 const NAME_PATTERN = /^[\p{L}\p{N} _.-]{3,16}$/u;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -77,6 +79,7 @@ const users = new Map();
  * @property {Array<{key: string, role: string|null}|null>} slots
  * @property {Map<string, {slot: number, from: string, expiresAt: number}>} invites
  * @property {Array<Object>} chat
+ * @property {Game|null} game
  */
 
 /** @type {Map<string, Lobby>} */
@@ -217,6 +220,8 @@ function createLobby(ownerKey) {
     slots: Array(MAX_PLAYERS).fill(null),
     invites: new Map(),
     chat: [],
+    game: null,
+    autoplayTimer: null,
   };
   lobbies.set(id, lobby);
   lobbyCodes.set(code, id);
@@ -255,11 +260,18 @@ function removeFromLobby(user, reason = 'left') {
   const index = lobby.slots.findIndex((s) => s && s.key === user.key);
   if (index !== -1) lobby.slots[index] = null;
 
+  // Quitter le salon pendant une partie = abandon
+  if (lobby.game && lobby.status === 'in-game' && lobby.game.player(user.key)) {
+    lobby.game.forfeit(user.key);
+    broadcastGame(lobby);
+  }
+
   const socket = user.socketId && io.sockets.sockets.get(user.socketId);
   if (socket) socket.leave(lobbyRoom(lobby.id));
 
   const remaining = lobby.slots.filter(Boolean);
   if (remaining.length === 0) {
+    clearTimeout(lobby.autoplayTimer);
     deleteLobby(lobby);
     return;
   }
@@ -287,6 +299,42 @@ function putInFreshLobby(user) {
 
 function currentLobby(user) {
   return (user.lobbyId && lobbies.get(user.lobbyId)) || null;
+}
+
+// ---------------------------------------------------------------------------
+// Partie
+// ---------------------------------------------------------------------------
+
+function broadcastGame(lobby) {
+  const game = lobby.game;
+  if (!game) return;
+  io.to(lobbyRoom(lobby.id)).emit('game:state', game.serialize());
+
+  // Fin de partie : le salon redevient disponible pour une revanche
+  if (game.phase === 'over' && lobby.status === 'in-game') {
+    lobby.status = 'lobby';
+    const winner = game.player(game.winner);
+    systemMessage(lobby, winner ? `${winner.name} remporte la partie !` : 'Partie terminée.');
+    broadcastLobby(lobby);
+    broadcastLobbyPresence(lobby);
+  }
+  scheduleAutoplay(lobby);
+}
+
+/** Si le joueur dont c'est le tour est déconnecté, on joue pour lui après un délai. */
+function scheduleAutoplay(lobby) {
+  clearTimeout(lobby.autoplayTimer);
+  lobby.autoplayTimer = null;
+  const game = lobby.game;
+  if (!game || game.phase === 'over') return;
+  const user = users.get(game.currentPlayer.key);
+  if (user && user.socketId) return;
+  lobby.autoplayTimer = setTimeout(() => {
+    lobby.autoplayTimer = null;
+    if (lobby.game !== game || game.phase === 'over') return;
+    game.autoStep();
+    broadcastGame(lobby);
+  }, AUTOPLAY_DELAY_MS);
 }
 
 // Purge périodique des invitations expirées
@@ -368,6 +416,10 @@ io.on('connection', (socket) => {
       socket.emit('chat:history', lobby.chat);
       broadcastLobby(lobby);
       broadcastPresence(key);
+      if (lobby.game && lobby.status === 'in-game') {
+        socket.emit('game:state', { ...lobby.game.serialize(), fx: [] });
+        scheduleAutoplay(lobby);
+      }
     } else {
       putInFreshLobby(user);
     }
@@ -553,14 +605,54 @@ io.on('connection', (socket) => {
 
     lobby.status = 'in-game';
     lobby.invites.clear();
+    // Ordre de jeu : l'ordre visuel des colonnes (slots), le chef en premier
+    const order = [...players].sort((a, b) => (a.key === lobby.ownerKey ? -1 : b.key === lobby.ownerKey ? 1 : 0));
+    lobby.game = new Game(order.map((s) => {
+      const u = users.get(s.key);
+      return { key: u.key, name: u.name, icon: u.icon };
+    }));
     systemMessage(lobby, 'Partie trouvée ! Chargement de la Faille…');
     broadcastLobby(lobby);
     broadcastLobbyPresence(lobby);
-    // Étape 4 : gameLogic.createGame(lobby) sera appelé ici.
     io.to(lobbyRoom(lobby.id)).emit('lobby:matchFound', {
       lobbyId: lobby.id,
       players: players.map((s) => ({ name: users.get(s.key).name, role: s.role })),
     });
+    broadcastGame(lobby);
+    reply(ack, { ok: true });
+  }));
+
+  // --- Partie ----------------------------------------------------------------
+
+  const GAME_ACTIONS = {
+    'game:roll': (g) => g.roll(me.key),
+    'game:buy': (g) => g.buy(me.key),
+    'game:skip': (g) => g.skipBuy(me.key),
+    'game:tax': (g, { choice }) => g.payTax(me.key, choice),
+    'game:payJail': (g) => g.payJail(me.key),
+    'game:useCard': (g) => g.useJailCard(me.key),
+    'game:build': (g, { index }) => g.build(me.key, Number(index)),
+    'game:sell': (g, { index }) => g.sell(me.key, Number(index)),
+    'game:mortgage': (g, { index }) => g.mortgage(me.key, Number(index)),
+    'game:unmortgage': (g, { index }) => g.unmortgage(me.key, Number(index)),
+    'game:end': (g) => g.endTurn(me.key),
+    'game:forfeit': (g) => g.forfeit(me.key),
+  };
+  for (const [event, action] of Object.entries(GAME_ACTIONS)) {
+    socket.on(event, authed((payload, ack) => {
+      const lobby = currentLobby(me);
+      const game = lobby && lobby.game;
+      if (!game || lobby.status !== 'in-game') return fail(ack, 'Aucune partie en cours.');
+      const result = action(game, payload);
+      if (result.ok) broadcastGame(lobby);
+      reply(ack, result);
+    }));
+  }
+
+  socket.on('game:sync', authed((_payload, ack) => {
+    const lobby = currentLobby(me);
+    if (!lobby || !lobby.game) return fail(ack, 'Aucune partie.');
+    socket.emit('game:state', { ...lobby.game.serialize(), fx: [] });
     reply(ack, { ok: true });
   }));
 
@@ -592,6 +684,7 @@ io.on('connection', (socket) => {
 
     const lobby = currentLobby(user);
     if (lobby) broadcastLobby(lobby);
+    if (lobby && lobby.game) scheduleAutoplay(lobby);
     broadcastPresence(user.key);
 
     // Fenêtre de grâce avant de libérer sa place (F5, micro-coupure…)

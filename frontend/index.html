@@ -649,7 +649,76 @@
   </div>
 
   <!-- Conteneur du plateau (Étape 4) -->
-  <section class="board-view" id="board-view" hidden aria-label="Plateau de jeu"></section>
+  <!-- =====================================================================
+       PLATEAU DE JEU (Étape 4) — scène 3D en CSS, remplie par game.js
+       ===================================================================== -->
+  <section class="board-view" id="board-view" hidden aria-label="Plateau de jeu">
+    <div class="gv-bg" aria-hidden="true"></div>
+
+    <header class="gv-top">
+      <div class="gv-top__brand"><span class="gv-top__logo" aria-hidden="true">M</span>League of Monopoly</div>
+      <div class="gv-top__info">
+        <span class="gv-pill">Tour <b id="gv-round">1</b></span>
+        <span class="gv-pill gv-pill--baron" id="gv-baron">Baron au 3ᵉ tour</span>
+      </div>
+      <button class="gv-btn gv-btn--ghost" type="button" id="gv-forfeit">Abandonner</button>
+    </header>
+
+    <aside class="gv-players" id="gv-players" aria-label="Joueurs"></aside>
+
+    <div class="gv-scene" id="gv-scene">
+      <div class="gv-camera" id="gv-camera">
+        <div class="gv-board" id="gv-board">
+          <div class="gv-center">
+            <div class="gv-center__logo" aria-hidden="true">
+              <span class="gv-center__league">League of</span>
+              <span class="gv-center__title">MONOPOLY</span>
+              <span class="gv-center__sub">Faille de l’Invocateur</span>
+            </div>
+            <div class="gv-deck gv-deck--chance" aria-hidden="true"><span>Ping SS</span></div>
+            <div class="gv-deck gv-deck--chest" aria-hidden="true"><span>Coffre Hextech</span></div>
+          </div>
+          <div class="gv-edge gv-edge--s" aria-hidden="true"></div>
+          <div class="gv-edge gv-edge--n" aria-hidden="true"></div>
+          <div class="gv-edge gv-edge--e" aria-hidden="true"></div>
+          <div class="gv-edge gv-edge--w" aria-hidden="true"></div>
+          <div class="gv-dice" id="gv-dice" aria-hidden="true"></div>
+          <div class="gv-pieces" id="gv-pieces" aria-hidden="true"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="gv-cam" role="group" aria-label="Caméra">
+      <button class="gv-cam__btn" type="button" data-cam="left" title="Tourner à gauche">⟲</button>
+      <button class="gv-cam__btn" type="button" data-cam="reset" title="Vue par défaut">◎</button>
+      <button class="gv-cam__btn" type="button" data-cam="right" title="Tourner à droite">⟳</button>
+    </div>
+
+    <div class="gv-actions" id="gv-actions">
+      <p class="gv-actions__status" id="gv-status"></p>
+      <div class="gv-actions__buttons" id="gv-buttons"></div>
+    </div>
+
+    <aside class="gv-side">
+      <div class="gv-side__tabs" role="tablist">
+        <button class="gv-side__tab is-active" type="button" data-gv-tab="log">Journal</button>
+        <button class="gv-side__tab" type="button" data-gv-tab="mine">Mes cases</button>
+        <button class="gv-side__tab" type="button" data-gv-tab="chat">Chat</button>
+      </div>
+      <ol class="gv-log" id="gv-log" data-gv-panel="log"></ol>
+      <div class="gv-mine" id="gv-mine" data-gv-panel="mine" hidden></div>
+      <div class="gv-chat" data-gv-panel="chat" hidden>
+        <ol class="gv-chat__list" id="gv-chat-list"></ol>
+        <form class="gv-chat__form" id="gv-chat-form" autocomplete="off">
+          <input class="gv-chat__input" id="gv-chat-input" type="text" maxlength="300" placeholder="Message à la partie…">
+        </form>
+      </div>
+    </aside>
+
+    <div class="gv-inspect" id="gv-inspect" hidden></div>
+    <div class="gv-cardfx" id="gv-cardfx" hidden></div>
+    <div class="gv-over" id="gv-over" hidden></div>
+  </section>
 
   <!-- =====================================================================
        TEMPLATES (clonés par lobby.js / main.js)
