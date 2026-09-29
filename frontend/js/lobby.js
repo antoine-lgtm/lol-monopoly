@@ -22,6 +22,27 @@
   let previousLobbyId = null;
   let previousPlayers = 0;
 
+  // ---------------------------------------------------------------------------
+  // Les bannières grandissent avec la fenêtre : 5 colonnes sur toute la largeur,
+  // sans descendre sous le chat, FIND MATCH et le panneau Partie.
+  // ---------------------------------------------------------------------------
+
+  const BANNER_W = 196; // largeur d'une colonne à l'échelle 1 (--col)
+  const BANNER_H = 540; // hauteur d'une colonne à l'échelle 1
+  const FOOTER_SPACE = 170; // place gardée en bas pour le chat et FIND MATCH
+
+  function fitBanners() {
+    const view = $('#view-lobby');
+    if (view.hidden) return;
+    const width = banners.clientWidth - 32;
+    const height = view.clientHeight - FOOTER_SPACE;
+    const zoom = Math.max(0.7, Math.min(width / (5 * BANNER_W), height / BANNER_H, 1.6));
+    banners.style.setProperty('--banner-zoom', zoom.toFixed(3));
+  }
+
+  new ResizeObserver(fitBanners).observe($('#view-lobby'));
+  document.addEventListener('app:view', fitBanners);
+
   const players = (lobby) => lobby.slots.filter((s) => s.player);
   const isOwner = () => Boolean(App.lobby && App.me && App.lobby.owner === App.me.name);
 
