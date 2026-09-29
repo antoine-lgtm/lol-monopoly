@@ -3603,3 +3603,18 @@ body.hide-chat-time .chat__time {
 .room-rules__item {
   border-radius: 12px;
 }
+
+/* Carte « Salon ouvert » (haut du panneau social) : carte arrondie posée sur le panneau */
+.party-card {
+  margin: 10px 10px 6px;
+  border: 1px solid rgba(95, 174, 106, 0.4);
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+.party-card .queue-icon {
+  border-radius: 12px;
+}
+/* Les icônes de file du salon aussi, un peu plus douces */
+.queue-icon {
+  border-radius: 8px;
+}
