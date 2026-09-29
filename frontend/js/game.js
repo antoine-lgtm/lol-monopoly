@@ -106,7 +106,10 @@
     const [kind, name] = file.split('/');
     const id = name.replace('_0.jpg', '');
     const cdragon = `https://cdn.communitydragon.org/latest/champion/${id}`;
-    const backups = kind === 'splash' ? [`${cdragon}/splash-art/centered`] : [`${cdragon}/portrait`, `${cdragon}/square`];
+    const square = `https://ddragon.leagueoflegends.com/cdn/14.24.1/img/champion/${id}.png`;
+    const backups = kind === 'splash'
+      ? [`${cdragon}/splash-art/centered`, `${cdragon}/splash-art`, square]
+      : [`${cdragon}/portrait`, square, `${cdragon}/square`];
     const sources = [`assets/champions/${file}`, `${DDRAGON}/${file}`, ...backups];
     img.referrerPolicy = 'no-referrer';
     img.addEventListener('error', () => {
