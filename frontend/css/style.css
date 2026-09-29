@@ -3618,3 +3618,11 @@ body.hide-chat-time .chat__time {
 .queue-icon {
   border-radius: 8px;
 }
+
+/* Colonnes sans icône d'invocateur : l'emblème (ailes + anneau + gemme) suffit */
+.banner__crest {
+  height: calc(var(--u) * 150);
+}
+.banner__gem {
+  top: 35%;
+}

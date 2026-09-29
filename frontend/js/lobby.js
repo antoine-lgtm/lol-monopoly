@@ -107,9 +107,6 @@
     status.textContent = !player.connected ? 'Reconnexion…' : titleFor(player.name);
     status.title = player.isOwner ? 'Chef du salon' : '';
 
-    const img = $('.summoner-icon__img', el);
-    img.src = App.iconUrl(player.icon);
-    img.alt = `Icône de ${player.name}`;
 
     const current = $('.role-picker__current', el);
     $('.role-icon', current).dataset.role = player.role || '';
