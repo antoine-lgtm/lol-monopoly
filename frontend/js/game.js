@@ -88,6 +88,25 @@
   // Construction du plateau
   // ---------------------------------------------------------------------------
 
+  // Illustrations officielles des champions (Data Dragon de Riot), chargées par le
+  // navigateur du joueur. Si elles ne chargent pas, la case garde son style sans image.
+  const DDRAGON = 'https://ddragon.leagueoflegends.com/cdn/img/champion';
+  const champId = (sq) => sq.name.replace(/[^A-Za-z]/g, '');
+  const portraitUrl = (sq) => `${DDRAGON}/loading/${champId(sq)}_0.jpg`;
+  const splashUrl = (sq) => `${DDRAGON}/splash/${champId(sq)}_0.jpg`;
+
+  function champImage(className, src) {
+    const img = document.createElement('img');
+    img.className = className;
+    img.src = src;
+    img.alt = '';
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    img.draggable = false;
+    img.addEventListener('error', () => img.remove(), { once: true });
+    return img;
+  }
+
   const ICONS = {
     go: 'fountain', jail: 'jail', baron: 'baron', gotojail: 'hook',
     chance: 'ping', chest: 'chest', dragon: 'dragon', potion: 'potion', tax: 'minion',
@@ -114,6 +133,7 @@
     inner.className = 'gv-sq__inner';
     if (sq.type === 'property') {
       inner.innerHTML = '<span class="gv-sq__band"></span>';
+      inner.append(champImage('gv-sq__art', portraitUrl(sq)));
     } else {
       const icon = document.createElement('span');
       icon.className = `gv-sq__icon gv-ico gv-ico--${ICONS[sq.type] || 'ping'}`;
@@ -566,6 +586,7 @@
       const lvl = document.createElement('span');
       lvl.className = 'gv-mine__level';
       lvl.textContent = st.mortgaged ? 'Hypothéquée' : st.level === 5 ? 'Inhibiteur' : st.level ? `T${st.level}` : `${fmt(state.rents[i])} Or`;
+      if (sq.type === 'property') row.append(champImage('gv-mine__art', portraitUrl(sq)));
       row.append(name, lvl);
       row.addEventListener('click', () => openInspect(i));
       box.append(row);
@@ -597,6 +618,10 @@
     title.className = 'gv-inspect__title';
     title.textContent = sq.name;
     head.append(kicker, title);
+    if (sq.type === 'property') {
+      card.classList.add('has-art');
+      head.prepend(champImage('gv-inspect__art', splashUrl(sq)));
+    }
 
     const close = document.createElement('button');
     close.type = 'button';

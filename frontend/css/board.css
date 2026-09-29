@@ -1404,3 +1404,94 @@ body.in-game .notifications {
    pour laisser voir la fosse du Baron et celle du Dragon */
 .gv-deck--chance { left: 6%; top: 50%; }
 .gv-deck--chest { right: 6%; bottom: 50%; }
+
+/* =====================================================================
+   Illustrations des champions sur leurs cases
+   ===================================================================== */
+.gv-sq__art {
+  position: absolute;
+  top: 24%;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  width: 100%;
+  height: 76%;
+  object-fit: cover;
+  object-position: 50% 14%;
+  pointer-events: none;
+}
+.gv-sq--property .gv-sq__inner::before {
+  /* dégradé sombre en bas pour garder le nom et le prix lisibles */
+  content: '';
+  position: absolute;
+  top: 24%;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--group) 25%, transparent) 0%, transparent 30%, rgba(4, 10, 16, 0.55) 58%, rgba(4, 10, 16, 0.95) 88%);
+  pointer-events: none;
+}
+.gv-sq--property .gv-sq__band,
+.gv-sq--property .gv-sq__name,
+.gv-sq--property .gv-sq__price,
+.gv-sq--property .gv-sq__owner {
+  position: relative;
+  z-index: 2;
+}
+.gv-sq--property .gv-sq__owner {
+  position: absolute;
+}
+.gv-sq--property .gv-sq__name {
+  margin-top: auto;
+  margin-bottom: 2px;
+  text-shadow: 0 1px 3px #000, 0 0 6px #000;
+}
+.gv-sq--property:hover .gv-sq__art {
+  filter: brightness(1.2) saturate(1.1);
+}
+
+/* Fiche : grande illustration en tête */
+.gv-inspect__card.has-art .gv-inspect__head {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 140px;
+  overflow: hidden;
+}
+.gv-inspect__art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 22%;
+}
+.gv-inspect__card.has-art .gv-inspect__head::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 30%, color-mix(in srgb, var(--group) 70%, #05080c) 100%);
+}
+.gv-inspect__card.has-art .gv-inspect__kicker,
+.gv-inspect__card.has-art .gv-inspect__title {
+  position: relative;
+  z-index: 1;
+}
+
+/* Mes cases : petit portrait rond */
+.gv-mine__art {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: 50% 12%;
+  border: 2px solid var(--group);
+}
+.gv-mine__name {
+  flex: 1;
+}
