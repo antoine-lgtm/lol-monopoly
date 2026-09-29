@@ -167,6 +167,7 @@ function serializeLobby(lobby) {
     id: lobby.id,
     code: lobby.code,
     status: lobby.status,
+    open: lobby.open,
     owner: users.get(lobby.ownerKey)?.name ?? null,
     maxPlayers: MAX_PLAYERS,
     minPlayers: MIN_PLAYERS_TO_START,
@@ -212,6 +213,7 @@ function createLobby(ownerKey) {
     code,
     ownerKey,
     status: 'lobby',
+    open: true, // salon ouvert : on peut le rejoindre avec le code
     slots: Array(MAX_PLAYERS).fill(null),
     invites: new Map(),
     chat: [],
@@ -374,6 +376,15 @@ io.on('connection', (socket) => {
     sendFriendList(key);
   });
 
+  socket.on('session:setIcon', authed(({ icon }, ack) => {
+    if (!Number.isInteger(icon) || icon < 0 || icon >= ICON_COUNT) return fail(ack, 'Icône inconnue.');
+    me.icon = icon;
+    const lobby = currentLobby(me);
+    if (lobby) broadcastLobby(lobby);
+    broadcastPresence(me.key);
+    reply(ack, { ok: true, icon });
+  }));
+
   // --- Amis ------------------------------------------------------------------
 
   socket.on('friends:add', authed(({ name }, ack) => {
@@ -436,6 +447,7 @@ io.on('connection', (socket) => {
     const lobby = lobbyId && lobbies.get(lobbyId);
     if (!lobby) return fail(ack, 'Aucun salon ne correspond à ce code.');
     if (lobby.id === me.lobbyId) return fail(ack, 'Tu es déjà dans ce salon.');
+    if (!lobby.open) return fail(ack, 'Ce salon est fermé : demande une invitation au chef.');
     if (lobby.status !== 'lobby') return fail(ack, 'Ce salon est déjà en partie.');
     if (!lobby.slots.includes(null)) return fail(ack, 'Ce salon est complet.');
 
@@ -449,6 +461,15 @@ io.on('connection', (socket) => {
 
   socket.on('lobby:leave', authed((_payload, ack) => {
     putInFreshLobby(me);
+    reply(ack, { ok: true });
+  }));
+
+  socket.on('lobby:setOpen', authed(({ open }, ack) => {
+    const lobby = currentLobby(me);
+    if (!lobby || lobby.ownerKey !== me.key) return fail(ack, 'Seul le chef du salon peut changer ça.');
+    lobby.open = Boolean(open);
+    systemMessage(lobby, lobby.open ? 'Le salon est ouvert : on peut le rejoindre avec le code.' : 'Le salon est fermé : sur invitation uniquement.');
+    broadcastLobby(lobby);
     reply(ack, { ok: true });
   }));
 

@@ -964,7 +964,7 @@ p {
   align-items: center;
   gap: 12px;
   min-width: 0;
-  margin-top: 6px; /* laisse la place aux boutons de fenêtre */
+  margin-top: 16px; /* laisse la place aux boutons de fenêtre */
 }
 .profile__identity {
   display: flex;
@@ -1923,7 +1923,8 @@ button.window-controls__btn:hover {
 }
 
 /* ----- Place occupée : bannière suspendue ----- */
-.banner--filled {
+/* .is-new : seulement pour un joueur qui vient d'arriver (sinon l'animation rejouerait à chaque mise à jour) */
+.banner--filled.is-new {
   animation: banner-drop 0.55s var(--ease);
 }
 
@@ -2915,7 +2916,7 @@ button.window-controls__btn:hover {
    -------------------------------------------------------------------------- */
 .notifications {
   position: fixed;
-  top: calc(var(--topbar-h) + 12px);
+  top: calc(var(--topbar-h) + 64px); /* sous l'en-tête du salon et ses boutons */
   right: calc(var(--social-w) + 16px);
   z-index: 90;
   display: flex;
@@ -3236,4 +3237,9 @@ body.reduce-motion .toast__timer {
     right: 16px;
     width: auto;
   }
+}
+
+/* Paramètre « Afficher l'heure dans le chat » décoché */
+body.hide-chat-time .chat__time {
+  display: none;
 }
