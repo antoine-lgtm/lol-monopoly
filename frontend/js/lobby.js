@@ -24,6 +24,19 @@
 
 
   const players = (lobby) => lobby.slots.filter((s) => s.player);
+
+  // Titre affiché sous le pseudo (comme « Sweaty » ou « Playmaker » dans le client) : toujours le même pour un pseudo
+  const TITLES = [
+    'Baron de l’immobilier', 'Roi des loyers', 'Farmeur d’or', 'Chasseur de Dragons',
+    'Main du Baron', 'Collectionneur de tours', 'Banquier de la Faille', 'Rusé comme Teemo',
+    'Stratège de Piltover', 'Magnat de Zaun', 'Seigneur des hypothèques', 'Voleur de Baron',
+    'Tank à loyers', 'Carry immobilier', 'Invocateur fortuné', 'Prince de Shurima',
+  ];
+  const titleFor = (name) => {
+    let hash = 0;
+    for (const ch of name.toLowerCase()) hash = (hash * 31 + ch.codePointAt(0)) >>> 0;
+    return TITLES[hash % TITLES.length];
+  };
   const isOwner = () => Boolean(App.lobby && App.me && App.lobby.owner === App.me.name);
 
   // ---------------------------------------------------------------------------
@@ -50,6 +63,7 @@
     renderBanners(lobby);
     renderTools(lobby);
     renderFindMatch(lobby);
+    renderMyRoleButton(lobby);
     renderInvites(lobby);
     renderPartyCard(lobby);
     App.renderProfile();
@@ -89,9 +103,9 @@
 
     $('.banner__name-text', el).textContent = player.name;
     $('.banner__crown', el).hidden = !player.isOwner;
-    $('.banner__status', el).textContent = !player.connected
-      ? 'Reconnexion…'
-      : lobby.status === 'in-game' ? 'En partie' : player.isOwner ? 'Chef du salon' : 'Prêt';
+    const status = $('.banner__status', el);
+    status.textContent = !player.connected ? 'Reconnexion…' : titleFor(player.name);
+    status.title = player.isOwner ? 'Chef du salon' : '';
 
     const img = $('.summoner-icon__img', el);
     img.src = App.iconUrl(player.icon);
@@ -137,6 +151,14 @@
     toggle.closest('.party-toggle').title = lobby.open
       ? 'Salon ouvert : on peut le rejoindre avec le code'
       : 'Salon fermé : sur invitation uniquement';
+  }
+
+  function renderMyRoleButton(lobby) {
+    const me = lobby.slots.find((s) => s.player?.name === App.me.name)?.player;
+    const button = $('#my-role-btn');
+    $('.role-icon', button).dataset.role = me?.role || '';
+    button.disabled = lobby.status !== 'lobby';
+    button.title = me?.role ? `Mon rôle : ${ROLE_LABELS[me.role]}` : 'Choisir mon rôle';
   }
 
   function renderFindMatch(lobby) {
@@ -392,6 +414,11 @@
 
   document.addEventListener('click', (event) => {
     if (!event.target.closest('.role-picker')) closeRolePickers();
+  });
+
+  $('#my-role-btn').addEventListener('click', (event) => {
+    event.stopPropagation();
+    $('.banner.is-me .role-picker__current', banners)?.click();
   });
 
   function chooseRole(role) {

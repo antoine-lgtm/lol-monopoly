@@ -1891,6 +1891,22 @@ button.window-controls__btn:hover {
     linear-gradient(90deg, rgba(255, 255, 255, 0.05), transparent 6%, transparent 94%, rgba(255, 255, 255, 0.05)),
     radial-gradient(ellipse 60% 30% at 50% 100%, rgba(200, 170, 110, 0.06), transparent 70%);
 }
+.banner--filled .banner__panel::after {
+  /* fin ornement doré dans le bas de la colonne */
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 62%;
+  width: 1px;
+  height: 22%;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, transparent, rgba(200, 170, 110, 0.28), transparent);
+  box-shadow: 0 0 6px rgba(200, 170, 110, 0.2);
+}
+.banner--filled:hover .banner__panel {
+  border-color: rgba(200, 170, 110, 0.4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 20px rgba(200, 170, 110, 0.12), 0 12px 30px rgba(0, 0, 0, 0.5);
+}
 .banner[data-pos='center'] .banner__panel {
   top: -14px;
   border-color: rgba(200, 170, 110, 0.32);
@@ -2521,9 +2537,28 @@ button.window-controls__btn:hover {
 }
 
 .lobby-panel__tabs {
+  position: relative;
   display: flex;
   height: 38px;
+  padding-right: 26px;
   border-bottom: 1px solid var(--grey-3);
+}
+/* Petite flèche : le panneau se déplie vers le haut */
+.lobby-panel__tabs::after {
+  content: '';
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid var(--cream);
+  border-bottom: 2px solid var(--cream);
+  transform: translateY(-30%) rotate(45deg);
+  transition: transform 0.2s var(--ease);
+  pointer-events: none;
+}
+.lobby-panel.is-collapsed .lobby-panel__tabs::after {
+  transform: translateY(-70%) rotate(-135deg);
 }
 /* Replié : seulement la rangée d'onglets, comme « Suggestions / Invités » dans le client */
 .lobby-panel.is-collapsed .lobby-panel__body {
@@ -3433,6 +3468,22 @@ body.reduce-motion .toast__timer {
   padding: 8px 10px;
   background: rgba(1, 10, 19, 0.82);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+/* Bouton rond « mon rôle », à droite de FIND MATCH */
+.round-btn--role {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+}
+.round-btn--role .role-icon {
+  width: 20px;
+  height: 20px;
+}
+.round-btn--role:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* Paramètre « Afficher l'heure dans le chat » décoché */
