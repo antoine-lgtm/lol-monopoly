@@ -1495,3 +1495,16 @@ body.in-game .notifications {
 .gv-mine__name {
   flex: 1;
 }
+
+/* Cases spéciales sans image : le nom seul, centré, sur leur fond coloré */
+.gv-sq:not(.gv-sq--property) .gv-sq__inner {
+  justify-content: center;
+  gap: 8px;
+  padding-bottom: 0;
+}
+.gv-sq:not(.gv-sq--property):not(.gv-sq--corner) .gv-sq__name {
+  font-size: 11.5px;
+}
+.gv-sq--corner .gv-sq__name {
+  font-size: 16px;
+}

@@ -102,7 +102,13 @@
     img.alt = '';
     img.decoding = 'async';
     img.draggable = false;
-    const sources = [`assets/champions/${file}`, `${DDRAGON}/${file}`];
+    // Secours : CommunityDragon, si Data Dragon ne répond pas
+    const [kind, name] = file.split('/');
+    const id = name.replace('_0.jpg', '');
+    const cdragon = `https://cdn.communitydragon.org/latest/champion/${id}`;
+    const backups = kind === 'splash' ? [`${cdragon}/splash-art/centered`] : [`${cdragon}/portrait`, `${cdragon}/square`];
+    const sources = [`assets/champions/${file}`, `${DDRAGON}/${file}`, ...backups];
+    img.referrerPolicy = 'no-referrer';
     img.addEventListener('error', () => {
       sources.shift();
       if (sources.length) img.src = sources[0];
@@ -112,10 +118,6 @@
     return img;
   }
 
-  const ICONS = {
-    go: 'fountain', jail: 'jail', baron: 'baron', gotojail: 'hook',
-    chance: 'ping', chest: 'chest', dragon: 'dragon', potion: 'potion', tax: 'minion',
-  };
 
   function priceLabel(sq) {
     return sq.price ? `${fmt(sq.price)} Or` : sq.amount ? `${sq.amount} Or` : '';
@@ -139,10 +141,6 @@
     if (sq.type === 'property') {
       inner.innerHTML = '<span class="gv-sq__band"></span>';
       inner.append(champImage('gv-sq__art', portraitUrl(sq)));
-    } else {
-      const icon = document.createElement('span');
-      icon.className = `gv-sq__icon gv-ico gv-ico--${ICONS[sq.type] || 'ping'}`;
-      inner.append(icon);
     }
     const name = document.createElement('span');
     name.className = 'gv-sq__name';
