@@ -4,8 +4,8 @@
  * Télécharge les illustrations des champions du plateau dans
  * frontend/assets/champions/, pour qu'elles s'affichent même hors ligne.
  *
- * Plusieurs sources sont essayées dans l'ordre (Data Dragon de Riot, puis
- * CommunityDragon). Lancé automatiquement avant `npm start` : les images déjà
+ * Plusieurs sources sont essayées dans l'ordre (CommunityDragon, puis
+ * Data Dragon de Riot). Lancé automatiquement avant `npm start` : les images déjà
  * présentes sont gardées, et une erreur réseau n'empêche jamais le serveur de démarrer.
  * `npm run images` relance le téléchargement et affiche le détail des erreurs.
  */
@@ -21,11 +21,14 @@ const CDRAGON = 'https://cdn.communitydragon.org/latest/champion';
 
 const champions = BOARD.filter((sq) => sq.type === 'property').map((sq) => sq.name.replace(/[^A-Za-z]/g, ''));
 
+// Même ordre que le plateau (frontend/js/game.js) : les adresses « sans version »
+// de Data Dragon (img/champion/loading, splash) ne répondent plus.
 function sourcesFor(kind, id) {
+  const square = `${DDRAGON}/14.24.1/img/champion/${id}.png`;
   if (kind === 'splash') {
-    return [`${DDRAGON}/img/champion/splash/${id}_0.jpg`, `${CDRAGON}/${id}/splash-art/centered`, `${CDRAGON}/${id}/splash-art`];
+    return [`${CDRAGON}/${id}/splash-art/centered`, `${CDRAGON}/${id}/splash-art`, `${CDRAGON}/${id}/tile`, `${CDRAGON}/${id}/square`, square];
   }
-  return [`${DDRAGON}/img/champion/loading/${id}_0.jpg`, `${CDRAGON}/${id}/portrait`, `${DDRAGON}/14.24.1/img/champion/${id}.png`];
+  return [`${CDRAGON}/${id}/tile`, `${CDRAGON}/${id}/portrait`, `${CDRAGON}/${id}/square`, square];
 }
 
 /** Résout avec un Buffer d'image, ou rejette avec la raison de l'échec. */

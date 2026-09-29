@@ -88,13 +88,19 @@
   // Construction du plateau
   // ---------------------------------------------------------------------------
 
-  // Illustrations officielles des champions (Data Dragon de Riot), chargées par le
-  // navigateur du joueur. Si elles ne chargent pas, la case garde son style sans image.
-  const DDRAGON = 'https://ddragon.leagueoflegends.com/cdn/img/champion';
+  // Illustrations des champions. Copie locale d'abord (téléchargée par `npm start`),
+  // puis CommunityDragon et Data Dragon (Riot). Si rien ne charge, la case garde son style.
   const champId = (sq) => sq.name.replace(/[^A-Za-z]/g, '');
-  // Copie locale d'abord (téléchargée par `npm start`), sinon directement chez Riot
   const portraitUrl = (sq) => `loading/${champId(sq)}_0.jpg`;
   const splashUrl = (sq) => `splash/${champId(sq)}_0.jpg`;
+
+  function imageSources(kind, id) {
+    const cdragon = `https://cdn.communitydragon.org/latest/champion/${id}`;
+    const square = `https://ddragon.leagueoflegends.com/cdn/14.24.1/img/champion/${id}.png`;
+    return kind === 'splash'
+      ? [`${cdragon}/splash-art/centered`, `${cdragon}/splash-art`, `${cdragon}/tile`, `${cdragon}/square`, square]
+      : [`${cdragon}/tile`, `${cdragon}/portrait`, `${cdragon}/square`, square];
+  }
 
   function champImage(className, file) {
     const img = document.createElement('img');
@@ -102,16 +108,9 @@
     img.alt = '';
     img.decoding = 'async';
     img.draggable = false;
-    // Secours : CommunityDragon, si Data Dragon ne répond pas
-    const [kind, name] = file.split('/');
-    const id = name.replace('_0.jpg', '');
-    const cdragon = `https://cdn.communitydragon.org/latest/champion/${id}`;
-    const square = `https://ddragon.leagueoflegends.com/cdn/14.24.1/img/champion/${id}.png`;
-    const backups = kind === 'splash'
-      ? [`${cdragon}/splash-art/centered`, `${cdragon}/splash-art`, square]
-      : [`${cdragon}/portrait`, square, `${cdragon}/square`];
-    const sources = [`assets/champions/${file}`, `${DDRAGON}/${file}`, ...backups];
     img.referrerPolicy = 'no-referrer';
+    const [kind, name] = file.split('/');
+    const sources = [`assets/champions/${file}`, ...imageSources(kind, name.replace('_0.jpg', ''))];
     img.addEventListener('error', () => {
       sources.shift();
       if (sources.length) img.src = sources[0];
@@ -120,7 +119,6 @@
     img.src = sources[0];
     return img;
   }
-
 
   function priceLabel(sq) {
     return sq.price ? `${fmt(sq.price)} Or` : sq.amount ? `${sq.amount} Or` : '';
