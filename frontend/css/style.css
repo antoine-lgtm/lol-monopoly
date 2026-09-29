@@ -1828,63 +1828,103 @@ button.window-controls__btn:hover {
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 16'%3E%3Ccircle cx='7' cy='4' r='3.2'/%3E%3Cpath d='M0 15c0-3.6 3-6 7-6s7 2.4 7 6z'/%3E%3Ccircle cx='14.5' cy='4.5' r='2.6' opacity='.75'/%3E%3Cpath d='M15 9c2.8.2 5 2.2 5 5h-4.4c-.2-2-1-3.7-2.4-4.8z' opacity='.75'/%3E%3C/svg%3E") center / 20px no-repeat;
 }
 
-/* ---------- Colonnes des joueurs ---------- */
+/* ---------- Colonnes des joueurs ----------
+   Cinq colonnes pleine hauteur, comme le salon du client. Tout le contenu d'une colonne
+   est dimensionné en --u, une unité qui suit la taille de la colonne (container queries). */
 .banners {
   position: absolute;
-  top: 0;
+  top: 64px;
+  bottom: 74px;
   left: 0;
   right: 0;
   z-index: 2;
   display: flex;
-  justify-content: space-evenly; /* les 5 colonnes occupent toute la largeur */
-  height: calc(680px * var(--banner-zoom, 1));
-  padding: 0 16px;
+  gap: 10px;
+  padding: 0 18px;
   pointer-events: none;
 }
 
 .banner {
   position: relative;
-  flex: none;
-  width: var(--col);
-  height: 540px;
-  /* Agrandissement calculé par lobby.js selon la taille de la fenêtre */
-  zoom: var(--banner-zoom, 1);
+  flex: 1 1 0;
+  min-width: 0;
+  container-type: size;
   pointer-events: auto;
-  /* Teinte de la bannière (R, G, B) */
   --tint: 14, 24, 34; /* ardoise sombre */
   --tint-hi: 200, 170, 110; /* or */
 }
-
-/* Formation en V : le joueur du milieu, plus grand, en bas ; les voisins un cran plus haut ;
-   les places extérieures tout en haut (data-pos posé par lobby.js) */
-.banner {
-  transform-origin: top center;
-  transition: transform 0.4s var(--ease);
-}
+/* Le joueur du milieu a une colonne un peu plus large */
 .banner[data-pos='center'] {
-  z-index: 1;
-  transform: translateY(80px) scale(1.14);
+  flex-grow: 1.18;
 }
-.banner[data-pos='inner'] {
-  transform: translateY(40px);
+/* Colonne dont la liste des rôles est ouverte : au-dessus de ses voisines */
+.banner:has(.role-picker__list:not([hidden])) {
+  z-index: 5;
 }
 
-/* Ordre visuel : la place 0 au centre, puis alternance gauche / droite */
+/* Ordre visuel par défaut (lobby.js le recalcule pour mettre le joueur local au centre) */
 .banner[data-slot='3'] { order: 1; }
 .banner[data-slot='1'] { order: 2; }
 .banner[data-slot='0'] { order: 3; }
 .banner[data-slot='2'] { order: 4; }
 .banner[data-slot='4'] { order: 5; }
 
+/* Fond de la colonne */
+.banner__panel {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 10px;
+  background:
+    radial-gradient(ellipse 90% 40% at 50% 22%, rgba(120, 150, 190, 0.1), transparent 70%),
+    linear-gradient(180deg, rgba(24, 32, 44, 0.94) 0%, rgba(12, 17, 24, 0.96) 55%, rgba(7, 10, 15, 0.97) 100%);
+  border: 1px solid rgba(160, 155, 140, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 12px 30px rgba(0, 0, 0, 0.5);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.banner__panel::before {
+  /* fins reflets verticaux sur les bords, comme le métal des colonnes du client */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05), transparent 6%, transparent 94%, rgba(255, 255, 255, 0.05)),
+    radial-gradient(ellipse 60% 30% at 50% 100%, rgba(200, 170, 110, 0.06), transparent 70%);
+}
+.banner[data-pos='center'] .banner__panel {
+  top: -14px;
+  border-color: rgba(200, 170, 110, 0.32);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 26px rgba(200, 170, 110, 0.12),
+    0 12px 30px rgba(0, 0, 0, 0.55);
+}
+.banner--empty .banner__panel {
+  background: linear-gradient(180deg, rgba(16, 22, 30, 0.6), rgba(7, 10, 15, 0.7));
+  border-color: rgba(160, 155, 140, 0.1);
+}
+
+/* Contenu de la colonne */
+.banner__inner {
+  --u: min(calc(100cqi / 210), calc(100cqh / 500));
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: calc(var(--u) * 24) 8px calc(var(--u) * 20);
+  text-align: center;
+}
 
 /* ----- Place libre : cercle « + » ----- */
 .banner__invite {
+  --u: min(calc(100cqi / 210), calc(100cqh / 500));
   position: absolute;
-  top: 184px;
+  top: calc(var(--u) * 80);
   left: 50%;
-  width: 70px;
-  height: 70px;
-  transform: translate(-50%, -50%);
+  width: calc(var(--u) * 76);
+  height: calc(var(--u) * 76);
+  transform: translateX(-50%);
   border-radius: 50%;
 }
 .banner__invite:focus-visible {
@@ -1905,11 +1945,25 @@ button.window-controls__btn:hover {
 @keyframes slot-breathe {
   50% { box-shadow: inset 0 0 0 3px rgba(1, 10, 19, 0.35), 0 0 14px rgba(200, 170, 110, 0.22); }
 }
+.banner__plus::before,
+.banner__plus::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 22%;
+  height: 2px;
+  background: var(--gold-1);
+  transform: translate(-50%, -50%);
+}
+.banner__plus::after {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
 /* Libellé « Inviter » au survol */
 .banner__invite::after {
   content: 'Inviter';
   position: absolute;
-  top: calc(100% + 10px);
+  top: calc(100% + 12px);
   left: 50%;
   transform: translate(-50%, -4px);
   font-weight: 700;
@@ -1933,6 +1987,12 @@ button.window-controls__btn:hover {
   content: 'Déposer ici';
   color: var(--blue-1);
 }
+.banner__invite:hover .banner__plus,
+.banner__invite:focus-visible .banner__plus {
+  border-color: var(--gold-2);
+  box-shadow: inset 0 0 0 3px rgba(1, 10, 19, 0.35), 0 0 16px rgba(200, 170, 110, 0.35);
+  transform: scale(1.05);
+}
 .banner__invite:disabled {
   cursor: default;
 }
@@ -1943,31 +2003,18 @@ button.window-controls__btn:hover {
 .banner__invite:disabled::after {
   display: none;
 }
-.banner__plus::before,
-.banner__plus::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 16px;
-  height: 2px;
-  background: var(--gold-1);
-  transform: translate(-50%, -50%);
-}
-.banner__plus::after {
-  transform: translate(-50%, -50%) rotate(90deg);
-}
-.banner__invite:hover .banner__plus,
-.banner__invite:focus-visible .banner__plus {
-  border-color: var(--gold-2);
-  box-shadow: inset 0 0 0 3px rgba(1, 10, 19, 0.35), 0 0 16px rgba(200, 170, 110, 0.35);
-  transform: scale(1.05);
-}
 
-/* Glisser-déposer : le cercle s'allume en bleu */
+/* Glisser-déposer : la colonne et le cercle s'allument en bleu */
+.banner.is-drop-target .banner__panel {
+  border-color: rgba(10, 200, 185, 0.45);
+}
 .banner.is-drop-target .banner__plus {
   border-color: var(--blue-2);
   box-shadow: 0 0 12px rgba(10, 200, 185, 0.35);
+}
+.banner.is-drag-over .banner__panel {
+  border-color: var(--blue-1);
+  box-shadow: 0 0 22px rgba(10, 200, 185, 0.35);
 }
 .banner.is-drag-over .banner__plus {
   border-color: var(--blue-1);
@@ -1981,8 +2028,9 @@ button.window-controls__btn:hover {
   display: none;
 }
 .banner__pending {
+  --u: min(calc(100cqi / 210), calc(100cqh / 500));
   position: absolute;
-  top: 149px;
+  top: calc(var(--u) * 80);
   left: 0;
   right: 0;
   display: flex;
@@ -1992,9 +2040,8 @@ button.window-controls__btn:hover {
   pointer-events: none;
 }
 .banner__pending-icon {
-  position: relative;
-  width: 70px;
-  height: 70px;
+  width: calc(var(--u) * 76);
+  height: calc(var(--u) * 76);
   margin-bottom: 12px;
   border-radius: 50%;
   border: 1px dashed var(--blue-2);
@@ -2004,7 +2051,6 @@ button.window-controls__btn:hover {
 .banner__pending-label {
   font-size: 12px;
   color: var(--grey-1);
-  text-shadow: 0 1px 3px #000;
 }
 .banner__pending-name {
   max-width: 100%;
@@ -2012,83 +2058,89 @@ button.window-controls__btn:hover {
   font-weight: 700;
   font-size: 15px;
   color: var(--status-game);
-  text-shadow: 0 1px 3px #000;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* ----- Place occupée : bannière suspendue ----- */
+/* ----- Place occupée ----- */
 /* .is-new : seulement pour un joueur qui vient d'arriver (sinon l'animation rejouerait à chaque mise à jour) */
-.banner--filled.is-new {
+.banner--filled.is-new .banner__inner {
   animation: banner-drop 0.55s var(--ease);
 }
 
-.banner__cloth {
-  position: absolute;
-  top: -240px; /* le tissu remonte hors de l'écran : la bannière reste accrochée en haut même décalée */
-  left: 14px;
-  right: 14px;
-  height: 650px;
-  background:
-    radial-gradient(ellipse 70% 20% at 50% 66%, rgba(var(--tint-hi), 0.1), transparent 70%),
-    linear-gradient(180deg, rgba(1, 10, 19, 0.35) 37%, rgba(var(--tint), 0.8) 58%, rgba(var(--tint), 0.95) 100%);
-  box-shadow:
-    inset 1px 0 0 rgba(200, 170, 110, 0.22),
-    inset -1px 0 0 rgba(200, 170, 110, 0.22),
-    0 0 30px rgba(0, 0, 0, 0.45);
-}
-.banner__cloth::before {
-  /* fines courbes tissées, comme sur les bannières du client */
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(ellipse 60% 25% at 50% 76%, transparent 62%, rgba(255, 255, 255, 0.05) 63%, transparent 64%),
-    radial-gradient(ellipse 45% 19% at 50% 81%, transparent 62%, rgba(255, 255, 255, 0.04) 63%, transparent 64%);
-}
-
+/* Emblème : ailes, anneau avec sa gemme, avatar posé en bas de l'anneau */
 .banner__crest {
+  position: relative;
+  flex: none;
+  width: calc(var(--u) * 196);
+  height: calc(var(--u) * 168);
+}
+.banner__wings {
   position: absolute;
-  top: 88px;
+  top: calc(var(--u) * 8);
   left: 50%;
-  width: 196px;
-  height: 147px;
+  width: calc(var(--u) * 196);
+  height: calc(var(--u) * 147);
   transform: translateX(-50%);
   overflow: visible;
-  filter: drop-shadow(0 0 8px rgba(var(--tint-hi), 0.25));
+  filter: drop-shadow(0 0 8px rgba(var(--tint-hi), 0.22));
 }
 .banner__wing {
-  fill: rgba(var(--tint-hi), 0.28);
+  fill: rgba(var(--tint-hi), 0.26);
   stroke: var(--gold-2);
   stroke-width: 1.5;
   stroke-linejoin: round;
 }
-.banner__gem {
-  fill: #7fe4ff;
-  stroke: var(--gold-1);
-  stroke-width: 1.5;
-  filter: drop-shadow(0 0 6px #33c9ff);
-}
-
-.banner__content {
+.banner__ring {
   position: absolute;
-  top: 136px;
-  left: 14px;
-  right: 14px;
-  height: 266px;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
+  top: 0;
+  left: 50%;
+  width: calc(var(--u) * 112);
+  height: calc(var(--u) * 112);
+  transform: translateX(-50%);
+  border-radius: 50%;
+  border: calc(var(--u) * 3) solid transparent;
+  background:
+    radial-gradient(circle at 50% 40%, #1b2636 0%, #0a0f16 70%) padding-box,
+    conic-gradient(from 200deg, var(--gold-4), var(--gold-1), var(--gold-3), var(--gold-4), var(--gold-2), var(--gold-4)) border-box;
+  box-shadow: 0 0 0 calc(var(--u) * 3) rgba(1, 10, 19, 0.7), inset 0 0 14px rgba(0, 0, 0, 0.7);
 }
+/* Gemme dorée au cœur de l'anneau */
+.banner__gem {
+  position: absolute;
+  top: 26%;
+  left: 50%;
+  width: 30%;
+  height: 30%;
+  transform: translateX(-50%) rotate(45deg);
+  background: linear-gradient(135deg, #fff3cf, #e0b85c 45%, #8a6424);
+  box-shadow: 0 0 12px rgba(240, 200, 110, 0.55), inset 0 0 0 1px rgba(255, 245, 220, 0.6);
+}
+/* Trois petites pastilles sur le haut de l'anneau */
+.banner__pip {
+  position: absolute;
+  width: calc(var(--u) * 16);
+  height: calc(var(--u) * 16);
+  border-radius: 50%;
+  border: 1px solid var(--gold-3);
+  background: radial-gradient(circle at 40% 35%, #3a4a5e, #0c131c);
+}
+.banner__pip:nth-of-type(1) { top: -6%; left: 50%; transform: translateX(-50%); }
+.banner__pip:nth-of-type(2) { top: 8%; left: 3%; }
+.banner__pip:nth-of-type(3) { top: 8%; right: 3%; }
 
+.banner__crest .summoner-icon--banner {
+  position: absolute;
+  top: calc(var(--u) * 84);
+  left: 50%;
+  transform: translateX(-50%);
+}
 .summoner-icon--banner {
-  --size: 96px;
-  padding: 3px;
+  --size: calc(var(--u) * 78);
+  padding: calc(var(--u) * 3);
   background: conic-gradient(from 200deg, var(--gold-4), var(--gold-1), var(--gold-3), var(--gold-4));
-  box-shadow: 0 0 0 3px rgba(1, 10, 19, 0.85), 0 0 24px rgba(var(--tint-hi), 0.55);
+  box-shadow: 0 0 0 calc(var(--u) * 3) rgba(1, 10, 19, 0.9), 0 0 20px rgba(var(--tint-hi), 0.35);
 }
 
 .banner__name {
@@ -2096,9 +2148,9 @@ button.window-controls__btn:hover {
   align-items: center;
   gap: 6px;
   max-width: 100%;
-  margin-top: 26px;
+  margin-top: calc(var(--u) * 12);
   font-weight: 700;
-  font-size: 17px;
+  font-size: calc(var(--u) * 17);
   color: var(--gold-1);
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
 }
@@ -2107,57 +2159,61 @@ button.window-controls__btn:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Couronne du chef, au-dessus de sa colonne */
 .banner__crown {
-  flex: none;
-  width: 16px;
-  height: 12px;
+  position: absolute;
+  top: -34px;
+  left: 50%;
+  width: 22px;
+  height: 16px;
+  transform: translateX(-50%);
   background: var(--gold-2);
+  filter: drop-shadow(0 0 6px rgba(200, 170, 110, 0.6));
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 16'%3E%3Cpath d='M0 3l5.5 5L11 0l5.5 8L22 3l-2 13H2z'/%3E%3C/svg%3E") center / contain no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 16'%3E%3Cpath d='M0 3l5.5 5L11 0l5.5 8L22 3l-2 13H2z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.banner:not([data-pos='center']) .banner__crown {
+  top: -22px;
 }
 
 .banner__status {
   margin-top: 2px;
-  font-size: 14px;
+  font-size: calc(var(--u) * 14);
   color: var(--grey-1);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
 }
 .banner.is-disconnected .banner__status {
   color: #ff8a8c;
 }
-.banner.is-disconnected .banner__cloth,
-.banner.is-disconnected .banner__crest,
-.banner.is-disconnected .summoner-icon {
+.banner.is-disconnected .banner__inner {
   filter: grayscale(0.9) brightness(0.65);
 }
 
-/* Trois jetons ronds sous le pseudo (décor, comme les emblèmes du client) */
+/* Trois jetons ronds sous le pseudo : dé, tour, pièce d'or */
 .banner__tokens {
   display: flex;
-  gap: 6px;
-  margin-top: 10px;
+  gap: calc(var(--u) * 8);
+  margin-top: calc(var(--u) * 16);
 }
 .banner__token {
-  width: 30px;
-  height: 30px;
+  width: calc(var(--u) * 36);
+  height: calc(var(--u) * 36);
   border-radius: 50%;
   border: 2px solid transparent;
   background:
-    radial-gradient(circle at 50% 40%, rgba(var(--tint-hi), 0.55), rgba(var(--tint), 1) 65%) padding-box,
+    radial-gradient(circle at 50% 40%, rgba(var(--tint-hi), 0.4), rgba(var(--tint), 1) 65%) padding-box,
     linear-gradient(180deg, #a09b8c, #5b5a56) border-box;
   box-shadow: 0 0 0 2px rgba(1, 10, 19, 0.6);
   display: grid;
   place-items: center;
 }
-/* Symboles du jeu gravés dans les jetons : dé, tour, pièce d'or */
 .banner__token::before {
   content: '';
-  width: 60%;
-  height: 60%;
+  width: 58%;
+  height: 58%;
   background: rgba(240, 230, 210, 0.85);
   -webkit-mask: var(--glyph) center / contain no-repeat;
   mask: var(--glyph) center / contain no-repeat;
-  filter: drop-shadow(0 0 2px rgba(var(--tint-hi), 0.8));
 }
 .banner__token:nth-child(1) {
   --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M3 1h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2zm1.5 2a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm7 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM8 6.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM4.5 10a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm7 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z'/%3E%3C/svg%3E");
@@ -2167,58 +2223,6 @@ button.window-controls__btn:hover {
 }
 .banner__token:nth-child(3) {
   --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1zm0 2.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zM7 5h2v6H7z'/%3E%3C/svg%3E");
-}
-
-/* Pointe ornementée en bas de la bannière */
-.banner__tip {
-  position: absolute;
-  top: 408px;
-  left: 14px;
-  width: calc(100% - 28px);
-  height: 58px;
-  overflow: visible;
-}
-.banner__tip-back {
-  fill: rgba(var(--tint), 0.92);
-}
-.banner__tip-edge {
-  fill: none;
-  stroke: rgba(var(--tint-hi), 0.85);
-  stroke-width: 2;
-  stroke-linejoin: miter;
-  filter: drop-shadow(0 0 4px rgba(var(--tint-hi), 0.8));
-}
-.banner__tip-gem {
-  fill: rgba(var(--tint-hi), 1);
-  stroke: var(--gold-1);
-  stroke-width: 1;
-}
-
-/* Pastille « Chef du salon » sous la bannière (comme « Rôle garanti ») */
-.banner__badge {
-  position: absolute;
-  top: 478px;
-  left: 50%;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 12px 4px 10px;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--gold-1);
-  background: rgba(1, 10, 19, 0.85);
-  border: 1px solid var(--grey-3);
-  border-radius: 14px;
-}
-.banner__badge::before {
-  content: '';
-  width: 14px;
-  height: 10px;
-  background: var(--gold-2);
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 16'%3E%3Cpath d='M0 3l5.5 5L11 0l5.5 8L22 3l-2 13H2z'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 16'%3E%3Cpath d='M0 3l5.5 5L11 0l5.5 8L22 3l-2 13H2z'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 /* ---------- Sélecteur de rôle (bas de la bannière) ---------- */
@@ -2336,6 +2340,7 @@ button.window-controls__btn:hover {
   max-height: 150px;
   overflow-y: auto;
   padding: 0 2px 8px;
+  border-radius: 8px;
   user-select: text;
   -webkit-mask: linear-gradient(180deg, transparent 0, #000 24px);
   mask: linear-gradient(180deg, transparent 0, #000 24px);
@@ -2519,6 +2524,16 @@ button.window-controls__btn:hover {
   display: flex;
   height: 38px;
   border-bottom: 1px solid var(--grey-3);
+}
+/* Replié : seulement la rangée d'onglets, comme « Suggestions / Invités » dans le client */
+.lobby-panel.is-collapsed .lobby-panel__body {
+  display: none;
+}
+.lobby-panel.is-collapsed .lobby-panel__tabs {
+  border-bottom: 0;
+}
+.lobby-panel.is-collapsed .lobby-panel__tab.is-active::after {
+  opacity: 0.5;
 }
 .lobby-panel__tab {
   position: relative;
@@ -3410,6 +3425,14 @@ body.reduce-motion .toast__timer {
     right: 16px;
     width: auto;
   }
+}
+
+/* Messages lisibles même par-dessus les colonnes des joueurs */
+.chat__messages:not(:empty) {
+  margin-bottom: 6px;
+  padding: 8px 10px;
+  background: rgba(1, 10, 19, 0.82);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
 }
 
 /* Paramètre « Afficher l'heure dans le chat » décoché */

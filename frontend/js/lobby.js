@@ -22,26 +22,6 @@
   let previousLobbyId = null;
   let previousPlayers = 0;
 
-  // ---------------------------------------------------------------------------
-  // Les bannières grandissent avec la fenêtre : 5 colonnes sur toute la largeur,
-  // sans descendre sous le chat, FIND MATCH et le panneau Partie.
-  // ---------------------------------------------------------------------------
-
-  const BANNER_W = 196; // largeur d'une colonne à l'échelle 1 (--col)
-  const BANNER_H = 700; // hauteur occupée à l'échelle 1, joueur du milieu agrandi et abaissé compris
-  const FOOTER_SPACE = 170; // place gardée en bas pour le chat et FIND MATCH
-
-  function fitBanners() {
-    const view = $('#view-lobby');
-    if (view.hidden) return;
-    const width = banners.clientWidth - 32;
-    const height = view.clientHeight - FOOTER_SPACE;
-    const zoom = Math.max(0.7, Math.min(width / (5 * BANNER_W), height / BANNER_H, 1.6));
-    banners.style.setProperty('--banner-zoom', zoom.toFixed(3));
-  }
-
-  new ResizeObserver(fitBanners).observe($('#view-lobby'));
-  document.addEventListener('app:view', fitBanners);
 
   const players = (lobby) => lobby.slots.filter((s) => s.player);
   const isOwner = () => Boolean(App.lobby && App.me && App.lobby.owner === App.me.name);
@@ -109,7 +89,6 @@
 
     $('.banner__name-text', el).textContent = player.name;
     $('.banner__crown', el).hidden = !player.isOwner;
-    $('.banner__badge', el).hidden = !player.isOwner;
     $('.banner__status', el).textContent = !player.connected
       ? 'Reconnexion…'
       : lobby.status === 'in-game' ? 'En partie' : player.isOwner ? 'Chef du salon' : 'Prêt';
@@ -150,6 +129,7 @@
 
   function renderTools(lobby) {
     $('#lobby-code-value').textContent = lobby.code;
+    $('#tab-room-code').textContent = lobby.code;
     $('#room-players').textContent = `${players(lobby).length}/${lobby.maxPlayers}`;
     const toggle = $('#lobby-open');
     toggle.checked = lobby.open;
@@ -445,12 +425,17 @@
     }
   });
 
+  // Panneau du bas : replié par défaut (onglets seuls), un clic l'ouvre, un 2ᵉ clic sur l'onglet actif le replie
+  const lobbyPanel = $('.lobby-panel');
   $$('.lobby-panel__tab').forEach((tab) => {
     tab.addEventListener('click', () => {
+      const collapse = tab.classList.contains('is-active') && !lobbyPanel.classList.contains('is-collapsed');
+      lobbyPanel.classList.toggle('is-collapsed', collapse);
       $$('.lobby-panel__tab').forEach((t) => {
         const on = t === tab;
         t.classList.toggle('is-active', on);
         t.setAttribute('aria-selected', String(on));
+        t.setAttribute('aria-expanded', String(on && !collapse));
         document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
       });
     });

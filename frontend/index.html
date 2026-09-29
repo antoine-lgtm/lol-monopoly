@@ -364,18 +364,23 @@
                lobby.js reconstruit ce contenu à chaque `lobby:state`. -->
           <div class="banners" id="banners" role="list" aria-label="Joueurs du salon">
             <div class="banner banner--empty" data-slot="0" data-dropzone="true" role="listitem">
+              <div class="banner__panel" aria-hidden="true"></div>
               <button class="banner__invite" type="button" data-invite-slot="0" aria-label="Inviter un ami dans l'emplacement 1"><span class="banner__plus" aria-hidden="true"></span></button>
             </div>
             <div class="banner banner--empty" data-slot="1" data-dropzone="true" role="listitem">
+              <div class="banner__panel" aria-hidden="true"></div>
               <button class="banner__invite" type="button" data-invite-slot="1" aria-label="Inviter un ami dans l'emplacement 2"><span class="banner__plus" aria-hidden="true"></span></button>
             </div>
             <div class="banner banner--empty" data-slot="2" data-dropzone="true" role="listitem">
+              <div class="banner__panel" aria-hidden="true"></div>
               <button class="banner__invite" type="button" data-invite-slot="2" aria-label="Inviter un ami dans l'emplacement 3"><span class="banner__plus" aria-hidden="true"></span></button>
             </div>
             <div class="banner banner--empty" data-slot="3" data-dropzone="true" role="listitem">
+              <div class="banner__panel" aria-hidden="true"></div>
               <button class="banner__invite" type="button" data-invite-slot="3" aria-label="Inviter un ami dans l'emplacement 4"><span class="banner__plus" aria-hidden="true"></span></button>
             </div>
             <div class="banner banner--empty" data-slot="4" data-dropzone="true" role="listitem">
+              <div class="banner__panel" aria-hidden="true"></div>
               <button class="banner__invite" type="button" data-invite-slot="4" aria-label="Inviter un ami dans l'emplacement 5"><span class="banner__plus" aria-hidden="true"></span></button>
             </div>
           </div>
@@ -402,10 +407,10 @@
           </div>
 
           <!-- Panneau à onglets (bas droite) -->
-          <section class="lobby-panel" aria-label="Infos du salon">
+          <section class="lobby-panel is-collapsed" aria-label="Infos du salon">
             <div class="lobby-panel__tabs" role="tablist">
-              <button class="lobby-panel__tab is-active" type="button" role="tab" aria-selected="true" aria-controls="panel-room" id="tab-room">Partie</button>
-              <button class="lobby-panel__tab" type="button" role="tab" aria-selected="false" aria-controls="panel-invites" id="tab-invites">Invités (<span id="invites-count">0</span>)</button>
+              <button class="lobby-panel__tab is-active" type="button" role="tab" aria-selected="true" aria-controls="panel-room" aria-expanded="false" id="tab-room">Partie · <span id="tab-room-code">------</span></button>
+              <button class="lobby-panel__tab" type="button" role="tab" aria-selected="false" aria-controls="panel-invites" aria-expanded="false" id="tab-invites">Invités (<span id="invites-count">0</span>)</button>
             </div>
             <div class="lobby-panel__body" id="panel-room" role="tabpanel" aria-labelledby="tab-room">
               <button class="lobby-code" id="lobby-code" type="button" title="Copier le code du salon">
@@ -646,21 +651,29 @@
        TEMPLATES (clonés par lobby.js / main.js)
        ===================================================================== -->
 
-  <!-- Bannière d'un joueur présent (suspendue depuis le haut, comme dans le client).
+  <!-- Colonne d'un joueur présent (comme dans le salon du client).
        .is-me = joueur local, .is-owner = chef du salon (couronne + pastille). -->
   <template id="tpl-banner-player">
     <div class="banner banner--filled" data-slot="" data-dropzone="false" role="listitem">
-      <div class="banner__cloth" aria-hidden="true"></div>
-      <svg class="banner__crest" viewBox="0 0 200 150" aria-hidden="true">
-        <path class="banner__wing" d="M84 124C52 116 18 96 8 60C24 74 38 80 52 82C36 64 26 40 30 6C40 36 56 56 76 68C78 88 82 108 84 124Z"/>
-        <path class="banner__wing" d="M116 124C148 116 182 96 192 60C176 74 162 80 148 82C164 64 174 40 170 6C160 36 144 56 124 68C122 88 118 108 116 124Z"/>
-        <path class="banner__gem" d="M100 116l14 16-14 16-14-16z"/>
-      </svg>
-      <div class="banner__content">
-        <div class="summoner-icon summoner-icon--banner">
-          <img class="summoner-icon__img" src="" alt="">
+      <div class="banner__panel" aria-hidden="true"></div>
+      <span class="banner__crown" title="Chef du salon" hidden></span>
+      <div class="banner__inner">
+        <div class="banner__crest">
+          <svg class="banner__wings" viewBox="0 0 200 150" aria-hidden="true">
+            <path class="banner__wing" d="M84 124C52 116 18 96 8 60C24 74 38 80 52 82C36 64 26 40 30 6C40 36 56 56 76 68C78 88 82 108 84 124Z"/>
+            <path class="banner__wing" d="M116 124C148 116 182 96 192 60C176 74 162 80 148 82C164 64 174 40 170 6C160 36 144 56 124 68C122 88 118 108 116 124Z"/>
+          </svg>
+          <div class="banner__ring" aria-hidden="true">
+            <span class="banner__pip"></span>
+            <span class="banner__pip"></span>
+            <span class="banner__pip"></span>
+            <span class="banner__gem"></span>
+          </div>
+          <div class="summoner-icon summoner-icon--banner">
+            <img class="summoner-icon__img" src="" alt="">
+          </div>
         </div>
-        <span class="banner__name"><span class="banner__crown" title="Chef du salon" hidden></span><span class="banner__name-text"></span></span>
+        <span class="banner__name"><span class="banner__name-text"></span></span>
         <span class="banner__status"></span>
 
         <div class="banner__tokens" aria-hidden="true">
@@ -683,19 +696,14 @@
           </ul>
         </div>
       </div>
-      <svg class="banner__tip" viewBox="0 0 250 70" preserveAspectRatio="none" aria-hidden="true">
-        <path class="banner__tip-back" d="M0 0h250v10C214 18 178 28 150 44c-10 6-18 13-25 22-7-9-15-16-25-22C72 28 36 18 0 10z"/>
-        <path class="banner__tip-edge" d="M0 10C36 18 72 28 100 44c10 6 18 13 25 22 7-9 15-16 25-22 28-16 64-26 100-34"/>
-        <path class="banner__tip-gem" d="M125 38c4 4 7 8 7 12s-3 8-7 12c-4-4-7-8-7-12s3-8 7-12z"/>
-      </svg>
-      <span class="banner__badge" hidden>Chef du salon</span>
     </div>
   </template>
 
-  <!-- Emplacement vide. Invitation en attente : ajouter .is-pending sur .banner,
+  <!-- Place libre. Invitation en attente : ajouter .is-pending sur .banner,
        retirer [hidden] de .banner__pending et remplir .banner__pending-name -->
   <template id="tpl-banner-empty">
     <div class="banner banner--empty" data-slot="" data-dropzone="true" role="listitem">
+      <div class="banner__panel" aria-hidden="true"></div>
       <button class="banner__invite" type="button" data-invite-slot="" aria-label="Inviter un ami">
         <span class="banner__plus" aria-hidden="true"></span>
       </button>
