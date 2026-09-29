@@ -1,3 +1,6 @@
 node_modules/
 .env
 *.log
+
+# Illustrations Riot téléchargées par npm start (non versionnées)
+frontend/assets/champions/

@@ -92,18 +92,23 @@
   // navigateur du joueur. Si elles ne chargent pas, la case garde son style sans image.
   const DDRAGON = 'https://ddragon.leagueoflegends.com/cdn/img/champion';
   const champId = (sq) => sq.name.replace(/[^A-Za-z]/g, '');
-  const portraitUrl = (sq) => `${DDRAGON}/loading/${champId(sq)}_0.jpg`;
-  const splashUrl = (sq) => `${DDRAGON}/splash/${champId(sq)}_0.jpg`;
+  // Copie locale d'abord (téléchargée par `npm start`), sinon directement chez Riot
+  const portraitUrl = (sq) => `loading/${champId(sq)}_0.jpg`;
+  const splashUrl = (sq) => `splash/${champId(sq)}_0.jpg`;
 
-  function champImage(className, src) {
+  function champImage(className, file) {
     const img = document.createElement('img');
     img.className = className;
-    img.src = src;
     img.alt = '';
-    img.loading = 'lazy';
     img.decoding = 'async';
     img.draggable = false;
-    img.addEventListener('error', () => img.remove(), { once: true });
+    const sources = [`assets/champions/${file}`, `${DDRAGON}/${file}`];
+    img.addEventListener('error', () => {
+      sources.shift();
+      if (sources.length) img.src = sources[0];
+      else img.remove();
+    });
+    img.src = sources[0];
     return img;
   }
 
