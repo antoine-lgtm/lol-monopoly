@@ -533,15 +533,27 @@
     chatList.scrollTop = chatList.scrollHeight;
   }
 
+  // Comme dans le client : les messages s'effacent après un moment sans activité,
+  // et réapparaissent au survol du chat ou quand on écrit.
+  const chatBox = $('#chat');
+  let idleTimer = 0;
+  function wakeChat() {
+    chatBox.classList.remove('is-idle');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => chatBox.classList.add('is-idle'), 12000);
+  }
+
   socket.on('chat:history', (history) => {
     chatList.replaceChildren(...history.map(buildMessage));
     scrollChat();
+    wakeChat();
   });
 
   socket.on('chat:message', (msg) => {
     const nearBottom = chatList.scrollHeight - chatList.scrollTop - chatList.clientHeight < 40;
     chatList.append(buildMessage(msg));
     if (nearBottom || msg.from === App.me?.name) scrollChat();
+    wakeChat();
   });
 
   chatForm.addEventListener('submit', (event) => {
