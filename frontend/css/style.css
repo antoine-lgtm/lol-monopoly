@@ -1325,6 +1325,10 @@ button.window-controls__btn:hover {
     radial-gradient(ellipse 60% 55% at 50% 48%, transparent 40%, rgba(12, 2, 28, 0.8) 100%),
     /* lueur violette qui monte du sol, comme le cercle d'un TP */
     radial-gradient(ellipse 45% 16% at 40% 90%, rgba(200, 130, 255, 0.5), transparent 70%),
+    /* la vraie icône du sort : officielle (Riot) si joignable, sinon l'image locale,
+       sinon le dessin vectoriel */
+    url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/spell/SummonerTeleport.png') center / cover no-repeat,
+    url('../assets/teleport.png') center / cover no-repeat,
     url('../assets/teleport.svg') 50% 50% / auto 78% no-repeat,
     #12052a;
   filter: saturate(0.8) brightness(0.72) contrast(1.1);
