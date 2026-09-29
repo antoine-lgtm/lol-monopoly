@@ -364,23 +364,23 @@
                lobby.js reconstruit ce contenu à chaque `lobby:state`. -->
           <div class="banners" id="banners" role="list" aria-label="Joueurs du salon">
             <div class="banner banner--empty" data-slot="0" data-dropzone="true" role="listitem">
-              <div class="banner__panel" aria-hidden="true"></div>
+              <div class="banner__panel" aria-hidden="true"></div><div class="banner__frame" aria-hidden="true"></div>
               <button class="banner__invite" type="button" data-invite-slot="0" aria-label="Inviter un ami dans l'emplacement 1"><span class="banner__plus" aria-hidden="true"></span></button>
             </div>
             <div class="banner banner--empty" data-slot="1" data-dropzone="true" role="listitem">
-              <div class="banner__panel" aria-hidden="true"></div>
+              <div class="banner__panel" aria-hidden="true"></div><div class="banner__frame" aria-hidden="true"></div>
               <button class="banner__invite" type="button" data-invite-slot="1" aria-label="Inviter un ami dans l'emplacement 2"><span class="banner__plus" aria-hidden="true"></span></button>
             </div>
             <div class="banner banner--empty" data-slot="2" data-dropzone="true" role="listitem">
-              <div class="banner__panel" aria-hidden="true"></div>
+              <div class="banner__panel" aria-hidden="true"></div><div class="banner__frame" aria-hidden="true"></div>
               <button class="banner__invite" type="button" data-invite-slot="2" aria-label="Inviter un ami dans l'emplacement 3"><span class="banner__plus" aria-hidden="true"></span></button>
             </div>
             <div class="banner banner--empty" data-slot="3" data-dropzone="true" role="listitem">
-              <div class="banner__panel" aria-hidden="true"></div>
+              <div class="banner__panel" aria-hidden="true"></div><div class="banner__frame" aria-hidden="true"></div>
               <button class="banner__invite" type="button" data-invite-slot="3" aria-label="Inviter un ami dans l'emplacement 4"><span class="banner__plus" aria-hidden="true"></span></button>
             </div>
             <div class="banner banner--empty" data-slot="4" data-dropzone="true" role="listitem">
-              <div class="banner__panel" aria-hidden="true"></div>
+              <div class="banner__panel" aria-hidden="true"></div><div class="banner__frame" aria-hidden="true"></div>
               <button class="banner__invite" type="button" data-invite-slot="4" aria-label="Inviter un ami dans l'emplacement 5"><span class="banner__plus" aria-hidden="true"></span></button>
             </div>
           </div>
@@ -659,7 +659,7 @@
        .is-me = joueur local, .is-owner = chef du salon (couronne + pastille). -->
   <template id="tpl-banner-player">
     <div class="banner banner--filled" data-slot="" data-dropzone="false" role="listitem">
-      <div class="banner__panel" aria-hidden="true"></div>
+      <div class="banner__panel" aria-hidden="true"></div><div class="banner__frame" aria-hidden="true"></div>
       <span class="banner__crown" title="Chef du salon" hidden></span>
       <div class="banner__inner">
         <div class="banner__crest">
@@ -707,7 +707,7 @@
        retirer [hidden] de .banner__pending et remplir .banner__pending-name -->
   <template id="tpl-banner-empty">
     <div class="banner banner--empty" data-slot="" data-dropzone="true" role="listitem">
-      <div class="banner__panel" aria-hidden="true"></div>
+      <div class="banner__panel" aria-hidden="true"></div><div class="banner__frame" aria-hidden="true"></div>
       <button class="banner__invite" type="button" data-invite-slot="" aria-label="Inviter un ami">
         <span class="banner__plus" aria-hidden="true"></span>
       </button>

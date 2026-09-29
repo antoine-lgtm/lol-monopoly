@@ -1912,24 +1912,32 @@ button.window-controls__btn:hover {
 }
 .banner--filled .banner__panel::before {
   background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.05), transparent 6%, transparent 94%, rgba(255, 255, 255, 0.05)),
-    linear-gradient(90deg, transparent 12%, rgba(200, 170, 110, 0.5) 50%, transparent 88%) bottom / 100% 1px no-repeat;
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05), transparent 6%, transparent 94%, rgba(255, 255, 255, 0.05));
+}
+.banner--filled:hover {
+  --frame: rgba(200, 170, 110, 0.55);
 }
 .banner--filled:hover .banner__panel {
-  border-color: rgba(200, 170, 110, 0.4);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 20px rgba(200, 170, 110, 0.12), 0 12px 30px rgba(0, 0, 0, 0.5);
 }
-.banner[data-pos='center'] .banner__panel {
+.banner[data-pos='center'] {
+  --frame: rgba(200, 170, 110, 0.45);
+}
+.banner[data-pos='center'] .banner__panel,
+.banner[data-pos='center'] .banner__frame {
   top: -14px;
-  border-color: rgba(200, 170, 110, 0.32);
+}
+.banner[data-pos='center'] .banner__panel {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
     0 0 26px rgba(200, 170, 110, 0.12),
     0 12px 30px rgba(0, 0, 0, 0.55);
 }
+.banner--empty {
+  --frame: rgba(160, 155, 140, 0.14);
+}
 .banner--empty .banner__panel {
   background: linear-gradient(180deg, rgba(16, 22, 30, 0.6), rgba(7, 10, 15, 0.7));
-  border-color: rgba(160, 155, 140, 0.1);
 }
 /* Place libre : silhouette pâle des ailes, comme un emplacement qui attend son invocateur */
 .banner--empty .banner__panel::after {
@@ -2051,16 +2059,18 @@ button.window-controls__btn:hover {
 }
 
 /* Glisser-déposer : la colonne et le cercle s'allument en bleu */
-.banner.is-drop-target .banner__panel {
-  border-color: rgba(10, 200, 185, 0.45);
+.banner.is-drop-target {
+  --frame: rgba(10, 200, 185, 0.5);
 }
 .banner.is-drop-target .banner__plus {
   border-color: var(--blue-2);
   box-shadow: 0 0 12px rgba(10, 200, 185, 0.35);
 }
+.banner.is-drag-over {
+  --frame: var(--blue-1);
+}
 .banner.is-drag-over .banner__panel {
-  border-color: var(--blue-1);
-  box-shadow: 0 0 22px rgba(10, 200, 185, 0.35);
+  box-shadow: inset 0 0 40px rgba(10, 200, 185, 0.18);
 }
 .banner.is-drag-over .banner__plus {
   border-color: var(--blue-1);
@@ -3532,4 +3542,64 @@ body.hide-chat-time .chat__time {
 .chat.is-idle:not(:hover):not(:focus-within) .chat__messages {
   opacity: 0;
   pointer-events: none;
+}
+
+/* ---------- Forme des colonnes : bannière avec arche en haut et pointe en bas ----------
+   Le fond est découpé par un masque en trois morceaux (arche, corps, pointe) pour que les
+   courbes gardent la même allure quelle que soit la hauteur de la colonne. Le cadre doré
+   (.banner__frame) suit exactement le même contour ; sa couleur vient de --frame. */
+.banner {
+  --frame: rgba(160, 155, 140, 0.2);
+  --cap: calc(min(100cqi, 260px) * 0.2);
+}
+.banner__panel {
+  border: 0;
+  border-radius: 0;
+  -webkit-mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 40' preserveAspectRatio='none'%3E%3Cpath d='M0 40V16Q0 9 7 7.5Q50-3 93 7.5Q100 9 100 16V40Z'/%3E%3C/svg%3E") top / 100% var(--cap) no-repeat,
+    linear-gradient(#000, #000) center / 100% calc(100% - 2 * var(--cap) + 2px) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 40' preserveAspectRatio='none'%3E%3Cpath d='M0 0V6Q0 14 10 18L44 35.5Q50 38.5 56 35.5L90 18Q100 14 100 6V0Z'/%3E%3C/svg%3E") bottom / 100% var(--cap) no-repeat;
+  mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 40' preserveAspectRatio='none'%3E%3Cpath d='M0 40V16Q0 9 7 7.5Q50-3 93 7.5Q100 9 100 16V40Z'/%3E%3C/svg%3E") top / 100% var(--cap) no-repeat,
+    linear-gradient(#000, #000) center / 100% calc(100% - 2 * var(--cap) + 2px) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 40' preserveAspectRatio='none'%3E%3Cpath d='M0 0V6Q0 14 10 18L44 35.5Q50 38.5 56 35.5L90 18Q100 14 100 6V0Z'/%3E%3C/svg%3E") bottom / 100% var(--cap) no-repeat;
+}
+.banner__frame {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--frame);
+  -webkit-mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 40' preserveAspectRatio='none'%3E%3Cpath d='M0 40V16Q0 9 7 7.5Q50-3 93 7.5Q100 9 100 16V40' fill='none' stroke='%23000' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") top / 100% var(--cap) no-repeat,
+    linear-gradient(90deg, #000 1px, transparent 1px, transparent calc(100% - 1px), #000 calc(100% - 1px)) center / 100% calc(100% - 2 * var(--cap) + 2px) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 40' preserveAspectRatio='none'%3E%3Cpath d='M0 0V6Q0 14 10 18L44 35.5Q50 38.5 56 35.5L90 18Q100 14 100 6V0' fill='none' stroke='%23000' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") bottom / 100% var(--cap) no-repeat;
+  mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 40' preserveAspectRatio='none'%3E%3Cpath d='M0 40V16Q0 9 7 7.5Q50-3 93 7.5Q100 9 100 16V40' fill='none' stroke='%23000' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") top / 100% var(--cap) no-repeat,
+    linear-gradient(90deg, #000 1px, transparent 1px, transparent calc(100% - 1px), #000 calc(100% - 1px)) center / 100% calc(100% - 2 * var(--cap) + 2px) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 40' preserveAspectRatio='none'%3E%3Cpath d='M0 0V6Q0 14 10 18L44 35.5Q50 38.5 56 35.5L90 18Q100 14 100 6V0' fill='none' stroke='%23000' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") bottom / 100% var(--cap) no-repeat;
+  transition: background-color 0.2s;
+}
+/* Ombre portée : le masque coupe box-shadow, on la porte sur la colonne entière */
+.banner--filled {
+  filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.45));
+}
+.banner--filled:hover,
+.banner[data-pos='center'] {
+  filter: drop-shadow(0 0 16px rgba(200, 170, 110, 0.14)) drop-shadow(0 12px 22px rgba(0, 0, 0, 0.45));
+}
+
+/* Formes plus douces autour des colonnes : champ de chat en pilule, panneaux bien arrondis */
+.chat__input {
+  border-radius: 20px;
+  padding: 0 16px;
+}
+.chat__messages:not(:empty) {
+  border-radius: 14px;
+}
+.lobby-panel {
+  border-radius: 16px;
+}
+.lobby-code,
+.room-rules__item {
+  border-radius: 12px;
 }
