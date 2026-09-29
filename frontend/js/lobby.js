@@ -28,7 +28,7 @@
   // ---------------------------------------------------------------------------
 
   const BANNER_W = 196; // largeur d'une colonne à l'échelle 1 (--col)
-  const BANNER_H = 540; // hauteur d'une colonne à l'échelle 1
+  const BANNER_H = 700; // hauteur occupée à l'échelle 1, joueur du milieu agrandi et abaissé compris
   const FOOTER_SPACE = 170; // place gardée en bas pour le chat et FIND MATCH
 
   function fitBanners() {
@@ -88,7 +88,9 @@
     const nodes = lobby.slots.map((slot) => {
       const el = slot.player ? buildPlayerBanner(slot, lobby) : buildEmptyBanner(slot, canInvite);
       el.dataset.slot = slot.index;
-      el.style.order = orderOf.get(slot.index);
+      const order = orderOf.get(slot.index);
+      el.style.order = order;
+      el.dataset.pos = order === 3 ? 'center' : order === 2 || order === 4 ? 'inner' : 'outer';
       if (slot.player && !shownPlayers.has(`${lobby.id}/${slot.player.name}`)) el.classList.add('is-new');
       return el;
     });

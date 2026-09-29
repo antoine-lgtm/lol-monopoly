@@ -1837,7 +1837,7 @@ button.window-controls__btn:hover {
   z-index: 2;
   display: flex;
   justify-content: space-evenly; /* les 5 colonnes occupent toute la largeur */
-  height: calc(540px * var(--banner-zoom, 1));
+  height: calc(680px * var(--banner-zoom, 1));
   padding: 0 16px;
   pointer-events: none;
 }
@@ -1853,6 +1853,20 @@ button.window-controls__btn:hover {
   /* Teinte de la bannière (R, G, B) */
   --tint: 14, 24, 34; /* ardoise sombre */
   --tint-hi: 200, 170, 110; /* or */
+}
+
+/* Formation en V : le joueur du milieu, plus grand, en bas ; les voisins un cran plus haut ;
+   les places extérieures tout en haut (data-pos posé par lobby.js) */
+.banner {
+  transform-origin: top center;
+  transition: transform 0.4s var(--ease);
+}
+.banner[data-pos='center'] {
+  z-index: 1;
+  transform: translateY(80px) scale(1.14);
+}
+.banner[data-pos='inner'] {
+  transform: translateY(40px);
 }
 
 /* Ordre visuel : la place 0 au centre, puis alternance gauche / droite */
@@ -2012,13 +2026,13 @@ button.window-controls__btn:hover {
 
 .banner__cloth {
   position: absolute;
-  top: 0;
+  top: -240px; /* le tissu remonte hors de l'écran : la bannière reste accrochée en haut même décalée */
   left: 14px;
   right: 14px;
-  height: 410px;
+  height: 650px;
   background:
-    radial-gradient(ellipse 70% 30% at 50% 44%, rgba(var(--tint-hi), 0.1), transparent 70%),
-    linear-gradient(180deg, rgba(1, 10, 19, 0.35) 0%, rgba(var(--tint), 0.8) 38%, rgba(var(--tint), 0.95) 100%);
+    radial-gradient(ellipse 70% 20% at 50% 66%, rgba(var(--tint-hi), 0.1), transparent 70%),
+    linear-gradient(180deg, rgba(1, 10, 19, 0.35) 37%, rgba(var(--tint), 0.8) 58%, rgba(var(--tint), 0.95) 100%);
   box-shadow:
     inset 1px 0 0 rgba(200, 170, 110, 0.22),
     inset -1px 0 0 rgba(200, 170, 110, 0.22),
@@ -2030,8 +2044,8 @@ button.window-controls__btn:hover {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 60% 40% at 50% 62%, transparent 62%, rgba(255, 255, 255, 0.05) 63%, transparent 64%),
-    radial-gradient(ellipse 45% 30% at 50% 70%, transparent 62%, rgba(255, 255, 255, 0.04) 63%, transparent 64%);
+    radial-gradient(ellipse 60% 25% at 50% 76%, transparent 62%, rgba(255, 255, 255, 0.05) 63%, transparent 64%),
+    radial-gradient(ellipse 45% 19% at 50% 81%, transparent 62%, rgba(255, 255, 255, 0.04) 63%, transparent 64%);
 }
 
 .banner__crest {
