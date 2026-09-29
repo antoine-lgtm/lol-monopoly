@@ -1297,3 +1297,110 @@ body.in-game .notifications {
   .gv-side__tab { font-size: 12px; letter-spacing: 0.02em; }
   .gv-player__name { font-size: 14px; }
 }
+
+
+/* =====================================================================
+   Couleurs de la Faille : mini-carte au centre, équipes bleue et rouge,
+   cases teintées selon ce qu'elles représentent
+   ===================================================================== */
+
+/* Centre : la Faille de l'Invocateur vue du dessus (jungle, rivière, trois voies,
+   base bleue en bas à gauche, base rouge en haut à droite) */
+.gv-center {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E %3Cdefs%3E %3CradialGradient id='j' cx='50%25' cy='50%25' r='75%25'%3E%3Cstop offset='0' stop-color='%2317402a'/%3E%3Cstop offset='1' stop-color='%230a1d15'/%3E%3C/radialGradient%3E %3CradialGradient id='b' cx='0' cy='100%25' r='38%25'%3E%3Cstop offset='0' stop-color='%232a8ad8' stop-opacity='.75'/%3E%3Cstop offset='1' stop-color='%232a8ad8' stop-opacity='0'/%3E%3C/radialGradient%3E %3CradialGradient id='r' cx='100%25' cy='0' r='38%25'%3E%3Cstop offset='0' stop-color='%23e0453c' stop-opacity='.7'/%3E%3Cstop offset='1' stop-color='%23e0453c' stop-opacity='0'/%3E%3C/radialGradient%3E %3C/defs%3E %3Crect width='100' height='100' fill='url%28%23j%29'/%3E %3Cg fill='%230f3320' opacity='.9'%3E %3Cellipse cx='24' cy='56' rx='9' ry='6'/%3E%3Cellipse cx='40' cy='76' rx='8' ry='5'/%3E%3Cellipse cx='60' cy='24' rx='8' ry='5'/%3E%3Cellipse cx='76' cy='44' rx='9' ry='6'/%3E %3Cellipse cx='30' cy='40' rx='5' ry='4'/%3E%3Cellipse cx='70' cy='60' rx='5' ry='4'/%3E%3Cellipse cx='56' cy='84' rx='5' ry='3'/%3E%3Cellipse cx='44' cy='16' rx='5' ry='3'/%3E %3C/g%3E %3Cpath d='M-6 6C14 16 30 30 50 50S86 84 106 94' fill='none' stroke='%230f4a66' stroke-width='15'/%3E %3Cpath d='M-6 6C14 16 30 30 50 50S86 84 106 94' fill='none' stroke='%231f7fa6' stroke-width='7' opacity='.7'/%3E %3Cpath d='M-6 6C14 16 30 30 50 50S86 84 106 94' fill='none' stroke='%237fd6ee' stroke-width='1.2' opacity='.5' stroke-dasharray='3 4'/%3E %3Cg fill='none' stroke='%238a7448' stroke-width='4.5' opacity='.55' stroke-linecap='round'%3E %3Cpath d='M8 96V8h88'/%3E%3Cpath d='M4 92h88V4'/%3E%3Cpath d='M9 91 91 9'/%3E %3C/g%3E %3Cellipse cx='27' cy='22' rx='7' ry='5' fill='%233b1d66' stroke='%239b6cf0' stroke-width='.8' opacity='.9'/%3E %3Cellipse cx='73' cy='78' rx='7' ry='5' fill='%235a2a12' stroke='%23f08a3c' stroke-width='.8' opacity='.9'/%3E %3Crect width='100' height='100' fill='url%28%23b%29'/%3E%3Crect width='100' height='100' fill='url%28%23r%29'/%3E %3Cg stroke='%23cfe6ff' stroke-width='.6'%3E %3Ccircle cx='7' cy='93' r='4.2' fill='%231a6fb0'/%3E%3Ccircle cx='93' cy='7' r='4.2' fill='%23b0302f' stroke='%23ffd6d0'/%3E %3C/g%3E %3Cg fill='%234fb3ff'%3E%3Ccircle cx='8' cy='70' r='1.4'/%3E%3Ccircle cx='8' cy='44' r='1.4'/%3E%3Ccircle cx='30' cy='92' r='1.4'/%3E%3Ccircle cx='56' cy='92' r='1.4'/%3E%3Ccircle cx='24' cy='76' r='1.4'/%3E%3Ccircle cx='36' cy='64' r='1.4'/%3E%3C/g%3E %3Cg fill='%23ff6a5a'%3E%3Ccircle cx='92' cy='30' r='1.4'/%3E%3Ccircle cx='92' cy='56' r='1.4'/%3E%3Ccircle cx='70' cy='8' r='1.4'/%3E%3Ccircle cx='44' cy='8' r='1.4'/%3E%3Ccircle cx='76' cy='24' r='1.4'/%3E%3Ccircle cx='64' cy='36' r='1.4'/%3E%3C/g%3E %3Crect width='100' height='100' fill='%2304121a' opacity='.28'/%3E %3C/svg%3E") center / 100% 100% no-repeat;
+  border-color: rgba(200, 170, 110, 0.45);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.55);
+}
+.gv-center__logo {
+  background: radial-gradient(ellipse at center, rgba(4, 14, 22, 0.78), rgba(4, 14, 22, 0.35) 70%, transparent);
+  border-color: var(--gold-3);
+}
+.gv-center__sub {
+  color: #7fe9f0;
+  text-shadow: 0 0 10px rgba(10, 200, 185, 0.6);
+}
+
+/* Cadre : or + liseré Hextech, bords teintés aux couleurs des deux équipes */
+.gv-board {
+  box-shadow:
+    0 0 0 2px #0ac8b9,
+    0 0 0 4px #7a5c2b,
+    0 0 0 6px #c8aa6e,
+    0 0 0 9px #3a2c14,
+    0 0 50px 6px rgba(10, 200, 185, 0.18),
+    0 0 120px 40px rgba(0, 0, 0, 0.65);
+}
+.gv-edge--s { background: linear-gradient(180deg, #2b7fc4, #123a66 55%, #081a30); }
+.gv-edge--w { background: linear-gradient(270deg, #2b7fc4, #123a66 55%, #081a30); }
+.gv-edge--n { background: linear-gradient(0deg, #c8453c, #6a1a18 55%, #2e0a0a); }
+.gv-edge--e { background: linear-gradient(90deg, #c8453c, #6a1a18 55%, #2e0a0a); }
+
+/* Propriétés : fond légèrement teinté de la couleur du groupe */
+.gv-sq--property {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--group) 28%, #0c1822) 0%, color-mix(in srgb, var(--group) 10%, #0c1822) 55%, #0b1620 100%);
+}
+.gv-sq--property:hover {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--group) 42%, #0c1822) 0%, color-mix(in srgb, var(--group) 18%, #0c1822) 60%, #0e1c28 100%);
+}
+.gv-sq__band {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 0 12px color-mix(in srgb, var(--group) 60%, transparent);
+}
+
+/* Cases spéciales : chacune sa couleur */
+.gv-sq--chance { background: linear-gradient(180deg, #3d3410, #151a14 70%); }
+.gv-sq--chest { background: linear-gradient(180deg, #0b4148, #0b1a22 70%); }
+.gv-sq--potion { background: linear-gradient(180deg, #45161c, #140f16 70%); }
+.gv-sq--potion[data-kind='mana'] { background: linear-gradient(180deg, #16305a, #0c1424 70%); }
+.gv-sq--dragon[data-element='ocean'] { background: linear-gradient(180deg, #0f3b52, #0b1822 70%); }
+.gv-sq--dragon[data-element='mountain'] { background: linear-gradient(180deg, #3e2c18, #16130f 70%); }
+.gv-sq--dragon[data-element='infernal'] { background: linear-gradient(180deg, #4a1a0e, #170e0c 70%); }
+.gv-sq--dragon[data-element='cloud'] { background: linear-gradient(180deg, #2a3a4a, #101820 70%); }
+.gv-sq--tax { background: linear-gradient(180deg, #1c2748, #0d1222 70%); }
+.gv-sq--tax[data-kind='boutique'] { background: linear-gradient(180deg, #3a2c10, #15120c 70%); }
+.gv-sq--chance:hover, .gv-sq--chest:hover, .gv-sq--potion:hover,
+.gv-sq--dragon:hover, .gv-sq--tax:hover {
+  filter: brightness(1.25);
+}
+
+/* Coins : Fontaine bleue, Prison acier, Baron violet, Blitzcrank or */
+.gv-sq--go {
+  background:
+    radial-gradient(circle at 70% 70%, rgba(95, 224, 240, 0.35), transparent 60%),
+    linear-gradient(135deg, #0a3a5a, #0a1a2c);
+}
+.gv-sq--jail {
+  background:
+    repeating-linear-gradient(90deg, rgba(160, 155, 140, 0.08) 0 6px, transparent 6px 14px),
+    linear-gradient(135deg, #262b31, #11151a);
+}
+.gv-sq--baron {
+  background:
+    radial-gradient(circle at 35% 35%, rgba(178, 124, 255, 0.45), transparent 60%),
+    linear-gradient(135deg, #2c1350, #120a22);
+}
+.gv-sq--gotojail {
+  background:
+    radial-gradient(circle at 65% 35%, rgba(240, 192, 64, 0.35), transparent 60%),
+    linear-gradient(135deg, #3a2c0c, #16110a);
+}
+
+/* Liserés : côté bleu (bas, gauche) et côté rouge (haut, droite), comme sur la carte */
+.gv-sq--s, .gv-sq--w { border-color: rgba(79, 160, 230, 0.35); }
+.gv-sq--n, .gv-sq--e { border-color: rgba(230, 90, 80, 0.35); }
+
+/* Fond de scène : lueurs des deux bases */
+.gv-bg {
+  background:
+    radial-gradient(ellipse 40% 45% at 22% 85%, rgba(42, 138, 216, 0.22), transparent 70%),
+    radial-gradient(ellipse 40% 45% at 78% 15%, rgba(224, 69, 60, 0.18), transparent 70%),
+    radial-gradient(ellipse 55% 50% at 50% 55%, rgba(30, 80, 90, 0.35), transparent 70%),
+    linear-gradient(180deg, rgba(3, 10, 18, 0.55), rgba(3, 8, 14, 0.92)),
+    var(--rift-image) center / cover no-repeat;
+}
+
+/* Paquets posés dans la jungle, de part et d'autre de la voie du milieu,
+   pour laisser voir la fosse du Baron et celle du Dragon */
+.gv-deck--chance { left: 6%; top: 50%; }
+.gv-deck--chest { right: 6%; bottom: 50%; }
