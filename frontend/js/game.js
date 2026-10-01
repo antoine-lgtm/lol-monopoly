@@ -682,7 +682,7 @@
     head.className = 'gv-inspect__head';
     const kicker = document.createElement('span');
     kicker.className = 'gv-inspect__kicker';
-    kicker.textContent = sq.group ? `Groupe ${groups[sq.group].label}` : sq.type === 'dragon' ? 'Dragon' : sq.type === 'potion' ? 'Potion' : 'Case spéciale';
+    kicker.textContent = sq.group ? groups[sq.group].label : sq.type === 'dragon' ? 'Dragon' : sq.type === 'potion' ? 'Potion' : 'Case spéciale';
     const title = document.createElement('h3');
     title.className = 'gv-inspect__title';
     title.textContent = sq.name;

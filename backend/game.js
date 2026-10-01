@@ -25,14 +25,14 @@ const LOG_SIZE = 80;
 const PLAYER_COLORS = ['#0ac8b9', '#e84057', '#b27cff', '#f0a030', '#6fd16a'];
 
 const GROUPS = {
-  marron: { label: 'Marron', color: '#8a5a3c', house: 50 },
-  gris: { label: 'Gris', color: '#9aa4ad', house: 50 },
-  rose: { label: 'Rose', color: '#d6519b', house: 100 },
-  orange: { label: 'Orange', color: '#e98a2c', house: 100 },
-  rouge: { label: 'Rouge', color: '#d8343f', house: 150 },
-  jaune: { label: 'Jaune', color: '#e6c440', house: 150 },
-  vert: { label: 'Vert', color: '#2f9e57', house: 200 },
-  bleu: { label: 'Bleu', color: '#2f6fd6', house: 200 },
+  marron: { label: 'Ixtal', color: '#8a5a3c', house: 50 },
+  gris: { label: 'Freljord', color: '#9aa4ad', house: 50 },
+  rose: { label: 'Ionia', color: '#d6519b', house: 100 },
+  orange: { label: 'Shurima', color: '#e98a2c', house: 100 },
+  rouge: { label: 'Noxus', color: '#d8343f', house: 150 },
+  jaune: { label: 'Targon', color: '#e6c440', house: 150 },
+  vert: { label: 'Zaun', color: '#2f9e57', house: 200 },
+  bleu: { label: 'Les Frères', color: '#2f6fd6', house: 200 },
 };
 
 const prop = (name, group, price, rent) => ({ type: 'property', name, group, price, rent });

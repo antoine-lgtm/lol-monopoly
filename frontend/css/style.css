@@ -3270,7 +3270,8 @@ button.window-controls__btn:hover {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: radial-gradient(circle, rgba(10, 50, 60, 0.55), rgba(1, 10, 19, 0.94) 60%);
+  /* écran noir opaque : seul l'anneau et le texte au centre sont visibles */
+  background: radial-gradient(circle, #0b2a33 0%, #02080e 38%, #000 70%);
   animation: fade-in 0.3s ease-out;
 }
 .match-found__ring {
