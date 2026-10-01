@@ -32,6 +32,7 @@
   const pawns = new Map(); // key -> élément du pion
   const shownPos = new Map(); // key -> case affichée (pendant les animations)
   let inspected = null; // case ouverte dans la fiche
+  let inspectByHover = false; // fiche ouverte au survol : elle se ferme quand la souris quitte la case
 
   const fmt = (n) => new Intl.NumberFormat('fr-FR').format(n);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -595,6 +596,7 @@
           button('Passer', 'game:skip'),
         );
         openInspect(state.pendingIndex);
+        inspectByHover = false;
         break;
       case 'tax':
         status.textContent = 'Les Sbires réclament leur part : choisis ton impôt.';
@@ -657,7 +659,10 @@
       if (sq.type === 'property') row.append(champImage('gv-mine__art', portraitUrl(sq)));
       else if (specialArt(sq)) row.append(artImage('gv-mine__art', specialArt(sq)));
       row.append(name, lvl);
-      row.addEventListener('click', () => openInspect(i));
+      row.addEventListener('click', () => {
+        openInspect(i);
+        inspectByHover = false;
+      });
       box.append(row);
     }
   }
@@ -782,13 +787,14 @@
 
   function closeInspect() {
     inspected = null;
+    inspectByHover = false;
     $('#gv-inspect').hidden = true;
     squares.forEach((el) => el.classList.remove('is-inspected'));
   }
 
   // Fiche d'une case : on garde la souris 2 secondes dessus (un contour se remplit
-  // pendant l'attente). La fiche reste ouverte pour pouvoir cliquer sur ses boutons ;
-  // elle se ferme avec ✕, Échap, ou en survolant une autre case.
+  // pendant l'attente), et elle disparaît dès que la souris quitte la case.
+  // Pour construire ou hypothéquer, la fiche ouverte depuis « Mes cases » reste affichée.
   const HOVER_DELAY = 2000;
   let hoverTimer = 0;
   let hovered = null;
@@ -810,10 +816,15 @@
       const index = Number(sq.dataset.index);
       cancelHover();
       openInspect(index);
+      inspectByHover = true;
     }, HOVER_DELAY);
   });
   boardEl.addEventListener('pointerout', (event) => {
     if (hovered && !hovered.contains(event.relatedTarget)) cancelHover();
+    const sq = event.target.closest('.gv-sq');
+    if (inspectByHover && sq && Number(sq.dataset.index) === inspected && !sq.contains(event.relatedTarget)) {
+      closeInspect();
+    }
   });
   // Sur écran tactile, pas de survol : on garde le toucher pour ouvrir la fiche
   boardEl.addEventListener('click', (event) => {
