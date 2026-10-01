@@ -1671,3 +1671,180 @@ body.in-game .notifications {
 .gv-sq.is-hovering {
   box-shadow: inset 0 0 18px rgba(240, 230, 210, 0.18);
 }
+
+
+/* =====================================================================
+   Plateau plus vivant : drapeaux, nom du joueur actif, résultat des dés,
+   lueur d'arrivée, rivière et bases animées
+   ===================================================================== */
+
+/* Drapeau du propriétaire, planté dans le coin extérieur de la case */
+.gv-flag {
+  --w: 14px;
+  --h: 30px;
+  --shape: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 40'%3E%3Cpath d='M2 1h2v39H2z'/%3E%3Cpath d='M4 2h15l-4 6 4 6H4z'/%3E%3Ccircle cx='3' cy='1.5' r='1.6'/%3E%3C/svg%3E");
+}
+.gv-flag .gv-standee__body {
+  background:
+    linear-gradient(90deg, #c8aa6e 0 20%, transparent 20%),
+    linear-gradient(180deg, color-mix(in srgb, var(--c) 60%, #fff), var(--c) 50%, color-mix(in srgb, var(--c) 55%, #000));
+  animation: flag-wave 2.6s ease-in-out infinite;
+}
+.gv-flag .gv-standee__shadow {
+  opacity: 0.6;
+}
+.gv-flag.is-mortgaged .gv-standee__body {
+  filter: grayscale(1) brightness(0.6);
+  animation: none;
+  translate: 0 0 -10px; /* drapeau en berne */
+}
+@keyframes flag-wave {
+  50% { scale: 0.94 1; }
+}
+
+/* Nom du joueur actif, au-dessus de son pion */
+.gv-pawn__label {
+  display: block;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: max-content;
+  padding: 2px 9px;
+  font-weight: 700;
+  font-size: 13px;
+  color: #fff;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--c) 70%, #05080c);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 999px;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--c) 70%, transparent);
+  transform-origin: 0 0;
+  transform: rotateZ(calc(var(--yaw, 0deg) * -1)) rotateX(-90deg) translate(-50%, -78px);
+  transition: transform 0.7s var(--ease), opacity 0.25s;
+  opacity: 0;
+  pointer-events: none;
+}
+.gv-pawn.is-current .gv-pawn__label {
+  opacity: 1;
+}
+.board-view.is-dragging .gv-pawn__label {
+  transition: opacity 0.25s;
+}
+
+/* Résultat des dés, en grand au milieu de la scène */
+.gv-roll {
+  position: absolute;
+  left: 280px;
+  right: 330px;
+  top: 38%;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  opacity: 0;
+}
+.gv-roll.is-shown {
+  animation: roll-pop 1.6s var(--ease) forwards;
+}
+.gv-roll__total {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 88px;
+  line-height: 1;
+  background: linear-gradient(180deg, #fff6de, #c89b3c 60%, #785a28);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 4px 0 #1c140a) drop-shadow(0 0 22px rgba(200, 155, 60, 0.5));
+}
+.gv-roll__detail {
+  margin-top: 4px;
+  padding: 3px 14px;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold-1);
+  background: rgba(1, 10, 19, 0.75);
+  border-radius: 999px;
+}
+.gv-roll.is-double .gv-roll__detail {
+  color: #05141a;
+  background: linear-gradient(90deg, #5fe0f0, #0ac8b9);
+  box-shadow: 0 0 16px rgba(10, 200, 185, 0.6);
+}
+@keyframes roll-pop {
+  0% { opacity: 0; transform: scale(0.4); }
+  18% { opacity: 1; transform: scale(1.12); }
+  30% { transform: scale(1); }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-20px); }
+}
+
+/* Lueur sur la case où le pion s'arrête */
+.gv-sq.is-landed {
+  animation: sq-landed 1.6s ease-out;
+}
+@keyframes sq-landed {
+  0% { box-shadow: inset 0 0 0 3px var(--land), inset 0 0 40px var(--land); }
+  100% { box-shadow: inset 0 0 0 0 transparent, inset 0 0 0 transparent; }
+}
+
+/* Centre vivant : reflets qui coulent sur la rivière, bases qui pulsent */
+.gv-center::before,
+.gv-center::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+}
+.gv-center::before {
+  /* reflets de la rivière (diagonale haut-gauche -> bas-droite) */
+  inset: 0;
+  background: linear-gradient(135deg, transparent 42%, rgba(160, 230, 255, 0.16) 48%, transparent 54%) 0 0 / 240% 240%;
+  -webkit-mask: linear-gradient(45deg, transparent 38%, #000 46%, #000 54%, transparent 62%);
+  mask: linear-gradient(45deg, transparent 38%, #000 46%, #000 54%, transparent 62%);
+  animation: river-flow 7s linear infinite;
+}
+@keyframes river-flow {
+  from { background-position: 100% 100%; }
+  to { background-position: 0 0; }
+}
+.gv-center::after {
+  /* les deux Nexus */
+  inset: 0;
+  background:
+    radial-gradient(circle at 7% 93%, rgba(80, 170, 255, 0.55), transparent 9%),
+    radial-gradient(circle at 93% 7%, rgba(255, 90, 80, 0.5), transparent 9%);
+  animation: nexus-pulse 3.2s ease-in-out infinite;
+}
+@keyframes nexus-pulse {
+  50% { opacity: 0.35; }
+}
+body.reduce-motion .gv-center::before,
+body.reduce-motion .gv-center::after,
+body.reduce-motion .gv-flag .gv-standee__body {
+  animation: none;
+}
+.gv-roll {
+  padding: 18px 60px 22px;
+  background: radial-gradient(closest-side, rgba(1, 10, 19, 0.78), rgba(1, 10, 19, 0.45) 60%, transparent);
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  margin-left: -25px;
+}
+.gv-roll.is-shown {
+  animation-name: roll-pop-centered;
+}
+@keyframes roll-pop-centered {
+  0% { opacity: 0; transform: translateX(-50%) scale(0.4); }
+  18% { opacity: 1; transform: translateX(-50%) scale(1.12); }
+  30% { transform: translateX(-50%) scale(1); }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+}
+.gv-flag {
+  --w: 16px;
+  --h: 34px;
+}

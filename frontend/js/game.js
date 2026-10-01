@@ -85,6 +85,90 @@
     }
   }
 
+  /** Bout de la bande de couleur d'une case, où l'on plante le drapeau du propriétaire
+   *  (les tours occupent le milieu de la bande). */
+  function flagPoint(i) {
+    const { row, col, side } = cellOf(i);
+    const [x0, w] = track(col);
+    const [y0, h] = track(row);
+    const d = CORNER * 0.12;
+    switch (side) {
+      case 's': return { x: x0 + w * 0.9, y: y0 + d };
+      case 'n': return { x: x0 + w * 0.1, y: y0 + h - d };
+      case 'w': return { x: x0 + w - d, y: y0 + h * 0.9 };
+      default: return { x: x0 + d, y: y0 + h * 0.1 };
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sons (générés, sans fichier), au volume des paramètres
+  // ---------------------------------------------------------------------------
+
+  function sfx(kind) {
+    const volume = (App.settings?.volume ?? 60) / 100;
+    if (!volume || view.hidden) return;
+    try {
+      const ctx = App.audio ?? (App.audio = new AudioContext());
+      const now = ctx.currentTime;
+      const tone = (freq, start, dur, gainValue, type = 'sine') => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, now + start);
+        gain.gain.setValueAtTime(0, now + start);
+        gain.gain.linearRampToValueAtTime(gainValue * volume, now + start + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + start + dur);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now + start);
+        osc.stop(now + start + dur + 0.02);
+        return osc;
+      };
+      const noise = (start, dur, gainValue, freq) => {
+        const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+        const src = ctx.createBufferSource();
+        const filter = ctx.createBiquadFilter();
+        const gain = ctx.createGain();
+        src.buffer = buffer;
+        filter.type = 'bandpass';
+        filter.frequency.value = freq;
+        gain.gain.value = gainValue * volume;
+        src.connect(filter).connect(gain).connect(ctx.destination);
+        src.start(now + start);
+      };
+      switch (kind) {
+        case 'dice': // cliquetis des dés qui roulent
+          for (let k = 0; k < 7; k++) noise(k * 0.11 + Math.random() * 0.04, 0.05, 0.5, 2200 + Math.random() * 1500);
+          break;
+        case 'step':
+          tone(520 + Math.random() * 60, 0, 0.07, 0.05, 'triangle');
+          break;
+        case 'gain': // pièces d'or
+          tone(1318, 0, 0.18, 0.08);
+          tone(1760, 0.07, 0.25, 0.07);
+          break;
+        case 'loss':
+          tone(330, 0, 0.2, 0.06, 'triangle');
+          tone(247, 0.08, 0.28, 0.05, 'triangle');
+          break;
+        case 'card':
+          noise(0, 0.35, 0.25, 900);
+          tone(660, 0.12, 0.3, 0.05);
+          break;
+        case 'build':
+          tone(196, 0, 0.18, 0.09, 'square');
+          tone(294, 0.06, 0.22, 0.06, 'triangle');
+          break;
+        case 'baron':
+          tone(110, 0, 0.9, 0.12, 'sawtooth');
+          tone(82, 0.1, 1.1, 0.1, 'sawtooth');
+          break;
+        default:
+      }
+    } catch { /* audio indisponible */ }
+  }
+
   // ---------------------------------------------------------------------------
   // Construction du plateau
   // ---------------------------------------------------------------------------
@@ -280,6 +364,7 @@
     el.style.setProperty('--y', `${y + Math.sin(angle) * r}px`);
     shownPos.set(key, index);
     if (hop) {
+      sfx('step');
       el.classList.remove('is-hopping');
       void el.offsetWidth;
       el.classList.add('is-hopping');
@@ -328,6 +413,16 @@
         piecesEl.append(el);
       }
     }
+    // Drapeau du propriétaire planté dans chaque case achetée
+    $$('.gv-flag', piecesEl).forEach((el) => el.remove());
+    for (const [i, st] of Object.entries(state.props)) {
+      const owner = state.players.find((p) => p.key === st.owner);
+      const { x, y } = flagPoint(Number(i));
+      const el = standing('gv-flag', x, y);
+      el.style.setProperty('--c', owner?.color || '#c8aa6e');
+      el.classList.toggle('is-mortgaged', st.mortgaged);
+      piecesEl.append(el);
+    }
     // Baron Nashor dans sa fosse
     $$('.gv-baron', piecesEl).forEach((el) => el.remove());
     if (!state.baron.taken) {
@@ -370,6 +465,40 @@
   // Effets (animations avant d'afficher l'état)
   // ---------------------------------------------------------------------------
 
+  function showRollTotal(values) {
+    let box = $('#gv-roll');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'gv-roll';
+      box.className = 'gv-roll';
+      view.append(box);
+    }
+    const [a, b] = values;
+    box.innerHTML = '';
+    const total = document.createElement('span');
+    total.className = 'gv-roll__total';
+    total.textContent = a + b;
+    const detail = document.createElement('span');
+    detail.className = 'gv-roll__detail';
+    detail.textContent = a === b ? `Double ${a} !` : `${a} + ${b}`;
+    box.append(total, detail);
+    box.classList.toggle('is-double', a === b);
+    box.classList.remove('is-shown');
+    void box.offsetWidth;
+    box.classList.add('is-shown');
+  }
+
+  function flashLanding(key, index) {
+    const sq = squares[index];
+    const p = state.players.find((q) => q.key === key);
+    if (!sq) return;
+    sq.style.setProperty('--land', p?.color || '#c8aa6e');
+    sq.classList.remove('is-landed');
+    void sq.offsetWidth;
+    sq.classList.add('is-landed');
+    setTimeout(() => sq.classList.remove('is-landed'), 1600);
+  }
+
   async function animateMove(fx) {
     if (!pawns.has(fx.key)) return;
     if (fx.direct || fx.steps === 0) {
@@ -377,6 +506,7 @@
       placePawn(fx.key, fx.to);
       await sleep(650);
       pawns.get(fx.key).classList.remove('is-gliding');
+      flashLanding(fx.key, fx.to);
       return;
     }
     const dir = fx.steps > 0 ? 1 : -1;
@@ -386,6 +516,7 @@
       placePawn(fx.key, pos, { hop: true });
       await sleep(190);
     }
+    flashLanding(fx.key, fx.to);
     await sleep(120);
   }
 
@@ -426,20 +557,29 @@
     for (const fx of list) {
       switch (fx.type) {
         case 'dice':
+          sfx('dice');
           showDice(fx.values, true);
-          await sleep(1000);
+          await sleep(950);
+          showRollTotal(fx.values);
+          await sleep(250);
           break;
         case 'move':
           await animateMove(fx);
           break;
         case 'card':
+          sfx('card');
           showCard(fx);
           await sleep(900);
           break;
         case 'gold':
           floatGold(fx);
+          sfx(fx.amount > 0 ? 'gain' : 'loss');
+          break;
+        case 'build':
+          sfx('build');
           break;
         case 'baron':
+          sfx('baron');
           view.classList.add('is-baron-flash');
           setTimeout(() => view.classList.remove('is-baron-flash'), 1400);
           break;
