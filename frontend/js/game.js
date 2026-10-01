@@ -786,12 +786,40 @@
     squares.forEach((el) => el.classList.remove('is-inspected'));
   }
 
+  // Fiche d'une case : on garde la souris 2 secondes dessus (un contour se remplit
+  // pendant l'attente). La fiche reste ouverte pour pouvoir cliquer sur ses boutons ;
+  // elle se ferme avec ✕, Échap, ou en survolant une autre case.
+  const HOVER_DELAY = 2000;
+  let hoverTimer = 0;
+  let hovered = null;
+
+  function cancelHover() {
+    clearTimeout(hoverTimer);
+    hovered?.classList.remove('is-hovering');
+    hovered = null;
+  }
+
+  boardEl.addEventListener('pointerover', (event) => {
+    const sq = event.target.closest('.gv-sq');
+    if (!sq || sq === hovered || event.pointerType === 'touch') return;
+    cancelHover();
+    if (drag || Number(sq.dataset.index) === inspected) return;
+    hovered = sq;
+    sq.classList.add('is-hovering');
+    hoverTimer = setTimeout(() => {
+      const index = Number(sq.dataset.index);
+      cancelHover();
+      openInspect(index);
+    }, HOVER_DELAY);
+  });
+  boardEl.addEventListener('pointerout', (event) => {
+    if (hovered && !hovered.contains(event.relatedTarget)) cancelHover();
+  });
+  // Sur écran tactile, pas de survol : on garde le toucher pour ouvrir la fiche
   boardEl.addEventListener('click', (event) => {
     const sq = event.target.closest('.gv-sq');
-    if (!sq || dragMoved) return;
-    const index = Number(sq.dataset.index);
-    if (inspected === index) closeInspect();
-    else openInspect(index);
+    if (!sq || dragMoved || !matchMedia('(hover: none)').matches) return;
+    openInspect(Number(sq.dataset.index));
   });
 
   // ---------------------------------------------------------------------------
@@ -1015,7 +1043,10 @@
     const dx = event.clientX - drag.x;
     const dy = event.clientY - drag.y;
     if (!dragMoved && Math.hypot(dx, dy) < 6) return;
-    if (!dragMoved) view.classList.add('is-dragging');
+    if (!dragMoved) {
+      view.classList.add('is-dragging');
+      cancelHover();
+    }
     dragMoved = true;
     cam.yaw = drag.yaw - dx * 0.3;
     cam.tilt = Math.max(20, Math.min(68, drag.tilt - dy * 0.2));
