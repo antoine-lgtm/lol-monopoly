@@ -1508,3 +1508,47 @@ body.in-game .notifications {
 .gv-sq--corner .gv-sq__name {
   font-size: 16px;
 }
+
+/* =====================================================================
+   Illustrations des cases spéciales (dragons, potions, cartes, taxes)
+   ===================================================================== */
+.gv-sq.has-art .gv-sq__inner {
+  justify-content: flex-end;
+  gap: 2px;
+  padding-bottom: 7px;
+}
+.gv-sq.has-art .gv-sq__art {
+  top: 0;
+  height: 100%;
+  object-position: 50% 30%;
+}
+.gv-sq.has-art .gv-sq__inner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(180deg, transparent 40%, rgba(4, 10, 16, 0.6) 65%, rgba(4, 10, 16, 0.95) 92%);
+  pointer-events: none;
+}
+.gv-sq.has-art .gv-sq__name,
+.gv-sq.has-art .gv-sq__price {
+  position: relative;
+  z-index: 2;
+  text-shadow: 0 1px 3px #000, 0 0 6px #000;
+}
+.gv-sq.has-art:hover .gv-sq__art {
+  filter: brightness(1.2) saturate(1.1);
+}
+.gv-inspect__card.has-art:not(.gv-inspect__card--property) .gv-inspect__art {
+  object-position: 50% 35%;
+}
+/* L'illustration occupe le haut de la case ; le nom et le prix restent en dessous */
+.gv-sq.has-art .gv-sq__art {
+  height: 80%;
+  object-position: 50% 45%;
+  -webkit-mask: linear-gradient(180deg, #000 70%, transparent);
+  mask: linear-gradient(180deg, #000 70%, transparent);
+}
+.gv-sq.has-art .gv-sq__inner::before {
+  background: linear-gradient(180deg, transparent 62%, rgba(4, 10, 16, 0.75) 82%, rgba(4, 10, 16, 0.95));
+}

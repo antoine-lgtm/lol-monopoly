@@ -120,6 +120,29 @@
     return img;
   }
 
+  /** Illustration dessinée des cases spéciales (dragons, potions, cartes, taxes). */
+  function specialArt(sq) {
+    const file = {
+      dragon: `dragon-${sq.element}`,
+      potion: `potion-${sq.kind}`,
+      chest: 'chest',
+      chance: 'ping',
+      tax: sq.kind,
+    }[sq.type];
+    return file ? `assets/board/${file}.svg` : null;
+  }
+
+  function artImage(className, src) {
+    const img = document.createElement('img');
+    img.className = className;
+    img.alt = '';
+    img.decoding = 'async';
+    img.draggable = false;
+    img.src = src;
+    img.addEventListener('error', () => img.remove(), { once: true });
+    return img;
+  }
+
   function priceLabel(sq) {
     return sq.price ? `${fmt(sq.price)} Or` : sq.amount ? `${sq.amount} Or` : '';
   }
@@ -142,6 +165,9 @@
     if (sq.type === 'property') {
       inner.innerHTML = '<span class="gv-sq__band"></span>';
       inner.append(champImage('gv-sq__art', portraitUrl(sq)));
+    } else if (specialArt(sq)) {
+      el.classList.add('has-art');
+      inner.append(artImage('gv-sq__art', specialArt(sq)));
     }
     const name = document.createElement('span');
     name.className = 'gv-sq__name';
@@ -591,6 +617,7 @@
       lvl.className = 'gv-mine__level';
       lvl.textContent = st.mortgaged ? 'Hypothéquée' : st.level === 5 ? 'Inhibiteur' : st.level ? `T${st.level}` : `${fmt(state.rents[i])} Or`;
       if (sq.type === 'property') row.append(champImage('gv-mine__art', portraitUrl(sq)));
+      else if (specialArt(sq)) row.append(artImage('gv-mine__art', specialArt(sq)));
       row.append(name, lvl);
       row.addEventListener('click', () => openInspect(i));
       box.append(row);
@@ -625,6 +652,9 @@
     if (sq.type === 'property') {
       card.classList.add('has-art');
       head.prepend(champImage('gv-inspect__art', splashUrl(sq)));
+    } else if (specialArt(sq)) {
+      card.classList.add('has-art');
+      head.prepend(artImage('gv-inspect__art', specialArt(sq)));
     }
 
     const close = document.createElement('button');

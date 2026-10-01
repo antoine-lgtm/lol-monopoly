@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 260">
+<defs>
+<radialGradient id="bg" cx="50%" cy="55%" r="70%"><stop offset="0" stop-color="#e8484f" stop-opacity=".45"/><stop offset=".6" stop-color="#5a0c12" stop-opacity=".9"/><stop offset="1" stop-color="#05080c"/></radialGradient>
+<linearGradient id="liq" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff9a9a"/><stop offset=".5" stop-color="#e8484f"/><stop offset="1" stop-color="#5a0c12"/></linearGradient>
+<linearGradient id="glass" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset=".3" stop-color="#fff" stop-opacity=".05"/><stop offset="1" stop-color="#fff" stop-opacity=".2"/></linearGradient>
+<linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0e6d2"/><stop offset="1" stop-color="#785a28"/></linearGradient>
+</defs>
+<rect width="200" height="260" fill="url(#bg)"/>
+<path d="M84 52 H116 V92 C142 104 156 128 156 154 C156 188 130 212 100 212 C70 212 44 188 44 154 C44 128 58 104 84 92 Z" fill="#0a141c" stroke="url(#gold)" stroke-width="5"/>
+<path d="M50 150 C64 140 80 156 100 148 C120 140 136 154 150 148 C150 184 128 206 100 206 C72 206 50 184 50 150 Z" fill="url(#liq)"/>
+<path d="M84 52 H116 V92 C142 104 156 128 156 154 C156 188 130 212 100 212 C70 212 44 188 44 154 C44 128 58 104 84 92 Z" fill="url(#glass)"/>
+<rect x="78" y="38" width="44" height="18" rx="5" fill="url(#gold)"/>
+<path d="M62 132 C64 120 72 110 82 104" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".55"/>
+<g fill="#ff9a9a" opacity=".8"><circle cx="86" cy="172" r="5"/><circle cx="112" cy="184" r="3.5"/><circle cx="104" cy="164" r="2.5"/></g>
+</svg>

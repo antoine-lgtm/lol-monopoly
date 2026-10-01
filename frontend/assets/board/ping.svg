@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 260">
+<defs>
+<radialGradient id="bg" cx="50%" cy="52%" r="72%"><stop offset="0" stop-color="#f0d64a" stop-opacity=".5"/><stop offset=".6" stop-color="#3a2c06" stop-opacity=".92"/><stop offset="1" stop-color="#05080c"/></radialGradient>
+<linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3cf"/><stop offset=".5" stop-color="#c89b3c"/><stop offset="1" stop-color="#5a4018"/></linearGradient>
+<linearGradient id="hex" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#cdfafa"/><stop offset=".5" stop-color="#0ac8b9"/><stop offset="1" stop-color="#03404e"/></linearGradient>
+<filter id="soft"><feGaussianBlur stdDeviation="8"/></filter>
+</defs>
+<rect width="200" height="260" fill="url(#bg)"/>
+
+<ellipse cx="100" cy="200" rx="56" ry="14" fill="none" stroke="#f0d64a" stroke-width="4" opacity=".7"/>
+<ellipse cx="100" cy="200" rx="82" ry="22" fill="none" stroke="#f0d64a" stroke-width="2" opacity=".35"/>
+<ellipse cx="100" cy="120" rx="60" ry="70" fill="#f0d64a" opacity=".3" filter="url(#soft)"/>
+<path d="M100 40 C138 40 160 66 160 96 C160 136 112 174 100 196 C88 174 40 136 40 96 C40 66 62 40 100 40 Z" fill="url(#gold)" stroke="#fff3cf" stroke-width="3"/>
+<path d="M100 54 C130 54 146 74 146 96 C146 126 112 158 100 176 C88 158 54 126 54 96 C54 74 70 54 100 54 Z" fill="#2a2004"/>
+<path d="M84 86 C84 74 92 68 102 68 C113 68 120 75 120 85 C120 96 108 98 105 106 V114" fill="none" stroke="#ffe680" stroke-width="10" stroke-linecap="round"/>
+<circle cx="104" cy="134" r="7" fill="#ffe680"/>
+</svg>
