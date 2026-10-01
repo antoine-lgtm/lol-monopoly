@@ -366,7 +366,8 @@
     const who = document.createElement('p');
     who.className = 'gv-cardfx__who';
     who.textContent = state.players.find((p) => p.key === fx.key)?.name || '';
-    card.append(title, text, who);
+    const art = artImage('gv-cardfx__art', `assets/board/${fx.deck === 'chance' ? 'ping' : 'chest'}.svg`);
+    card.append(art, title, text, who);
     box.append(card);
     box.hidden = false;
     clearTimeout(showCard.timer);
