@@ -1,0 +1,10 @@
+Images officielles du jeu (facultatif)
+======================================
+
+Dépose ici les vraies images de League of Legends pour remplacer nos dessins :
+
+  chest.png  ->  Coffre Hextech (cases « Coffre Hextech » et paquet de cartes)
+  ping.png   ->  Ping « ? » (cases « Ping SS » et paquet de cartes)
+
+Le format .webp marche aussi (chest.webp, ping.webp).
+Le plateau les utilise automatiquement : recharge simplement la page (Cmd + Maj + R).

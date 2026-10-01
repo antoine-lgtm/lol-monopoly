@@ -1622,3 +1622,18 @@ body.in-game .notifications {
   letter-spacing: 0.04em;
   white-space: nowrap;
 }
+
+/* Images officielles (PNG détourés) : affichées entières, centrées, avec une lueur */
+.gv-sq__art.is-official,
+.gv-inspect__art.is-official,
+.gv-cardfx__art.is-official,
+.gv-deck__art.is-official,
+.gv-mine__art.is-official {
+  object-fit: contain;
+  padding: 10%;
+  filter: drop-shadow(0 0 10px rgba(255, 230, 160, 0.35));
+}
+.gv-sq--chest .gv-sq__art.is-official { background: radial-gradient(circle at 50% 45%, #0a5a66, #032a34 75%); }
+.gv-sq--chance .gv-sq__art.is-official { background: radial-gradient(circle at 50% 45%, #6a5410, #2a2004 75%); }
+.gv-inspect__card--chest .gv-inspect__art.is-official { background: radial-gradient(circle at 50% 45%, #0a5a66, #032a34 75%); }
+.gv-inspect__card--chance .gv-inspect__art.is-official { background: radial-gradient(circle at 50% 45%, #6a5410, #2a2004 75%); }

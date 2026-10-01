@@ -120,26 +120,57 @@
     return img;
   }
 
-  /** Illustration dessinée des cases spéciales (dragons, potions, cartes, taxes). */
+  // Images officielles du jeu pour le Coffre Hextech et le ping « ? » : d'abord celles
+  // déposées dans frontend/assets/board/real/ (chest.png, ping.png), puis CommunityDragon,
+  // et en dernier recours notre dessin.
+  const CDRAGON_RAW = 'https://raw.communitydragon.org/latest';
+  const OFFICIAL_ART = {
+    chest: [
+      `${CDRAGON_RAW}/plugins/rcp-fe-lol-loot/global/default/assets/loot_item_icons/chest.png`,
+      `${CDRAGON_RAW}/plugins/rcp-fe-lol-loot/global/default/assets/loot_item_icons/chest_generic.png`,
+      `${CDRAGON_RAW}/plugins/rcp-fe-lol-loot/global/default/assets/loot_item_icons/chest_masterwork.png`,
+    ],
+    ping: [
+      `${CDRAGON_RAW}/game/assets/ux/minimap/pings/ping_enemymissing.png`,
+      `${CDRAGON_RAW}/game/assets/ux/minimap/pings/enemymissing.png`,
+      `${CDRAGON_RAW}/game/assets/ux/minimap/pings/mia.png`,
+    ],
+  };
+
+  function artSources(name) {
+    const drawn = `assets/board/${name}.svg`;
+    if (!OFFICIAL_ART[name]) return [drawn];
+    return [`assets/board/real/${name}.png`, `assets/board/real/${name}.webp`, ...OFFICIAL_ART[name], drawn];
+  }
+
+  /** Illustration des cases spéciales (dragons, potions, cartes, taxes). */
   function specialArt(sq) {
-    const file = {
+    const name = {
       dragon: `dragon-${sq.element}`,
       potion: `potion-${sq.kind}`,
       chest: 'chest',
       chance: 'ping',
       tax: sq.kind,
     }[sq.type];
-    return file ? `assets/board/${file}.svg` : null;
+    return name ? artSources(name) : null;
   }
 
-  function artImage(className, src) {
+  /** Image qui essaie ses sources dans l'ordre ; les images officielles (PNG) sont marquées. */
+  function artImage(className, srcs) {
+    const sources = [].concat(srcs);
     const img = document.createElement('img');
     img.className = className;
     img.alt = '';
     img.decoding = 'async';
     img.draggable = false;
-    img.src = src;
-    img.addEventListener('error', () => img.remove(), { once: true });
+    img.referrerPolicy = 'no-referrer';
+    img.addEventListener('error', () => {
+      sources.shift();
+      if (sources.length) img.src = sources[0];
+      else img.remove();
+    });
+    img.addEventListener('load', () => img.classList.toggle('is-official', !img.src.endsWith('.svg')));
+    img.src = sources[0];
     return img;
   }
 
@@ -203,6 +234,12 @@
       const el = buildSquare(sq, i);
       squares.push(el);
       boardEl.insertBefore(el, boardEl.firstChild);
+    });
+    // Paquets de cartes du centre
+    $$('.gv-deck__art', boardEl).forEach((old) => {
+      const art = artImage('gv-deck__art', artSources(old.dataset.art));
+      art.dataset.art = old.dataset.art;
+      old.replaceWith(art);
     });
     diceEl.innerHTML = '';
     for (let d = 0; d < 2; d++) {
@@ -366,7 +403,7 @@
     const who = document.createElement('p');
     who.className = 'gv-cardfx__who';
     who.textContent = state.players.find((p) => p.key === fx.key)?.name || '';
-    const art = artImage('gv-cardfx__art', `assets/board/${fx.deck === 'chance' ? 'ping' : 'chest'}.svg`);
+    const art = artImage('gv-cardfx__art', artSources(fx.deck === 'chance' ? 'ping' : 'chest'));
     card.append(art, title, text, who);
     box.append(card);
     box.hidden = false;
