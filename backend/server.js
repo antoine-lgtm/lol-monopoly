@@ -416,16 +416,19 @@ io.on('connection', (socket) => {
       socket.emit('chat:history', lobby.chat);
       broadcastLobby(lobby);
       broadcastPresence(key);
-      if (lobby.game && lobby.status === 'in-game') {
-        socket.emit('game:state', { ...lobby.game.serialize(), fx: [] });
-        scheduleAutoplay(lobby);
-      }
+
     } else {
       putInFreshLobby(user);
     }
 
     reply(ack, { ok: true, user: { name: user.name, icon: user.icon }, roles: ROLES });
     sendFriendList(key);
+
+    // Partie en cours : l'état part après la confirmation, pour que le client sache déjà qui il est
+    if (lobby && lobby.game && lobby.status === 'in-game') {
+      socket.emit('game:state', { ...lobby.game.serialize(), fx: [] });
+      scheduleAutoplay(lobby);
+    }
   });
 
   socket.on('session:setIcon', authed(({ icon }, ack) => {

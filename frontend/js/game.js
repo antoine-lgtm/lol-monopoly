@@ -857,6 +857,8 @@
     }).catch((err) => console.error('[game]', err));
   }
   socket.on('game:state', onGameState);
+  // Par sécurité : si l'état est arrivé avant la fin de la connexion, on le réaffiche
+  document.addEventListener('app:login', () => { if (state) queue = queue.then(renderAll); });
 
   function send(event, payload = {}) {
     socket.emit(event, payload, (res) => {
