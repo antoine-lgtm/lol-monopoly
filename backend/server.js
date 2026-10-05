@@ -24,6 +24,8 @@ const PORT = Number(process.env.PORT) || 3000;
 const MAX_PLAYERS = 5;
 const MIN_PLAYERS_TO_START = Number(process.env.MIN_PLAYERS) || 2;
 const ROLES = ['TOP', 'JGL', 'MID', 'ADC', 'SUPP'];
+// Pions du plateau (images dans frontend/assets/pawns/) : un pion différent par joueur
+const PAWNS = ['poro', 'teemo', 'ward', 'minion', 'zhonya', 'blade', 'classic'];
 const ICON_COUNT = 30; // icônes d'invocateur disponibles côté client (0..29)
 const CHAT_MAX_LENGTH = 300;
 const CHAT_HISTORY_SIZE = 50;
@@ -76,7 +78,7 @@ const users = new Map();
  * @property {string} code         code à partager pour "Rejoindre un lobby"
  * @property {string} ownerKey
  * @property {'lobby'|'in-game'} status
- * @property {Array<{key: string, role: string|null}|null>} slots
+ * @property {Array<{key: string, role: string|null, pawn: string}|null>} slots
  * @property {Map<string, {slot: number, from: string, expiresAt: number}>} invites
  * @property {Array<Object>} chat
  * @property {Game|null} game
@@ -175,6 +177,7 @@ function serializeLobby(lobby) {
     maxPlayers: MAX_PLAYERS,
     minPlayers: MIN_PLAYERS_TO_START,
     roles: ROLES,
+    pawns: PAWNS,
     slots: lobby.slots.map((slot, index) => {
       if (!slot) return { index, player: null, pendingInvite: pendingBySlot.get(index) ?? null };
       const user = users.get(slot.key);
@@ -184,6 +187,7 @@ function serializeLobby(lobby) {
           name: user.name,
           icon: user.icon,
           role: slot.role,
+          pawn: slot.pawn,
           isOwner: slot.key === lobby.ownerKey,
           connected: Boolean(user.socketId),
         },
@@ -239,7 +243,8 @@ function addToLobby(user, lobby, preferredSlot = null) {
   if (index === -1) index = lobby.slots.indexOf(null);
   if (index === -1) return false;
 
-  lobby.slots[index] = { key: user.key, role: null };
+  const taken = new Set(lobby.slots.filter(Boolean).map((s) => s.pawn));
+  lobby.slots[index] = { key: user.key, role: null, pawn: PAWNS.find((p) => !taken.has(p)) };
   lobby.invites.delete(user.key);
   user.lobbyId = lobby.id;
 
@@ -585,6 +590,18 @@ io.on('connection', (socket) => {
     reply(ack, { ok: true });
   }));
 
+  socket.on('lobby:setPawn', authed(({ pawn }, ack) => {
+    const lobby = currentLobby(me);
+    if (!lobby) return fail(ack, 'Aucun salon.');
+    if (lobby.status !== 'lobby') return fail(ack, 'La partie est déjà lancée.');
+    if (!PAWNS.includes(pawn)) return fail(ack, 'Pion inconnu.');
+    const owner = lobby.slots.find((s) => s && s.pawn === pawn && s.key !== me.key);
+    if (owner) return fail(ack, `${users.get(owner.key)?.name ?? 'Un joueur'} a déjà ce pion.`);
+    lobby.slots.find((s) => s && s.key === me.key).pawn = pawn;
+    broadcastLobby(lobby);
+    reply(ack, { ok: true });
+  }));
+
   socket.on('lobby:kick', authed(({ name }, ack) => {
     const lobby = currentLobby(me);
     if (!lobby || lobby.ownerKey !== me.key) return fail(ack, 'Seul le chef du salon peut exclure.');
@@ -612,7 +629,7 @@ io.on('connection', (socket) => {
     const order = [...players].sort((a, b) => (a.key === lobby.ownerKey ? -1 : b.key === lobby.ownerKey ? 1 : 0));
     lobby.game = new Game(order.map((s) => {
       const u = users.get(s.key);
-      return { key: u.key, name: u.name, icon: u.icon };
+      return { key: u.key, name: u.name, icon: u.icon, pawn: s.pawn };
     }));
     systemMessage(lobby, 'Partie trouvée ! Chargement de la Faille…');
     broadcastLobby(lobby);

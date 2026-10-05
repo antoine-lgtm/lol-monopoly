@@ -1848,3 +1848,32 @@ body.reduce-motion .gv-flag .gv-standee__body {
   --w: 16px;
   --h: 34px;
 }
+
+/* =====================================================================
+   Pions choisis dans le salon : image du pion, socle lumineux à la couleur du joueur
+   ===================================================================== */
+.gv-pawn:not([data-pawn='classic']) {
+  --w: 38px;
+  --h: 64px;
+}
+.gv-pawn:not([data-pawn='classic']) .gv-standee__body {
+  -webkit-mask: none;
+  mask: none;
+  background: var(--pawn-img) center bottom / contain no-repeat;
+}
+/* Socle : anneau à la couleur du joueur sous chaque pion, pour savoir à qui il est */
+.gv-pawn .gv-standee__shadow {
+  background:
+    radial-gradient(closest-side, rgba(0, 0, 0, 0.55) 55%, transparent 60%),
+    radial-gradient(closest-side, color-mix(in srgb, var(--c) 85%, transparent) 70%, transparent);
+}
+.gv-pawn:not([data-pawn='classic']) .gv-pawn__label {
+  transform: rotateZ(calc(var(--yaw, 0deg) * -1)) rotateX(-90deg) translate(-50%, -92px);
+}
+/* Liste des joueurs : même image que sur le plateau */
+.gv-player__pawn:not([data-pawn='classic']) {
+  -webkit-mask: none;
+  mask: none;
+  background: var(--pawn-img) center / contain no-repeat;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--c) 80%, transparent));
+}

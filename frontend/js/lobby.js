@@ -108,6 +108,8 @@
     status.title = player.isOwner ? 'Chef du salon' : '';
 
 
+    renderPawnPicker(el, player, lobby, me);
+
     const current = $('.role-picker__current', el);
     $('.role-icon', current).dataset.role = player.role || '';
     $('.role-picker__label', current).textContent = player.role
@@ -366,6 +368,101 @@
   socket.on('lobby:kicked', ({ by }) => {
     App.toast(`${by} t'a exclu du salon.`, 'error', 6000);
     App.showView('home');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Pions (un pion différent par joueur, affiché ensuite sur le plateau)
+  // ---------------------------------------------------------------------------
+
+  const PAWN_LABELS = {
+    poro: 'Poro',
+    teemo: 'Champignon de Teemo',
+    ward: 'Balise',
+    minion: 'Sbire',
+    zhonya: 'Sablier de Zhonya',
+    blade: 'Lame de Doran',
+    classic: 'Pion classique',
+  };
+  const pawnImage = (pawn) => `assets/pawns/${pawn}.svg`;
+
+  function renderPawnPicker(el, player, lobby, me) {
+    const current = $('.pawn-picker__current', el);
+    const pawn = player.pawn || 'classic';
+    $('.pawn-picker__img', current).src = pawnImage(pawn);
+    $('.pawn-picker__label', current).textContent = PAWN_LABELS[pawn];
+    current.disabled = !me || lobby.status !== 'lobby';
+    current.title = me ? 'Choisir mon pion' : `Pion de ${player.name}`;
+    if (!me) return;
+
+    // Liste des pions : ceux déjà pris par un autre joueur sont grisés
+    const takenBy = new Map(lobby.slots.filter((s) => s.player && s.player.name !== player.name)
+      .map((s) => [s.player.pawn, s.player.name]));
+    const list = $('.pawn-picker__list', el);
+    list.replaceChildren(...(lobby.pawns || Object.keys(PAWN_LABELS)).map((id) => {
+      const li = document.createElement('li');
+      li.className = 'pawn-picker__option';
+      li.setAttribute('role', 'option');
+      li.dataset.pawn = id;
+      li.tabIndex = 0;
+      li.setAttribute('aria-selected', String(id === pawn));
+      const owner = takenBy.get(id);
+      if (owner) li.setAttribute('aria-disabled', 'true');
+      li.title = owner ? `${PAWN_LABELS[id]} — pris par ${owner}` : PAWN_LABELS[id];
+      const img = document.createElement('img');
+      img.src = pawnImage(id);
+      img.alt = '';
+      const label = document.createElement('span');
+      label.textContent = PAWN_LABELS[id];
+      li.append(img, label);
+      return li;
+    }));
+  }
+
+  function closePawnPickers() {
+    $$('.pawn-picker__list', banners).forEach((list) => {
+      list.hidden = true;
+      list.previousElementSibling.setAttribute('aria-expanded', 'false');
+    });
+  }
+
+  function choosePawn(option) {
+    if (option.getAttribute('aria-disabled') === 'true') {
+      App.toast(option.title, 'info');
+      return;
+    }
+    closePawnPickers();
+    socket.emit('lobby:setPawn', { pawn: option.dataset.pawn }, (res) => {
+      if (!res?.ok) App.toast(res?.error, 'error');
+    });
+  }
+
+  banners.addEventListener('click', (event) => {
+    const current = event.target.closest('.pawn-picker__current');
+    if (current && !current.disabled) {
+      const list = current.nextElementSibling;
+      const open = list.hidden;
+      closePawnPickers();
+      closeRolePickers();
+      list.hidden = !open;
+      current.setAttribute('aria-expanded', String(open));
+      if (open) $('.pawn-picker__option[aria-selected="true"]', list)?.focus();
+      return;
+    }
+    const option = event.target.closest('.pawn-picker__option');
+    if (option) choosePawn(option);
+  });
+  banners.addEventListener('keydown', (event) => {
+    const option = event.target.closest('.pawn-picker__option');
+    if (!option) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      choosePawn(option);
+    } else if (event.key === 'Escape') {
+      closePawnPickers();
+    }
+  });
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('.pawn-picker')) closePawnPickers();
   });
 
   // ---------------------------------------------------------------------------

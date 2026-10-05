@@ -359,7 +359,7 @@
     const inJail = index === 10 && p?.inJail;
     const { x, y } = centerOf(index, inJail ? 0.7 : 0);
     const angle = (same * 2.1) + (key.length * 0.7);
-    const r = same ? 16 : 0;
+    const r = same ? 22 : 0;
     el.style.setProperty('--x', `${x + Math.cos(angle) * r}px`);
     el.style.setProperty('--y', `${y + Math.sin(angle) * r}px`);
     shownPos.set(key, index);
@@ -377,6 +377,9 @@
       if (!el) {
         el = standing('gv-pawn', 0, 0);
         el.style.setProperty('--c', p.color);
+        // Pion choisi dans le salon (le pion classique garde la couleur du joueur)
+        el.dataset.pawn = p.pawn || 'classic';
+        if (p.pawn && p.pawn !== 'classic') el.style.setProperty('--pawn-img', `url("/assets/pawns/${p.pawn}.svg")`);
         el.dataset.key = p.key;
         const label = document.createElement('span');
         label.className = 'gv-pawn__label';
@@ -621,6 +624,8 @@
 
       const pawn = document.createElement('span');
       pawn.className = 'gv-player__pawn';
+      pawn.dataset.pawn = p.pawn || 'classic';
+      if (p.pawn && p.pawn !== 'classic') pawn.style.setProperty('--pawn-img', `url("/assets/pawns/${p.pawn}.svg")`);
       const info = document.createElement('div');
       info.className = 'gv-player__info';
       const name = document.createElement('span');

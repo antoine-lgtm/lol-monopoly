@@ -3627,3 +3627,96 @@ body.hide-chat-time .chat__time {
 .banner__gem {
   top: 35%;
 }
+
+/* ---------- Choix du pion (colonnes du salon) ---------- */
+.pawn-picker {
+  position: relative;
+  margin-top: calc(var(--u) * 12);
+}
+.banner:has(.pawn-picker__list:not([hidden])) {
+  z-index: 5;
+}
+.pawn-picker__current {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 10px 2px;
+  border-radius: 12px;
+  transition: background 0.15s, filter 0.15s;
+}
+.pawn-picker__current:not(:disabled) {
+  cursor: pointer;
+}
+.pawn-picker__current:not(:disabled):hover {
+  background: rgba(200, 170, 110, 0.12);
+  filter: brightness(1.15);
+}
+.pawn-picker__img {
+  width: calc(var(--u) * 44);
+  height: calc(var(--u) * 72);
+  object-fit: contain;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.6));
+}
+.pawn-picker__label {
+  font-weight: 600;
+  font-size: calc(var(--u) * 12);
+  color: var(--grey-1);
+}
+.banner.is-me .pawn-picker__label::after {
+  content: ' ▾';
+  color: var(--gold-3);
+}
+.pawn-picker__list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  z-index: 6;
+  display: grid;
+  grid-template-columns: repeat(4, 64px);
+  gap: 4px;
+  margin: 0;
+  padding: 8px;
+  list-style: none;
+  transform: translateX(-50%);
+  background: #010a13;
+  border: 1px solid var(--gold-4);
+  border-radius: 12px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.75);
+  animation: fade-in 0.14s ease-out;
+}
+.pawn-picker__option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 2px 5px;
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1.1;
+  text-align: center;
+  color: var(--grey-1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.pawn-picker__option img {
+  width: 34px;
+  height: 52px;
+  object-fit: contain;
+}
+.pawn-picker__option:hover,
+.pawn-picker__option:focus-visible {
+  outline: none;
+  color: var(--gold-1);
+  background: rgba(200, 170, 110, 0.14);
+}
+.pawn-picker__option[aria-selected='true'] {
+  color: var(--gold-1);
+  background: rgba(10, 200, 185, 0.14);
+  box-shadow: inset 0 0 0 1px var(--blue-2);
+}
+.pawn-picker__option[aria-disabled='true'] {
+  opacity: 0.3;
+  cursor: not-allowed;
+}

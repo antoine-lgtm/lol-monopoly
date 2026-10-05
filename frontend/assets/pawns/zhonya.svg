@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 100"><defs><linearGradient id="gold" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7a5a20"/><stop offset=".35" stop-color="#f0d890"/><stop offset=".6" stop-color="#c89b3c"/><stop offset="1" stop-color="#5a4018"/></linearGradient>
+<linearGradient id="glass" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#bfefff" stop-opacity=".35"/><stop offset=".3" stop-color="#ffffff" stop-opacity=".55"/><stop offset="1" stop-color="#7fd0ff" stop-opacity=".25"/></linearGradient>
+<linearGradient id="sand" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff0a0"/><stop offset="1" stop-color="#e0a020"/></linearGradient></defs>
+<ellipse cx="30" cy="94" rx="21" ry="5" fill="#2a1e0c"/><path d="M9 90 C9 86 51 86 51 90 L51 93 C51 97 9 97 9 93 Z" fill="url(#gold)"/>
+<rect x="10" y="10" width="40" height="7" rx="2" fill="url(#gold)"/>
+<rect x="10" y="80" width="40" height="7" rx="2" fill="url(#gold)"/>
+<path d="M15 17 H45 C45 34 34 42 32 48.5 C34 55 45 63 45 80 H15 C15 63 26 55 28 48.5 C26 42 15 34 15 17 Z" fill="url(#glass)" stroke="#e8d8a8" stroke-width="1.5"/>
+<path d="M20 26 H40 C38 36 32 42 30 46 C28 42 22 36 20 26 Z" fill="url(#sand)"/>
+<path d="M29.5 48 H30.5 V72 H29.5 Z" fill="#ffe680"/>
+<path d="M19 80 C21 70 26 67 30 67 C34 67 39 70 41 80 Z" fill="url(#sand)"/>
+<path d="M12 17 V80 M48 17 V80" stroke="url(#gold)" stroke-width="3"/>
+<path d="M18 22 C19 30 22 35 25 39" stroke="#fff" stroke-width="1.8" fill="none" opacity=".6" stroke-linecap="round"/>
+</svg>

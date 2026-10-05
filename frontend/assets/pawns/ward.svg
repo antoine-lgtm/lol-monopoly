@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 100"><defs><linearGradient id="gold" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7a5a20"/><stop offset=".35" stop-color="#f0d890"/><stop offset=".6" stop-color="#c89b3c"/><stop offset="1" stop-color="#5a4018"/></linearGradient>
+<radialGradient id="eye" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#fffbe0"/><stop offset=".45" stop-color="#ffe14a"/><stop offset="1" stop-color="#c88a10"/></radialGradient>
+<linearGradient id="wood" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3a5a2a"/><stop offset=".5" stop-color="#6fa04a"/><stop offset="1" stop-color="#2a4420"/></linearGradient>
+<radialGradient id="halo" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffe14a" stop-opacity=".6"/><stop offset="1" stop-color="#ffe14a" stop-opacity="0"/></radialGradient></defs>
+<ellipse cx="30" cy="94" rx="21" ry="5" fill="#2a1e0c"/><path d="M9 90 C9 86 51 86 51 90 L51 93 C51 97 9 97 9 93 Z" fill="url(#gold)"/>
+<circle cx="30" cy="26" r="24" fill="url(#halo)"/>
+<path d="M26 40 H34 L36 89 H24 Z" fill="url(#wood)"/>
+<path d="M18 46 C22 44 26 46 26 50 M42 46 C38 44 34 46 34 50" fill="none" stroke="#4a7a32" stroke-width="3" stroke-linecap="round"/>
+<path d="M30 6 C40 12 46 20 46 28 C46 36 38 42 30 42 C22 42 14 36 14 28 C14 20 20 12 30 6 Z" fill="#2a4420" stroke="url(#gold)" stroke-width="2.5"/>
+<ellipse cx="30" cy="28" rx="11" ry="9" fill="url(#eye)"/>
+<ellipse cx="30" cy="28" rx="3" ry="7" fill="#3a2404"/>
+</svg>

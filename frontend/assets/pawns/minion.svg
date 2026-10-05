@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 100"><defs><linearGradient id="gold" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7a5a20"/><stop offset=".35" stop-color="#f0d890"/><stop offset=".6" stop-color="#c89b3c"/><stop offset="1" stop-color="#5a4018"/></linearGradient>
+<linearGradient id="armor" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1a3c78"/><stop offset=".45" stop-color="#4f8fe8"/><stop offset="1" stop-color="#12285a"/></linearGradient>
+<linearGradient id="robe" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2a3a5a"/><stop offset=".5" stop-color="#5a7ab0"/><stop offset="1" stop-color="#1c2840"/></linearGradient></defs>
+<ellipse cx="30" cy="94" rx="21" ry="5" fill="#2a1e0c"/><path d="M9 90 C9 86 51 86 51 90 L51 93 C51 97 9 97 9 93 Z" fill="url(#gold)"/>
+<path d="M16 54 H44 L50 89 H10 Z" fill="url(#robe)"/>
+<path d="M20 56 H40 V62 H20 Z" fill="url(#gold)"/>
+<path d="M12 40 C12 22 20 12 30 12 C40 12 48 22 48 40 V50 H40 L38 58 H22 L20 50 H12 Z" fill="url(#armor)" stroke="url(#gold)" stroke-width="2.5" stroke-linejoin="round"/>
+<path d="M30 2 L34 13 H26 Z" fill="url(#gold)"/>
+<path d="M17 34 H43 V41 H17 Z" fill="#0a1426"/>
+<path d="M19 36 L27 37.5 L26.5 40 L19 39.5 Z M41 36 L33 37.5 L33.5 40 L41 39.5 Z" fill="#9fe8ff"/>
+<path d="M30 14 V33" stroke="#9cc6ff" stroke-width="2" opacity=".6"/>
+</svg>
