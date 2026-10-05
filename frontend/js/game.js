@@ -723,6 +723,15 @@
         case 'baron-spawn':
           App.toast('Le Baron Nashor apparaît dans la fosse !', 'info', 5000);
           break;
+        case 'trade-offer':
+          if (fx.to === myKey()) sfx('card');
+          break;
+        case 'trade-done':
+          if (fx.from === myKey() || fx.to === myKey()) {
+            sfx(fx.accepted ? 'gain' : 'loss');
+            App.toast(fx.accepted ? 'Échange conclu !' : 'Échange refusé.', fx.accepted ? 'success' : 'info', 3500);
+          }
+          break;
         default:
       }
     }
@@ -862,6 +871,17 @@
     }
 
     const sq = state.pendingIndex !== null ? board[state.pendingIndex] : null;
+    if (state.trade && state.trade.from === myKey()) {
+      const target = state.players.find((p) => p.key === state.trade.to);
+      status.textContent = `Échange proposé : en attente de la réponse de ${target?.name || '…'}.`;
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'gv-btn';
+      cancel.textContent = 'Retirer l’offre';
+      cancel.addEventListener('click', () => send('game:tradeCancel'));
+      box.append(cancel);
+      return;
+    }
     switch (state.phase) {
       case 'roll':
         if (mine.inJail) {
@@ -898,13 +918,223 @@
         showTab('mine');
         break;
       case 'end':
-        status.textContent = 'Construis, hypothèque… ou termine ton tour.';
+        status.textContent = 'Construis, hypothèque, échange… ou termine ton tour.';
         box.append(button('Fin du tour', 'game:end', { primary: true }));
         break;
       default:
         status.textContent = '';
     }
+    // pendant son tour, on peut proposer un échange à un autre joueur
+    if (['roll', 'end', 'debt'].includes(state.phase) && state.players.some((p) => !p.bankrupt && p.key !== myKey())) {
+      const trade = document.createElement('button');
+      trade.type = 'button';
+      trade.className = 'gv-btn gv-btn--trade';
+      trade.textContent = 'Échanger';
+      trade.addEventListener('click', openTradeComposer);
+      box.append(trade);
+    }
   }
+
+  // ---------------------------------------------------------------------------
+  // Échanges entre joueurs
+  // ---------------------------------------------------------------------------
+
+  const TRADABLE = new Set(['property', 'dragon', 'potion']);
+  const tradeBox = document.createElement('div');
+  tradeBox.className = 'gv-trade';
+  tradeBox.hidden = true;
+  view.append(tradeBox);
+  let tradeDraft = null; // { to, give: Set, get: Set } pendant qu'on compose
+  let reviewedTrade = null; // id de l'échange affiché au destinataire
+
+  /** Cases d'un joueur, avec la raison si elles ne peuvent pas être échangées. */
+  function tradableOf(key) {
+    return Object.entries(state.props)
+      .filter(([, st]) => st.owner === key)
+      .map(([i]) => Number(i))
+      .filter((i) => TRADABLE.has(board[i].type))
+      .sort((a, b) => a - b)
+      .map((i) => {
+        const sq = board[i];
+        const built = sq.group && Object.entries(state.props).some(([j, st]) => board[j].group === sq.group && st.level > 0);
+        return { i, reason: built ? `Vends d’abord les tours du groupe ${groups[sq.group].label}` : '' };
+      });
+  }
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  function propChip(i, extra = '') {
+    const sq = board[i];
+    const st = state.props[i];
+    const chip = el('span', `gv-trade__chip ${extra}`);
+    chip.style.setProperty('--group', sq.group ? groups[sq.group].color : sq.type === 'dragon' ? '#9fb3c4' : '#7fd1ff');
+    chip.append(el('span', 'gv-trade__swatch'), el('span', 'gv-trade__name', sq.name));
+    if (st?.mortgaged) chip.append(el('span', 'gv-trade__flag', 'hypothéquée'));
+    return chip;
+  }
+
+  function closeTrade() {
+    tradeBox.hidden = true;
+    tradeBox.replaceChildren();
+    tradeDraft = null;
+  }
+
+  function openTradeComposer() {
+    const others = state.players.filter((p) => !p.bankrupt && p.key !== myKey());
+    if (!others.length) return;
+    if (!tradeDraft || !others.some((p) => p.key === tradeDraft.to)) {
+      tradeDraft = { to: others[0].key, give: new Set(), get: new Set(), giveGold: 0, getGold: 0 };
+    }
+    renderTradeComposer();
+  }
+
+  function renderTradeComposer() {
+    const mine = me();
+    const target = state.players.find((p) => p.key === tradeDraft.to);
+    const others = state.players.filter((p) => !p.bankrupt && p.key !== myKey());
+    const card = el('div', 'gv-trade__card');
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-label', 'Proposer un échange');
+    card.append(el('h3', 'gv-trade__title', 'Proposer un échange'));
+
+    const pick = el('div', 'gv-trade__players');
+    for (const p of others) {
+      const b = el('button', `gv-trade__player${p.key === tradeDraft.to ? ' is-active' : ''}`);
+      b.type = 'button';
+      b.style.setProperty('--c', p.color);
+      b.append(el('span', 'gv-trade__dot'), p.name);
+      b.addEventListener('click', () => {
+        tradeDraft = { to: p.key, give: tradeDraft.give, get: new Set(), giveGold: tradeDraft.giveGold, getGold: 0 };
+        renderTradeComposer();
+      });
+      pick.append(b);
+    }
+    card.append(pick);
+
+    const column = (title, owner, set, goldKey, maxGold) => {
+      const col = el('section', 'gv-trade__col');
+      col.append(el('h4', 'gv-trade__subtitle', title));
+      const list = el('div', 'gv-trade__list');
+      const items = tradableOf(owner.key);
+      if (!items.length) list.append(el('p', 'gv-trade__empty', 'Aucune case.'));
+      for (const { i, reason } of items) {
+        const label = el('label', `gv-trade__item${reason ? ' is-locked' : ''}`);
+        if (reason) label.title = reason;
+        const box = el('input');
+        box.type = 'checkbox';
+        box.checked = set.has(i);
+        box.disabled = Boolean(reason);
+        box.addEventListener('change', () => { if (box.checked) set.add(i); else set.delete(i); });
+        label.append(box, propChip(i));
+        list.append(label);
+      }
+      const gold = el('label', 'gv-trade__gold');
+      gold.append(el('span', '', 'Or'));
+      const input = el('input');
+      input.type = 'number';
+      input.min = '0';
+      input.max = String(Math.max(0, maxGold));
+      input.step = '10';
+      input.value = String(tradeDraft[goldKey] || 0);
+      input.addEventListener('input', () => {
+        tradeDraft[goldKey] = Math.max(0, Math.min(Math.max(0, maxGold), Math.floor(Number(input.value) || 0)));
+      });
+      gold.append(input, el('span', 'gv-trade__max', `max ${fmt(Math.max(0, maxGold))}`));
+      col.append(list, gold);
+      return col;
+    };
+    const cols = el('div', 'gv-trade__cols');
+    cols.append(
+      column('Tu donnes', mine, tradeDraft.give, 'giveGold', mine.gold),
+      column(`Tu reçois de ${target.name}`, target, tradeDraft.get, 'getGold', target.gold),
+    );
+    card.append(cols);
+    card.append(el('p', 'gv-trade__note', 'Les cases d’un groupe avec des tours ne peuvent pas être échangées. Une case hypothéquée le reste.'));
+
+    const foot = el('div', 'gv-trade__foot');
+    const cancel = el('button', 'gv-btn', 'Annuler');
+    cancel.type = 'button';
+    cancel.addEventListener('click', closeTrade);
+    const go = el('button', 'gv-btn gv-btn--primary', 'Proposer');
+    go.type = 'button';
+    go.addEventListener('click', () => {
+      const offer = {
+        to: tradeDraft.to,
+        giveProps: [...tradeDraft.give],
+        getProps: [...tradeDraft.get],
+        giveGold: tradeDraft.giveGold || 0,
+        getGold: tradeDraft.getGold || 0,
+      };
+      socket.emit('game:trade', offer, (res) => {
+        if (!res?.ok) return App.toast(res?.error || 'Échange impossible.', 'error');
+        closeTrade();
+        App.toast('Proposition envoyée.', 'info', 2500);
+      });
+    });
+    foot.append(cancel, go);
+    card.append(foot);
+    tradeBox.replaceChildren(card);
+    tradeBox.hidden = false;
+  }
+
+  /** Fenêtre du destinataire : le détail de l'offre, accepter ou refuser. */
+  function renderTradeReview(t) {
+    const from = state.players.find((p) => p.key === t.from);
+    const card = el('div', 'gv-trade__card gv-trade__card--review');
+    card.setAttribute('role', 'dialog');
+    card.append(el('h3', 'gv-trade__title', `${from.name} te propose un échange`));
+    const side = (title, part) => {
+      const col = el('section', 'gv-trade__col');
+      col.append(el('h4', 'gv-trade__subtitle', title));
+      const list = el('div', 'gv-trade__list');
+      for (const i of part.props) list.append(propChip(i));
+      if (part.gold) list.append(el('span', 'gv-trade__chip gv-trade__chip--gold', `${fmt(part.gold)} Or`));
+      if (!part.props.length && !part.gold) list.append(el('p', 'gv-trade__empty', 'Rien'));
+      col.append(list);
+      return col;
+    };
+    const cols = el('div', 'gv-trade__cols');
+    cols.append(side('Tu reçois', t.give), side('Tu donnes', t.get));
+    card.append(cols);
+    const foot = el('div', 'gv-trade__foot');
+    const no = el('button', 'gv-btn', 'Refuser');
+    no.type = 'button';
+    no.addEventListener('click', () => send('game:tradeRespond', { accept: false }));
+    const yes = el('button', 'gv-btn gv-btn--primary', 'Accepter');
+    yes.type = 'button';
+    yes.addEventListener('click', () => send('game:tradeRespond', { accept: true }));
+    foot.append(no, yes);
+    card.append(foot);
+    tradeBox.replaceChildren(card);
+    tradeBox.hidden = false;
+  }
+
+  function renderTrade() {
+    const t = state.trade;
+    if (t && t.to === myKey()) {
+      if (reviewedTrade !== t.id) {
+        reviewedTrade = t.id;
+        tradeDraft = null;
+        renderTradeReview(t);
+      }
+      return;
+    }
+    if (reviewedTrade !== null && (!t || t.id !== reviewedTrade)) {
+      reviewedTrade = null;
+      if (!tradeDraft) closeTrade();
+    }
+    // on ne compose que pendant son tour, sans offre déjà envoyée
+    if (tradeDraft && (!isMyTurn() || !['roll', 'end', 'debt'].includes(state.phase) || t)) closeTrade();
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && tradeDraft) closeTrade();
+  });
 
   function renderLog() {
     const log = $('#gv-log');
@@ -922,6 +1152,12 @@
     const mine = me();
     box.replaceChildren();
     const owned = Object.entries(state.props).filter(([, st]) => st.owner === myKey()).map(([i]) => Number(i));
+    if (state.supply) {
+      const supply = document.createElement('p');
+      supply.className = 'gv-supply';
+      supply.textContent = `Réserve de la banque : ${state.supply.towers} tours · ${state.supply.inhibs} inhibiteurs`;
+      box.append(supply);
+    }
     if (!mine || !owned.length) {
       const empty = document.createElement('p');
       empty.className = 'gv-empty';
@@ -1188,6 +1424,7 @@
     renderActions();
     renderLog();
     renderMine();
+    renderTrade();
     renderOver();
     if (inspected !== null && state.phase !== 'buy') openInspect(inspected);
     if (state.phase !== 'buy' && inspected === state.pendingIndex) closeInspect();

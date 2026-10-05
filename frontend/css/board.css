@@ -2031,3 +2031,96 @@ body.reduce-motion .gv-pawn.is-current .gv-standee__body {
   font-size: 18px;
   cursor: pointer;
 }
+
+/* --- Échanges entre joueurs ------------------------------------------------- */
+.gv-btn--trade { border-color: rgba(200, 155, 60, 0.7); }
+.gv-trade {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(1, 6, 12, 0.6);
+  backdrop-filter: blur(3px);
+}
+.gv-trade[hidden] { display: none; }
+.gv-trade__card {
+  width: min(720px, 100%);
+  max-height: calc(100% - 32px);
+  overflow: auto;
+  padding: 20px 22px 18px;
+  border: 1px solid #785a28;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #0f1c28, #070e16);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(200, 155, 60, 0.15);
+  color: #f0e6d2;
+}
+.gv-trade__title {
+  margin: 0 0 14px;
+  font: 700 20px/1.2 Cinzel, Georgia, serif;
+  color: #f0e6d2;
+  letter-spacing: 0.03em;
+}
+.gv-trade__players { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.gv-trade__player {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: 1px solid rgba(160, 155, 140, 0.35);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #cdbe91;
+  font: 600 13px/1 Barlow, Arial, sans-serif;
+  cursor: pointer;
+}
+.gv-trade__player.is-active { border-color: var(--c); color: #f0e6d2; background: rgba(255, 255, 255, 0.07); box-shadow: 0 0 0 1px var(--c) inset; }
+.gv-trade__dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+.gv-trade__cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 620px) { .gv-trade__cols { grid-template-columns: 1fr; } }
+.gv-trade__col {
+  padding: 12px;
+  border: 1px solid rgba(120, 90, 40, 0.5);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.gv-trade__subtitle {
+  margin: 0 0 10px;
+  font: 700 12px/1 Barlow, Arial, sans-serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #c89b3c;
+}
+.gv-trade__list { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow: auto; }
+.gv-trade__item { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.gv-trade__item.is-locked { opacity: 0.45; cursor: not-allowed; }
+.gv-trade__item input { accent-color: #0ac8b9; width: 16px; height: 16px; }
+.gv-trade__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-left: 3px solid var(--group, #c89b3c);
+  font: 600 13px/1.2 Barlow, Arial, sans-serif;
+}
+.gv-trade__chip--gold { border-left-color: #f0c860; color: #f0d890; }
+.gv-trade__swatch { width: 8px; height: 8px; border-radius: 2px; background: var(--group); }
+.gv-trade__flag { color: #a09b8c; font-size: 11px; font-weight: 500; }
+.gv-trade__empty { margin: 0; color: #7a8590; font-size: 13px; }
+.gv-trade__gold { display: flex; align-items: center; gap: 8px; margin-top: 12px; font: 600 13px/1 Barlow, Arial, sans-serif; color: #f0d890; }
+.gv-trade__gold input {
+  width: 90px;
+  padding: 6px 8px;
+  border: 1px solid #785a28;
+  border-radius: 6px;
+  background: #06101a;
+  color: #f0e6d2;
+  font: inherit;
+}
+.gv-trade__max { color: #7a8590; font-weight: 500; font-size: 12px; }
+.gv-trade__note { margin: 12px 0 0; color: #8a96a0; font-size: 12px; }
+.gv-trade__foot { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+.gv-supply { margin: 0 0 10px; color: #a09b8c; font-size: 12px; letter-spacing: 0.02em; }

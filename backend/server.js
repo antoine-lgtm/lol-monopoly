@@ -660,6 +660,9 @@ io.on('connection', (socket) => {
     'game:unmortgage': (g, { index }) => g.unmortgage(me.key, Number(index)),
     'game:end': (g) => g.endTurn(me.key),
     'game:forfeit': (g) => g.forfeit(me.key),
+    'game:trade': (g, offer) => g.proposeTrade(me.key, offer || {}),
+    'game:tradeRespond': (g, { accept } = {}) => g.respondTrade(me.key, Boolean(accept)),
+    'game:tradeCancel': (g) => g.cancelTrade(me.key),
   };
   for (const [event, action] of Object.entries(GAME_ACTIONS)) {
     socket.on(event, authed((payload, ack) => {

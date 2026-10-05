@@ -20,6 +20,9 @@ const BARON_ROUND = 3; // le Baron apparaît au 3e tour de table
 const BARON_GO_BONUS = 300;
 const BARON_RENT_MULT = 1.5;
 const MAX_LEVEL = 5; // 1–4 = tours, 5 = inhibiteur
+// Réserve de la banque (règle officielle de la pénurie) : 32 tours et 12 inhibiteurs
+const TOWER_SUPPLY = 32;
+const INHIB_SUPPLY = 12;
 const LOG_SIZE = 80;
 
 const PLAYER_COLORS = ['#0ac8b9', '#e84057', '#b27cff', '#f0a030', '#6fd16a'];
@@ -169,6 +172,9 @@ class Game {
     this.rollAgain = false;
     this.pendingIndex = null;
     this.baron = { active: false, taken: false, holder: null };
+    this.supply = { towers: TOWER_SUPPLY, inhibs: INHIB_SUPPLY };
+    /** Échange proposé par le joueur dont c'est le tour, en attente de réponse. */
+    this.trade = null;
     this.decks = {
       chance: { order: shuffle(CHANCE_CARDS, random), next: 0 },
       chest: { order: shuffle(CHEST_CARDS, random), next: 0 },
@@ -261,7 +267,13 @@ class Game {
       to.gold += amount;
       this.effect({ type: 'gold', key: to.key, amount });
     }
-    if (p.gold < 0) this.enterDebt(p);
+    if (p.gold < 0) {
+      // on note qui a été payé « à crédit » : en cas de faillite, il rend ce qui n'existait pas
+      (p.owes ||= []).push({ key: to ? to.key : null, amount });
+      this.enterDebt(p);
+    } else {
+      p.owes = [];
+    }
   }
 
   payEachPlayer(p, amount) {
@@ -317,6 +329,7 @@ class Game {
       this.bankrupt(p);
       return;
     }
+    p.owes = [];
   }
 
   // --- Déplacements ------------------------------------------------------------
@@ -600,6 +613,7 @@ class Game {
     this.doubles = 0;
     this.rollAgain = false;
     this.pendingIndex = null;
+    this.trade = null;
     this.say(`Au tour de ${this.currentPlayer.name}.`);
   }
 
@@ -627,6 +641,15 @@ class Game {
     if (st.level > minLevel) return { ok: false, error: 'Construis d’abord sur les autres cases du groupe.' };
     const cost = GROUPS[sq.group].house;
     if (p.gold < cost) return { ok: false, error: 'Pas assez d’Or.' };
+    const inhib = st.level + 1 === MAX_LEVEL;
+    if (inhib && this.supply.inhibs <= 0) return { ok: false, error: 'La banque n’a plus d’Inhibiteur en réserve.' };
+    if (!inhib && this.supply.towers <= 0) return { ok: false, error: 'La banque n’a plus de tour en réserve.' };
+    if (inhib) {
+      this.supply.inhibs -= 1;
+      this.supply.towers += MAX_LEVEL - 1; // les 4 tours retournent à la banque
+    } else {
+      this.supply.towers -= 1;
+    }
     p.gold -= cost;
     st.level += 1;
     this.effect({ type: 'gold', key, amount: -cost });
@@ -640,8 +663,18 @@ class Game {
   sellLevel(p, index) {
     const sq = BOARD[index];
     const st = this.props[index];
-    const refund = GROUPS[sq.group].house / 2;
-    st.level -= 1;
+    let removed = 1;
+    if (st.level === MAX_LEVEL) {
+      // un Inhibiteur redevient 4 tours… s'il en reste assez à la banque, sinon moins
+      const back = Math.min(MAX_LEVEL - 1, this.supply.towers);
+      this.supply.inhibs += 1;
+      this.supply.towers -= back;
+      removed = MAX_LEVEL - back;
+    } else {
+      this.supply.towers += 1;
+    }
+    const refund = (GROUPS[sq.group].house / 2) * removed;
+    st.level -= removed;
     p.gold += refund;
     this.effect({ type: 'gold', key: p.key, amount: refund });
     this.effect({ type: 'build', key: p.key, index, level: st.level });
@@ -704,20 +737,132 @@ class Game {
     if (this.phase === 'debt' && this.currentPlayer.gold >= 0) {
       this.phase = this.resumePhase === 'moving' ? 'end' : this.resumePhase || 'end';
       this.resumePhase = null;
+      this.currentPlayer.owes = [];
       this.settle();
     }
+  }
+
+  // --- Échanges ----------------------------------------------------------------
+
+  /** Vérifie qu'une liste de cases peut changer de main (à `owner`, sans construction). */
+  tradableProps(owner, list) {
+    if (!Array.isArray(list) || list.length > 28) return 'Échange invalide.';
+    const seen = new Set();
+    for (const raw of list) {
+      const i = Number(raw);
+      if (!Number.isInteger(i) || seen.has(i)) return 'Échange invalide.';
+      seen.add(i);
+      const sq = BOARD[i];
+      if (!sq || !BUYABLE.has(sq.type) || this.props[i]?.owner !== owner) return 'Une des cases n’appartient plus à ce joueur.';
+      if (sq.group && groupMembers(sq.group).some((j) => this.props[j]?.level > 0)) {
+        return `Vends d’abord les tours du groupe ${GROUPS[sq.group].label} (${sq.name}).`;
+      }
+    }
+    return null;
+  }
+
+  validTrade(t) {
+    const from = this.player(t.from);
+    const to = this.player(t.to);
+    if (!from || !to || from.bankrupt || to.bankrupt || from === to) return 'Joueur invalide.';
+    for (const g of [t.give.gold, t.get.gold]) if (!Number.isInteger(g) || g < 0) return 'Montant invalide.';
+    if (t.give.gold > Math.max(0, from.gold)) return 'Tu n’as pas assez d’Or pour cet échange.';
+    if (t.get.gold > Math.max(0, to.gold)) return `${to.name} n’a pas assez d’Or pour cet échange.`;
+    if (!t.give.gold && !t.get.gold && !t.give.props.length && !t.get.props.length) return 'L’échange est vide.';
+    return this.tradableProps(from.key, t.give.props) || this.tradableProps(to.key, t.get.props);
+  }
+
+  /** Le joueur dont c'est le tour propose un échange (cases et/ou Or) à un autre joueur. */
+  proposeTrade(key, { to, giveGold = 0, giveProps = [], getGold = 0, getProps = [] } = {}) {
+    const error = this.guard(key, ['roll', 'end', 'debt']);
+    if (error) return { ok: false, error };
+    if (this.trade) return { ok: false, error: 'Un échange attend déjà une réponse.' };
+    const trade = {
+      id: ++this.seq,
+      from: key,
+      to: String(to || ''),
+      give: { gold: Number(giveGold), props: (Array.isArray(giveProps) ? giveProps : []).map(Number) },
+      get: { gold: Number(getGold), props: (Array.isArray(getProps) ? getProps : []).map(Number) },
+    };
+    const invalid = this.validTrade(trade);
+    if (invalid) return { ok: false, error: invalid };
+    this.trade = trade;
+    this.effect({ type: 'trade-offer', from: key, to: trade.to });
+    this.say(`${this.player(key).name} propose un échange à ${this.player(trade.to).name}.`);
+    return { ok: true };
+  }
+
+  /** Le destinataire accepte ou refuse l'échange. */
+  respondTrade(key, accept) {
+    const t = this.trade;
+    if (!t || t.to !== key) return { ok: false, error: 'Aucun échange ne t’attend.' };
+    const from = this.player(t.from);
+    const to = this.player(t.to);
+    this.trade = null;
+    if (!accept) {
+      this.effect({ type: 'trade-done', accepted: false, from: t.from, to: t.to });
+      this.say(`${to.name} refuse l’échange de ${from.name}.`);
+      return { ok: true };
+    }
+    const invalid = this.validTrade(t);
+    if (invalid) return { ok: false, error: `Échange annulé : ${invalid}` };
+    for (const i of t.give.props) this.props[i].owner = to.key;
+    for (const i of t.get.props) this.props[i].owner = from.key;
+    const move = (a, b, gold) => {
+      if (!gold) return;
+      a.gold -= gold;
+      b.gold += gold;
+      this.effect({ type: 'gold', key: a.key, amount: -gold });
+      this.effect({ type: 'gold', key: b.key, amount: gold });
+    };
+    move(from, to, t.give.gold);
+    move(to, from, t.get.gold);
+    this.effect({ type: 'trade-done', accepted: true, from: t.from, to: t.to, give: t.give, get: t.get });
+    const part = ({ gold, props }) => [...props.map((i) => BOARD[i].name), ...(gold ? [`${gold} Or`] : [])].join(', ') || 'rien';
+    this.say(`Échange conclu : ${from.name} donne ${part(t.give)} à ${to.name} contre ${part(t.get)}.`);
+    this.checkDebt();
+    return { ok: true };
+  }
+
+  cancelTrade(key) {
+    if (!this.trade || this.trade.from !== key) return { ok: false, error: 'Aucun échange à annuler.' };
+    this.trade = null;
+    this.say(`${this.player(key).name} retire sa proposition d’échange.`);
+    return { ok: true };
   }
 
   // --- Faillite ----------------------------------------------------------------
 
   bankrupt(p) {
     if (p.bankrupt) return;
+    // Le créancier ne garde que l'or que le joueur avait vraiment : on reprend le reste
+    let deficit = Math.max(0, -p.gold);
+    for (const debt of [...(p.owes || [])].reverse()) {
+      if (!deficit) break;
+      const back = Math.min(deficit, debt.amount);
+      deficit -= back;
+      const creditor = debt.key && this.player(debt.key);
+      if (creditor && !creditor.bankrupt) {
+        creditor.gold -= back;
+        this.effect({ type: 'gold', key: creditor.key, amount: -back });
+        this.say(`${creditor.name} ne touche que ${debt.amount - back} Or sur les ${debt.amount} dus.`);
+      }
+    }
+    p.owes = [];
     p.bankrupt = true;
     p.gold = 0;
     p.baron = false;
-    for (const i of this.ownedBy(p.key)) delete this.props[i];
+    // toutes ses cases retournent à la banque, libres ; ses constructions rejoignent la réserve
+    const owned = this.ownedBy(p.key);
+    for (const i of owned) {
+      const level = this.props[i].level;
+      if (level === MAX_LEVEL) this.supply.inhibs += 1;
+      else this.supply.towers += level;
+      delete this.props[i];
+    }
+    if (this.trade && (this.trade.from === p.key || this.trade.to === p.key)) this.trade = null;
     this.effect({ type: 'bankrupt', key: p.key });
-    this.say(`${p.name} est éliminé !`);
+    this.say(`${p.name} est éliminé !${owned.length ? ' Ses cases retournent à la banque.' : ''}`);
 
     const alive = this.alivePlayers();
     if (alive.length <= 1) {
@@ -777,6 +922,8 @@ class Game {
       pendingIndex: this.pendingIndex,
       baron: { ...this.baron },
       winner: this.winner,
+      supply: { ...this.supply },
+      trade: this.trade,
       players: this.players.map((p) => ({
         key: p.key,
         name: p.name,
