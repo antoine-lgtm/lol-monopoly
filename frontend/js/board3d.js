@@ -10,6 +10,7 @@
 import * as THREE from '/vendor/three/three.module.js';
 import { buildPawn } from './pawns3d.js';
 import { buildTowerStatue, animateStatues } from './tower3d.js';
+import { buildRock, buildHextechChest, buildRuneterra } from './props3d.js';
 
 const BOARD_PX = 900;
 const S = BOARD_PX / 100; // côté du plateau en unités
@@ -119,7 +120,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   let bloomOn = true;
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x050b12, 22, 48); // un peu de brume au loin : profondeur
+  scene.fog = new THREE.Fog(0x08121e, 20, 62); // un peu de brume au loin : profondeur
   // Fond : halo bleu nuit derrière le plateau, bords sombres (vignette)
   {
     const cv = document.createElement('canvas');
@@ -939,8 +940,33 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   const cArea = BOARD_PX - 2 * CORNER;
   makeDeck(['/assets/board/real/ping.png', '/assets/board/ping.svg'], 'PING SS', '#ffe680', '#c8901a',
     CORNER + 0.06 * cArea + 84, CORNER + cArea / 2 + 64);
-  makeDeck(['/assets/board/real/chest.png', '/assets/board/chest.svg'], 'COFFRE HEXTECH', '#1ad6e0', '#035a76',
-    BOARD_PX - CORNER - 0.06 * cArea - 84, CORNER + cArea / 2 - 64);
+  // Coffre hextech en 3D à la place du paquet de cartes « Coffre Hextech »
+  {
+    const chest = buildHextechChest();
+    const pos = toWorld(BOARD_PX - CORNER - 0.06 * cArea - 84, CORNER + cArea / 2 - 64, 0);
+    chest.position.copy(pos);
+    chest.rotation.y = Math.PI / 4;
+    chest.scale.setScalar(0.66);
+    scene.add(chest);
+    ambient.push((t) => chest.userData.animate(t));
+  }
+
+  // Rochers stylisés dans la jungle (là où était la forêt)
+  for (const [mx, my, ry] of [[42, 79, 0.4], [58, 21, 3.5], [78, 62, -1.2], [22, 38, 2.0]]) {
+    const rock = buildRock();
+    rock.position.copy(toRift(mx, my, 0));
+    rock.rotation.y = ry;
+    rock.scale.setScalar(0.3);
+    scene.add(rock);
+  }
+
+  // En contrebas, la carte de Runeterra en relief : le plateau flotte au-dessus du monde
+  {
+    const world = buildRuneterra();
+    world.position.y = -5;
+    world.scale.set(0.8, 0.7, 0.8);
+    scene.add(world);
+  }
 
   // --- Vagues de sbires -----------------------------------------------------
   // Toutes les 16 s, chaque Nexus envoie 3 sbires dans chaque voie ; ils se
