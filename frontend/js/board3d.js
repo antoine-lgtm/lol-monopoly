@@ -135,7 +135,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   // Sol qui reçoit l'ombre du plateau
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.ShadowMaterial({ opacity: 0.45 }));
   ground.rotation.x = -Math.PI / 2;
-  ground.position.y = -0.42;
+  ground.position.y = -0.9;
   ground.receiveShadow = true;
   scene.add(ground);
 
@@ -251,33 +251,13 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   function drawTop() {
     ctx.fillStyle = '#0a1a24';
     ctx.fillRect(0, 0, TEX, TEX);
-    // Centre : la Faille vue du dessus, puis le logo en diagonale
+    // Centre : la Faille vue du dessus (le logo est un calque à part, au-dessus de la rivière)
     const c0 = CORNER * K;
     const cs = (BOARD_PX - 2 * CORNER) * K;
     if (riftMap) ctx.drawImage(riftMap, c0, c0, cs, cs);
     ctx.strokeStyle = 'rgba(200,170,110,0.5)';
     ctx.lineWidth = 2 * K;
     ctx.strokeRect(c0, c0, cs, cs);
-    ctx.save();
-    ctx.translate(TEX / 2, TEX / 2);
-    ctx.rotate(-Math.PI / 4);
-    ctx.textAlign = 'center';
-    ctx.shadowColor = 'rgba(0,0,0,0.8)';
-    ctx.shadowBlur = 24;
-    ctx.fillStyle = '#c8aa6e';
-    ctx.font = `600 ${Math.round(18 * K)}px Cinzel, Georgia, serif`;
-    ctx.fillText('L E A G U E   O F', 0, -40 * K);
-    const g = ctx.createLinearGradient(0, -40 * K, 0, 20 * K);
-    g.addColorStop(0, '#fff6de');
-    g.addColorStop(0.6, '#c89b3c');
-    g.addColorStop(1, '#785a28');
-    ctx.fillStyle = g;
-    ctx.font = `800 ${Math.round(66 * K)}px Cinzel, Georgia, serif`;
-    ctx.fillText('MONOPOLY', 0, 22 * K);
-    ctx.fillStyle = '#7fe9f0';
-    ctx.font = `600 ${Math.round(13 * K)}px Barlow, Arial, sans-serif`;
-    ctx.fillText('F A I L L E   D E   L ’ I N V O C A T E U R', 0, 50 * K);
-    ctx.restore();
     board.forEach(drawSquare);
     topTexture.needsUpdate = true;
   }
@@ -357,6 +337,17 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     return tileSideMats.get(color);
   };
   const GAP = 3; // rainure entre deux tuiles (px plateau)
+  const BAND_H = 0.016; // épaisseur des bandes de région en relief
+  const enamelMats = new Map();
+  const enamel = (color) => {
+    const key = color.getHex();
+    if (!enamelMats.has(key)) {
+      enamelMats.set(key, new THREE.MeshPhysicalMaterial({
+        color, emissive: color, emissiveIntensity: 0.35, roughness: 0.25, metalness: 0.2, clearcoat: 1, clearcoatRoughness: 0.15,
+      }));
+    }
+    return enamelMats.get(key);
+  };
   board.forEach((sq, i) => {
     const { x0, y0, w, h } = squareRect(i);
     const corner = cellOf(i).side === 'corner';
@@ -370,6 +361,21 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     tile.castShadow = true;
     tile.receiveShadow = true;
     scene.add(tile);
+    // bande de la région en émail, en relief sur le bord intérieur de la case
+    if (sq.type === 'property') {
+      const band = CORNER * 0.24 - 4;
+      const color = new THREE.Color(groups[sq.group].color);
+      let r;
+      if (cellOf(i).side === 's') r = [x0 + 3, y0 + 3, w - 6, band];
+      else if (cellOf(i).side === 'n') r = [x0 + 3, y0 + h - 3 - band, w - 6, band];
+      else if (cellOf(i).side === 'w') r = [x0 + w - 3 - band, y0 + 3, band, h - 6];
+      else r = [x0 + 3, y0 + 3, band, h - 6];
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(r[2] / 100, BAND_H, r[3] / 100), enamel(color));
+      const bc = toWorld(r[0] + r[2] / 2, r[1] + r[3] / 2, TOP + BAND_H / 2);
+      strip.position.copy(bc);
+      strip.castShadow = strip.receiveShadow = true;
+      scene.add(strip);
+    }
   });
 
   // Le centre : la carte de la Faille au fond de l'arène
@@ -400,6 +406,160 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     m.receiveShadow = true;
     scene.add(m);
   });
+
+  // Ornements des quatre coins du cadre : piliers dorés surmontés d'une gemme
+  const cornerGems = [];
+  {
+    const capGeo = new THREE.CylinderGeometry(0.22, 0.27, frameH + 0.1, 8);
+    const crownGeo = new THREE.CylinderGeometry(0.15, 0.22, 0.07, 8);
+    const gemGeo = new THREE.OctahedronGeometry(0.12, 0);
+    const darkGold = new THREE.MeshStandardMaterial({ color: 0x785a28, metalness: 0.9, roughness: 0.35 });
+    const off = S / 2 + frameW / 2;
+    // coin bleu (côté Nexus bleu), coin rouge, et deux coins hextech
+    for (const [x, z, color] of [[-off, off, 0x4aa8ff], [off, -off, 0xff5a4a], [off, off, 0x0ac8b9], [-off, -off, 0x0ac8b9]]) {
+      const cap = new THREE.Mesh(capGeo, frameMat);
+      cap.rotation.y = Math.PI / 8;
+      cap.position.set(x, -BASE + (frameH + 0.1) / 2, z);
+      const crown = new THREE.Mesh(crownGeo, darkGold);
+      crown.rotation.y = Math.PI / 8;
+      crown.position.set(x, -BASE + frameH + 0.135, z);
+      const gem = new THREE.Mesh(gemGeo, new THREE.MeshStandardMaterial({
+        color, emissive: color, emissiveIntensity: 1.3, roughness: 0.1, metalness: 0.1,
+      }));
+      gem.scale.set(1, 1.5, 1);
+      gem.position.set(x, -BASE + frameH + 0.36, z);
+      cap.castShadow = crown.castShadow = gem.castShadow = true;
+      cap.receiveShadow = true;
+      scene.add(cap, crown, gem);
+      cornerGems.push(gem);
+    }
+    // filet hextech lumineux tout le long du cadre, entre deux moulures sombres
+    const glowLine = new THREE.MeshStandardMaterial({ color: 0x9ff3f8, emissive: 0x0ac8b9, emissiveIntensity: 1.1 });
+    const y = -BASE + frameH * 0.42;
+    for (const [x, z, w, d] of [[0, -off, S + frameW * 2, frameW], [0, off, S + frameW * 2, frameW], [-off, 0, frameW, S], [off, 0, frameW, S]]) {
+      const line = new THREE.Mesh(new THREE.BoxGeometry(w + (w > 1 ? 0 : 0.012), 0.022, d + (d > 1 ? 0 : 0.012)), glowLine);
+      line.position.set(x, y, z);
+      const mold = new THREE.Mesh(new THREE.BoxGeometry(w + (w > 1 ? 0 : 0.008), 0.07, d + (d > 1 ? 0 : 0.008)), darkGold);
+      mold.position.set(x, y, z);
+      scene.add(line, mold);
+    }
+    cornerGems.glowLine = glowLine;
+  }
+
+  // Socle de pierre runique sous le plateau, cerclé d'un anneau hextech lumineux
+  const pedestalRing = (() => {
+    const R = 8.4;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 1024;
+    const g = cv.getContext('2d');
+    const grad = g.createRadialGradient(512, 512, 120, 512, 512, 512);
+    grad.addColorStop(0, '#1a222c');
+    grad.addColorStop(0.75, '#121920');
+    grad.addColorStop(1, '#0a0e13');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 1024, 1024);
+    // dalles : cercles et rayons gravés
+    g.strokeStyle = 'rgba(200,170,110,0.18)';
+    g.lineWidth = 3;
+    for (const r of [400, 470, 500]) { g.beginPath(); g.arc(512, 512, r, 0, Math.PI * 2); g.stroke(); }
+    for (let k = 0; k < 48; k++) {
+      const a = (k / 48) * Math.PI * 2;
+      g.beginPath();
+      g.moveTo(512 + Math.cos(a) * 400, 512 + Math.sin(a) * 400);
+      g.lineTo(512 + Math.cos(a) * 470, 512 + Math.sin(a) * 470);
+      g.stroke();
+    }
+    // runes dorées entre les deux cercles extérieurs
+    g.fillStyle = 'rgba(200,170,110,0.55)';
+    g.font = '600 22px Cinzel, Georgia, serif';
+    g.textAlign = 'center';
+    const glyphs = 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ';
+    for (let k = 0; k < 72; k++) {
+      const a = (k / 72) * Math.PI * 2;
+      g.save();
+      g.translate(512 + Math.cos(a) * 486, 512 + Math.sin(a) * 486);
+      g.rotate(a + Math.PI / 2);
+      g.fillText(glyphs[k % glyphs.length], 0, 8);
+      g.restore();
+    }
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    const stone = new THREE.MeshStandardMaterial({ color: 0x2a323c, roughness: 0.85, metalness: 0.1 });
+    const top = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.75, metalness: 0.15 });
+    const H = 0.5;
+    const dais = new THREE.Mesh(new THREE.CylinderGeometry(R, R + 0.35, H, 96, 1), [stone, top, stone]);
+    dais.position.y = -BASE - H / 2 - 0.001;
+    dais.receiveShadow = true;
+    scene.add(dais);
+    const lip = new THREE.Mesh(new THREE.TorusGeometry(R, 0.05, 8, 128), frameMat);
+    lip.rotation.x = -Math.PI / 2;
+    lip.position.y = -BASE;
+    scene.add(lip);
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(R * 0.79, 0.025, 8, 160),
+      new THREE.MeshStandardMaterial({ color: 0x5fe0f0, emissive: 0x0ac8b9, emissiveIntensity: 1.6 }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = -BASE + 0.01;
+    scene.add(ring);
+    return ring;
+  })();
+
+  // Le logo, peint en lettres d'or au-dessus de la Faille (lisible même sur la rivière)
+  {
+    const W = 5.2;
+    const H = 1.7;
+    const cv = document.createElement('canvas');
+    cv.width = 2048;
+    cv.height = Math.round((2048 * H) / W);
+    const g = cv.getContext('2d');
+    const u = 2048 / W / 100; // px plateau -> px de ce calque
+    const draw = () => {
+      g.clearRect(0, 0, cv.width, cv.height);
+      g.save();
+      g.translate(cv.width / 2, cv.height / 2);
+      g.textAlign = 'center';
+      g.shadowColor = 'rgba(0,0,0,0.85)';
+      g.shadowBlur = 30;
+      g.fillStyle = '#c8aa6e';
+      g.font = `600 ${Math.round(18 * u)}px Cinzel, Georgia, serif`;
+      g.fillText('L E A G U E   O F', 0, -40 * u);
+      const grad = g.createLinearGradient(0, -40 * u, 0, 22 * u);
+      grad.addColorStop(0, '#fff6de');
+      grad.addColorStop(0.6, '#c89b3c');
+      grad.addColorStop(1, '#785a28');
+      g.fillStyle = grad;
+      g.font = `800 ${Math.round(66 * u)}px Cinzel, Georgia, serif`;
+      g.fillText('MONOPOLY', 0, 22 * u);
+      g.shadowBlur = 0;
+      g.lineWidth = 2;
+      g.strokeStyle = 'rgba(60,40,10,0.9)';
+      g.strokeText('MONOPOLY', 0, 22 * u);
+      g.shadowBlur = 30;
+      g.fillStyle = '#7fe9f0';
+      g.font = `600 ${Math.round(13 * u)}px Barlow, Arial, sans-serif`;
+      g.fillText('F A I L L E   D E   L ’ I N V O C A T E U R', 0, 50 * u);
+      g.restore();
+      logoTex.needsUpdate = true;
+    };
+    const logoTex = new THREE.CanvasTexture(cv);
+    logoTex.colorSpace = THREE.SRGBColorSpace;
+    logoTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    draw();
+    if (document.fonts?.ready) document.fonts.ready.then(draw);
+    const logo = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshStandardMaterial({
+      map: logoTex, transparent: true, depthWrite: false, roughness: 0.35, metalness: 0.6,
+      emissive: 0xffffff, emissiveMap: logoTex, emissiveIntensity: 0.25,
+      polygonOffset: true, polygonOffsetFactor: -2,
+    }));
+    logo.rotation.x = -Math.PI / 2;
+    const holder = new THREE.Group();
+    holder.rotation.y = Math.PI / 4;
+    holder.position.y = 0.045;
+    holder.add(logo);
+    scene.add(holder);
+  }
 
   // --- La Faille en relief (centre du plateau) -------------------------------
   // Coordonnées « carte » 0..100 (comme la mini-carte) -> monde
@@ -477,7 +637,8 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     const blocked = (x, y) => {
       if (x < 13 || y < 13 || x > 87 || y > 87) return true; // voies du haut, du bas, des côtés
       if (Math.abs(y - x) < 15) return true; // rivière
-      if (Math.abs(y - (100 - x)) < 13) return true; // voie du milieu + logo
+      if (Math.abs(y - (100 - x)) < 13) return true; // voie du milieu
+      if (Math.abs(y - (100 - x)) < 24 && Math.abs(x - 50) < 34) return true; // logo
       if (Math.hypot(x - 19, y - 60) < 17 || Math.hypot(x - 81, y - 40) < 17) return true; // paquets
       if (Math.hypot(x - 27, y - 22) < 10 || Math.hypot(x - 73, y - 78) < 10) return true; // fosses
       return spots.some(([sx, sy]) => Math.hypot(sx - x, sy - y) < 4.2);
@@ -670,7 +831,9 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   }
 
   // --- Paquets de cartes ----------------------------------------------------
+  const deckRects = [];
   async function makeDeck(art, label, colorA, colorB, px, py) {
+    deckRects.push(toWorld(px, py));
     const cv = document.createElement('canvas');
     cv.width = 512;
     cv.height = 390;
@@ -712,6 +875,136 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     CORNER + 0.06 * cArea + 84, CORNER + cArea / 2 + 64);
   makeDeck(['/assets/board/real/chest.png', '/assets/board/chest.svg'], 'COFFRE HEXTECH', '#1ad6e0', '#035a76',
     BOARD_PX - CORNER - 0.06 * cArea - 84, CORNER + cArea / 2 - 64);
+
+  // --- Vagues de sbires -----------------------------------------------------
+  // Toutes les 16 s, chaque Nexus envoie 3 sbires dans chaque voie ; ils se
+  // rejoignent au milieu, se battent un instant puis disparaissent.
+  {
+    const LANES = [
+      [[12, 86], [11.5, 60], [11.5, 11.5], [60, 11.5], [86, 12]], // haut
+      [[14, 90], [90, 14]], // milieu
+      [[16, 89], [40, 88.5], [88.5, 88.5], [88.5, 40], [89, 16]], // bas
+    ].map((pts) => {
+      const world = pts.map(([x, y]) => toRift(x, y, 0));
+      const lens = [0];
+      for (let k = 1; k < world.length; k++) lens.push(lens[k - 1] + world[k].distanceTo(world[k - 1]));
+      return { world, lens, total: lens[lens.length - 1] };
+    });
+    const PER = 3;
+    const count = LANES.length * PER * 2;
+    const bodyGeo = new THREE.CapsuleGeometry(0.03, 0.035, 3, 8);
+    bodyGeo.translate(0, 0.06, 0);
+    const hatGeo = new THREE.ConeGeometry(0.034, 0.05, 8);
+    hatGeo.translate(0, 0.13, 0);
+    const bodies = new THREE.InstancedMesh(bodyGeo, new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0.3 }), count);
+    const hats = new THREE.InstancedMesh(hatGeo, new THREE.MeshStandardMaterial({ color: 0xd4a84a, metalness: 0.8, roughness: 0.3 }), count);
+    for (let k = 0; k < count; k++) bodies.setColorAt(k, new THREE.Color(k < count / 2 ? 0x3a8ae8 : 0xe0483c));
+    bodies.castShadow = hats.castShadow = true;
+    bodies.frustumCulled = hats.frustumCulled = false;
+    scene.add(bodies, hats);
+    const pointAt = (lane, d, out) => {
+      let k = 1;
+      while (k < lane.lens.length - 1 && lane.lens[k] < d) k++;
+      const a = lane.world[k - 1];
+      const b = lane.world[k];
+      const f = Math.max(0, Math.min(1, (d - lane.lens[k - 1]) / (lane.lens[k] - lane.lens[k - 1])));
+      out.lerpVectors(a, b, f);
+      // les sbires grimpent sur les paquets de cartes qu'ils traversent
+      for (const c of deckRects) {
+        const dx = out.x - c.x;
+        const dz = out.z - c.z;
+        const lx = (dx - dz) * Math.SQRT1_2;
+        const lz = (dx + dz) * Math.SQRT1_2;
+        if (Math.abs(lx) < 0.86 && Math.abs(lz) < 0.66) out.y = 0.12;
+      }
+      return Math.atan2(b.x - a.x, b.z - a.z);
+    };
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const sc = new THREE.Vector3();
+    const pos = new THREE.Vector3();
+    const up = new THREE.Vector3(0, 1, 0);
+    const PERIOD = 16;
+    ambient.push((t) => {
+      const cycle = t % PERIOD;
+      let n = 0;
+      for (const team of [0, 1]) {
+        LANES.forEach((lane, li) => {
+          for (let k = 0; k < PER; k++) {
+            // progression : marche (0..10 s) jusqu'au milieu, combat (10..13 s), disparition
+            const walk = Math.min(1, cycle / 10);
+            const meet = lane.total / 2 - 0.07 - k * 0.09;
+            let d = walk * meet;
+            const fighting = cycle > 10 && cycle < 13.5;
+            if (fighting) d = meet + Math.sin(t * 9 + k + li) * 0.015;
+            let yaw = pointAt(lane, team ? lane.total - d : d, pos);
+            if (team) yaw += Math.PI;
+            pos.y += fighting ? Math.abs(Math.sin(t * 9 + k * 2 + li)) * 0.03 : Math.abs(Math.sin(t * 12 + k)) * 0.008;
+            const size = cycle < 0.6 ? cycle / 0.6 : cycle > 13.5 ? Math.max(0, 1 - (cycle - 13.5) / 0.8) : 1;
+            q.setFromAxisAngle(up, yaw + (fighting ? Math.sin(t * 9 + k) * 0.3 : 0));
+            sc.setScalar(Math.max(size * 1.45, 0.0001));
+            m.compose(pos, q, sc);
+            bodies.setMatrixAt(n, m);
+            hats.setMatrixAt(n, m);
+            n++;
+          }
+        });
+      }
+      bodies.instanceMatrix.needsUpdate = true;
+      hats.instanceMatrix.needsUpdate = true;
+    });
+  }
+
+  // --- Poussière magique qui flotte autour du plateau --------------------------
+  {
+    const N = 320;
+    const positions = new Float32Array(N * 3);
+    const colors = new Float32Array(N * 3);
+    const seeds = [];
+    const teal = new THREE.Color(0x7fe9f0);
+    const gold = new THREE.Color(0xf0c860);
+    for (let k = 0; k < N; k++) {
+      const a = rand() * Math.PI * 2;
+      const r = 2 + rand() * 6.5;
+      seeds.push({ x: Math.cos(a) * r, z: Math.sin(a) * r, y: rand() * 3.2, speed: 0.08 + rand() * 0.14, phase: rand() * 6 });
+      (rand() < 0.65 ? teal : gold).toArray(colors, k * 3);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 64;
+    const g = cv.getContext('2d');
+    const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.3, 'rgba(255,255,255,0.6)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+    const dust = new THREE.Points(geo, new THREE.PointsMaterial({
+      size: 0.13, map: new THREE.CanvasTexture(cv), vertexColors: true, transparent: true,
+      depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.85,
+    }));
+    dust.frustumCulled = false;
+    scene.add(dust);
+    ambient.push((t) => {
+      seeds.forEach((s, k) => {
+        positions[k * 3] = s.x + Math.sin(t * 0.4 + s.phase) * 0.25;
+        positions[k * 3 + 1] = -0.2 + ((s.y + t * s.speed) % 3.2);
+        positions[k * 3 + 2] = s.z + Math.cos(t * 0.35 + s.phase) * 0.25;
+      });
+      geo.attributes.position.needsUpdate = true;
+    });
+  }
+
+  ambient.push((t) => {
+    pedestalRing.material.emissiveIntensity = 1.2 + Math.sin(t * 1.5) * 0.5;
+    cornerGems.glowLine.emissiveIntensity = 0.9 + Math.sin(t * 1.5) * 0.35;
+    cornerGems.forEach((gem, k) => {
+      gem.rotation.y = t * 0.9 + k;
+      gem.position.y = -BASE + frameH + 0.36 + Math.sin(t * 1.8 + k * 1.3) * 0.03;
+    });
+  });
 
   // --- Matériaux et géométries partagés -------------------------------------
   const stoneMat = new THREE.MeshStandardMaterial({ color: 0xb8b2a2, roughness: 0.7 });
@@ -780,6 +1073,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
 
   // --- Constructions --------------------------------------------------------
   const buildings = new THREE.Group();
+  buildings.position.y = BAND_H; // posées sur les bandes de région en relief
   scene.add(buildings);
   const animated = []; // objets animés (inhibiteurs, drapeaux, Baron)
 
