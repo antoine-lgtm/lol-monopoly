@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8"><title>Statue 3D</title>
+<script type="importmap">{ "imports": { "three": "/vendor/three/three.module.js" } }</script>
+<style>body{margin:0;background:#4a4c66}canvas{display:block}</style></head>
+<body><script type="module">
+import * as THREE from '/vendor/three/three.module.js';
+import { RoomEnvironment } from '/vendor/three-addons/environments/RoomEnvironment.js';
+import { buildTowerStatue, animateStatues } from '/js/tower3d.js';
+const W = 1400, H = 700;
+const r = new THREE.WebGLRenderer({ antialias: true });
+r.setSize(W, H); r.shadowMap.enabled = true; r.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.append(r.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x4a4c66);
+scene.environment = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.6;
+scene.add(new THREE.HemisphereLight(0xcfe4ff, 0x2a2438, 1.0));
+const sun = new THREE.DirectionalLight(0xffe6c0, 2.2); sun.position.set(2, 5, 4); sun.castShadow = true; scene.add(sun);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 10), new THREE.MeshStandardMaterial({ color: 0x5a5c78 }));
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+const colors = ['#e84057', '#0ac8b9', '#b27cff'];
+[0.35, 0, -0.9].forEach((rot, i) => { const s = buildTowerStatue(colors[i]); s.position.x = (i - 1) * 0.85; s.rotation.y = rot; scene.add(s); });
+const cam = new THREE.PerspectiveCamera(30, W / H, 0.1, 50);
+cam.position.set(0, 0.85, 3.4); cam.lookAt(0, 0.45, 0);
+animateStatues(1); r.render(scene, cam);
+window.done = true;
+</script></body></html>

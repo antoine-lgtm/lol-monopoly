@@ -525,7 +525,7 @@
       const index = Number(i);
       const color = state.players.find((p) => p.key === st.owner)?.color || '#c8aa6e';
       if (st.level === 5) inhibs.push({ ...bandPoint(index, 0.5), color });
-      else for (let t = 0; t < st.level; t++) towers.push({ ...bandPoint(index, st.level === 1 ? 0.5 : t / (st.level - 1)), color });
+      else for (let t = 0; t < st.level; t++) towers.push({ ...bandPoint(index, st.level === 1 ? 0.5 : t / (st.level - 1)), color, slot: t, count: st.level });
       flags.push({ ...flagPoint(index), color, mortgaged: st.mortgaged });
     }
     const baron = state.baron.taken ? null : { ...centerOf(20, 0.9), active: state.baron.active };

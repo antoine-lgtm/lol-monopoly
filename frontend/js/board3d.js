@@ -9,6 +9,7 @@
  */
 import * as THREE from '/vendor/three/three.module.js';
 import { buildPawn } from './pawns3d.js';
+import { buildTowerStatue, animateStatues } from './tower3d.js';
 
 const BOARD_PX = 900;
 const S = BOARD_PX / 100; // côté du plateau en unités
@@ -1071,10 +1072,6 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   });
 
   // --- Matériaux et géométries partagés -------------------------------------
-  const stoneMat = new THREE.MeshStandardMaterial({ color: 0xb8b2a2, roughness: 0.7 });
-  const towerGeo = new THREE.CylinderGeometry(0.075, 0.095, 0.3, 10);
-  const merlonGeo = new THREE.BoxGeometry(0.04, 0.05, 0.04);
-  const bandGeo = new THREE.CylinderGeometry(0.083, 0.083, 0.05, 10);
   const inhibGeo = new THREE.OctahedronGeometry(0.15, 0);
   const poleGeo = new THREE.CylinderGeometry(0.008, 0.008, 0.46, 6);
   const goldMat = new THREE.MeshStandardMaterial({ color: 0xc89b3c, metalness: 0.9, roughness: 0.25 });
@@ -1160,23 +1157,18 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     lastBuildings = { towers, inhibs, flags, baron };
     buildings.clear();
     animated.length = 0;
+    // Tours : des gardiens de pierre (tower3d.js), tournés vers l'extérieur du plateau.
+    // À 3 ou 4 sur une case, ils rapetissent un peu et se placent en quinconce.
     for (const t of towers) {
-      const g = new THREE.Group();
-      const body = new THREE.Mesh(towerGeo, stoneMat);
-      body.position.y = 0.15;
-      body.castShadow = true;
-      const band = new THREE.Mesh(bandGeo, colorMat(t.color));
-      band.position.y = 0.26;
-      g.add(body, band);
-      for (let k = 0; k < 4; k++) {
-        const m = new THREE.Mesh(merlonGeo, stoneMat);
-        const a = (k * Math.PI) / 2 + Math.PI / 4;
-        m.position.set(Math.cos(a) * 0.06, 0.32, Math.sin(a) * 0.06);
-        m.castShadow = true;
-        g.add(m);
-      }
-      g.position.copy(toWorld(t.x, t.y));
-      buildings.add(g);
+      const pos = toWorld(t.x, t.y);
+      const facing = Math.abs(pos.z) > Math.abs(pos.x) ? new THREE.Vector3(0, 0, Math.sign(pos.z)) : new THREE.Vector3(Math.sign(pos.x), 0, 0);
+      const count = t.count || 1;
+      const statue = buildTowerStatue(t.color);
+      statue.scale.setScalar(count >= 4 ? 0.32 : count === 3 ? 0.37 : 0.45);
+      if (count >= 3) pos.addScaledVector(facing, ((t.slot || 0) % 2 ? 1 : -1) * 0.045);
+      statue.position.copy(pos);
+      statue.rotation.y = Math.atan2(facing.x, facing.z);
+      buildings.add(statue);
     }
     for (const h of inhibs) {
       const g = new THREE.Group();
@@ -1645,6 +1637,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
       baronLight.intensity = 3 + Math.sin(t * 3) * 1.2;
     }
     for (const animate of ambient) animate(t);
+    animateStatues(t);
     blueNexus.intensity = 5 + Math.sin(t * 2) * 2;
     redNexus.intensity = 5 + Math.sin(t * 2 + Math.PI) * 2;
 
