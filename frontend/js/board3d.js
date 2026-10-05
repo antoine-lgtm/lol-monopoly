@@ -1582,7 +1582,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   const ZOOM_MAX = 6;
   const PITCH_MIN = 6;
   const PITCH_MAX = 89;
-  const clampFocus = (v) => { v.x = Math.max(-6, Math.min(6, v.x)); v.z = Math.max(-6, Math.min(6, v.z)); return v; };
+  const clampFocus = (v) => { v.x = Math.max(-5.2, Math.min(5.2, v.x)); v.z = Math.max(-5.2, Math.min(5.2, v.z)); return v; };
   /** Déplace le point visé (dx vers la droite de l'écran, dz vers le haut de l'écran, en unités). */
   function pan(dx, dz) {
     const yaw = (cam.yaw * Math.PI) / 180;
@@ -1713,7 +1713,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     if (drag.panning) {
       // on « attrape » le plateau : il suit la souris
       const d = (cam.base || 13) / cam.zoom;
-      const sx = 0.0011 * d;
+      const sx = 0.0005 * d;
       const sz = sx / Math.max(0.35, Math.sin((cam.pitch * Math.PI) / 180));
       pan(-(e.clientX - drag.lx) * sx, (e.clientY - drag.ly) * sz);
       drag.lx = e.clientX;
