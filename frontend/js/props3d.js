@@ -138,47 +138,72 @@ export function buildHextechChest() {
   const gold = new THREE.MeshPhysicalMaterial({ color: 0xeec060, metalness: 0.95, roughness: 0.22, clearcoat: 0.6 });
   const slate = new THREE.MeshPhysicalMaterial({ color: 0x2c3c4c, metalness: 0.55, roughness: 0.35, clearcoat: 0.4 });
   const glow = new THREE.MeshStandardMaterial({ color: 0x9ff3f8, emissive: 0x2ad8e0, emissiveIntensity: 1.6 });
-  const w = workshop();
   const H = 0.5; // demi-côté
-  // cœur lumineux qui filtre par les jointures
-  w.add('glow', new THREE.BoxGeometry(0.94, 0.94, 0.94), [0, H, 0]);
-  // panneaux d'ardoise de chaque face (un peu en retrait du cadre)
-  const P = 0.82;
-  for (const [x, z, ry] of [[0, H - 0.02, 0], [0, -H + 0.02, 0], [H - 0.02, 0, Math.PI / 2], [-H + 0.02, 0, Math.PI / 2]]) {
-    w.add('slate', new THREE.BoxGeometry(P, 0.6, 0.03), [x, 0.38, z], [0, ry, 0]); // bas
-    w.add('slate', new THREE.BoxGeometry(P, 0.2, 0.03), [x, 0.84, z], [0, ry, 0]); // couvercle
-  }
-  w.add('slate', new THREE.BoxGeometry(P, 0.03, P), [0, 2 * H - 0.02, 0]);
-  // cadre d'or : les 12 arêtes
-  const T = 0.09;
+  const LID = 0.7; // hauteur de la charnière : le couvercle va de 0,7 à 1
+  const T = 0.09; // épaisseur du cadre d'or
+  const P = 0.82; // largeur des panneaux d'ardoise
+  const E = H - T / 2 + 0.01; // position des arêtes
+  const faces = [[0, H - 0.02, 0], [0, -H + 0.02, 0], [H - 0.02, 0, Math.PI / 2], [-H + 0.02, 0, Math.PI / 2]];
+
+  // --- la base (0 à 0,7) ---
+  const base = workshop();
+  base.add('glow', new THREE.BoxGeometry(0.94, LID - 0.02, 0.94), [0, LID / 2, 0]); // cœur lumineux
+  for (const [x, z, ry] of faces) base.add('slate', new THREE.BoxGeometry(P, 0.6, 0.03), [x, 0.38, z], [0, ry, 0]);
   for (const sx of [-1, 1]) {
-    for (const sz of [-1, 1]) w.add('gold', new THREE.BoxGeometry(T, 1, T), [sx * (H - T / 2 + 0.01), H, sz * (H - T / 2 + 0.01)]);
-    for (const y of [T / 2, 1 - T / 2]) {
-      w.add('gold', new THREE.BoxGeometry(T, T, 1), [sx * (H - T / 2 + 0.01), y, 0]);
-      w.add('gold', new THREE.BoxGeometry(1, T, T), [0, y, sx * (H - T / 2 + 0.01)]);
+    for (const sz of [-1, 1]) base.add('gold', new THREE.BoxGeometry(T, LID, T), [sx * E, LID / 2, sz * E]);
+    for (const y of [T / 2, LID - 0.02]) {
+      base.add('gold', new THREE.BoxGeometry(T, T * (y < 0.1 ? 1 : 0.5), 1), [sx * E, y, 0]);
+      base.add('gold', new THREE.BoxGeometry(1, T * (y < 0.1 ? 1 : 0.5), T), [0, y, sx * E]);
     }
-  }
-  // ceinture du couvercle
-  for (const [x, z, ry] of [[0, H + 0.005, 0], [0, -H - 0.005, 0], [H + 0.005, 0, Math.PI / 2], [-H - 0.005, 0, Math.PI / 2]]) {
-    w.add('gold', new THREE.BoxGeometry(1.0, 0.05, 0.04), [x, 0.7, z], [0, ry, 0]);
   }
   // motif hextech en relief sur chaque face : deux crochets et un losange
   for (const [x, z, ry, nx, nz] of [[0, H, 0, 0, 1], [0, -H, Math.PI, 0, -1], [H, 0, Math.PI / 2, 1, 0], [-H, 0, -Math.PI / 2, -1, 0]]) {
     const o = 0.03;
     const at = (u, y) => [x + nx * o + Math.cos(ry) * u, y, z + nz * o - Math.sin(ry) * u];
-    for (const s of [-1, 1]) {
-      w.add('gold', new THREE.BoxGeometry(0.05, 0.42, 0.04), at(s * 0.2, 0.38), [0, ry, 0]);
-      w.add('gold', new THREE.BoxGeometry(0.16, 0.05, 0.04), at(s * 0.13, 0.57), [0, ry, 0]);
-      w.add('gold', new THREE.BoxGeometry(0.12, 0.05, 0.04), at(s * 0.15, 0.19), [0, ry, s * 0.5]);
+    for (const sgn of [-1, 1]) {
+      base.add('gold', new THREE.BoxGeometry(0.05, 0.42, 0.04), at(sgn * 0.2, 0.38), [0, ry, 0]);
+      base.add('gold', new THREE.BoxGeometry(0.16, 0.05, 0.04), at(sgn * 0.13, 0.57), [0, ry, 0]);
+      base.add('gold', new THREE.BoxGeometry(0.12, 0.05, 0.04), at(sgn * 0.15, 0.19), [0, ry, sgn * 0.5]);
     }
-    w.add('gold', new THREE.BoxGeometry(0.13, 0.13, 0.04), at(0, 0.4), [0, ry, Math.PI / 4]);
-    w.add('glow', new THREE.BoxGeometry(0.07, 0.07, 0.05), at(0, 0.4), [0, ry, Math.PI / 4]);
+    base.add('gold', new THREE.BoxGeometry(0.13, 0.13, 0.04), at(0, 0.4), [0, ry, Math.PI / 4]);
+    base.add('glow', new THREE.BoxGeometry(0.07, 0.07, 0.05), at(0, 0.4), [0, ry, Math.PI / 4]);
   }
-  // plaque du dessus avec sa poignée
-  w.add('gold', new THREE.BoxGeometry(0.5, 0.04, 0.32), [0, 1.02, 0]);
-  w.add('slate', new THREE.BoxGeometry(0.34, 0.05, 0.16), [0, 1.03, 0]);
-  w.add('gold', new THREE.TorusGeometry(0.09, 0.022, 6, 16, Math.PI), [0, 1.04, 0]);
-  const chest = w.build({ gold, slate, glow });
+
+  // --- le couvercle, construit autour de sa charnière (au bord arrière, en haut de la base) ---
+  const lidW = workshop();
+  const L = (x, y, z) => [x, y - LID, z + H]; // coordonnées coffre -> coordonnées charnière
+  lidW.add('glow', new THREE.BoxGeometry(0.94, 0.26, 0.94), L(0, 0.84, 0));
+  for (const [x, z, ry] of faces) lidW.add('slate', new THREE.BoxGeometry(P, 0.2, 0.03), L(x, 0.85, z), [0, ry, 0]);
+  lidW.add('slate', new THREE.BoxGeometry(P, 0.03, P), L(0, 0.98, 0));
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) lidW.add('gold', new THREE.BoxGeometry(T, 1 - LID, T), L(sx * E, (1 + LID) / 2, sz * E));
+    lidW.add('gold', new THREE.BoxGeometry(T, T, 1), L(sx * E, 1 - T / 2, 0));
+    lidW.add('gold', new THREE.BoxGeometry(1, T, T), L(0, 1 - T / 2, sx * E));
+    lidW.add('gold', new THREE.BoxGeometry(T, T * 0.5, 1), L(sx * E, LID + 0.02, 0));
+    lidW.add('gold', new THREE.BoxGeometry(1, T * 0.5, T), L(0, LID + 0.02, sx * E));
+  }
+  lidW.add('gold', new THREE.BoxGeometry(0.5, 0.04, 0.32), L(0, 1.02, 0)); // plaque du dessus
+  lidW.add('slate', new THREE.BoxGeometry(0.34, 0.05, 0.16), L(0, 1.03, 0));
+  lidW.add('gold', new THREE.TorusGeometry(0.09, 0.022, 6, 16, Math.PI), L(0, 1.04, 0)); // poignée
+  lidW.add('gold', new THREE.BoxGeometry(0.12, 0.1, 0.05), L(0, 0.74, H + 0.02)); // fermoir
+  const materials = { gold, slate, glow };
+  const chest = base.build(materials);
+  const lid = lidW.build(materials);
+  lid.position.set(0, LID, -H);
+  chest.add(lid);
+
+  // étincelles qui jaillissent à l'ouverture
+  const sparkMat = new THREE.MeshBasicMaterial({ color: 0xbff8ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+  const sparkGeo = new THREE.OctahedronGeometry(0.04, 0);
+  const rand = seeded(5);
+  const sparks = Array.from({ length: 16 }, () => {
+    const m = new THREE.Mesh(sparkGeo, sparkMat);
+    m.userData = { a: rand() * Math.PI * 2, r: 0.1 + rand() * 0.35, h: 0.8 + rand() * 1.2, spin: rand() * 8 };
+    m.visible = false;
+    chest.add(m);
+    return m;
+  });
+
   // anneau de lumière au sol et petite lumière
   const halo = new THREE.Mesh(
     new THREE.RingGeometry(0.62, 0.95, 48),
@@ -190,12 +215,37 @@ export function buildHextechChest() {
   light.position.y = 0.6;
   const root = new THREE.Group();
   root.add(chest, halo, light);
+
+  let openedAt = -1; // temps (s) de la dernière ouverture
+  const OPEN = 0.45;
+  const HOLD = 2.6;
+  const CLOSE = 0.6;
+  let clock = 0;
+  /** Ouvre le coffre (il se referme tout seul quelques secondes plus tard). */
+  root.userData.open = () => { openedAt = clock; };
   root.userData.animate = (t) => {
-    chest.position.y = 0.06 + Math.sin(t * 1.4) * 0.04;
-    chest.rotation.y = Math.sin(t * 0.5) * 0.25;
-    glow.emissiveIntensity = 1.3 + Math.sin(t * 2.4) * 0.5;
-    halo.material.opacity = 0.25 + Math.sin(t * 2.4) * 0.1;
-    light.intensity = 2 + Math.sin(t * 2.4) * 0.8;
+    clock = t;
+    const since = openedAt < 0 ? Infinity : t - openedAt;
+    let k = 0; // 0 fermé, 1 ouvert
+    if (since < OPEN) k = 1 - (1 - since / OPEN) ** 3;
+    else if (since < OPEN + HOLD) k = 1;
+    else if (since < OPEN + HOLD + CLOSE) k = 1 - ((since - OPEN - HOLD) / CLOSE) ** 2;
+    lid.rotation.x = -1.95 * k;
+    const burst = since < 1.6 ? 1 - since / 1.6 : 0;
+    chest.position.y = 0.06 + Math.sin(t * 1.4) * 0.04 * (1 - k) + k * 0.08;
+    chest.rotation.y = Math.sin(t * 0.5) * 0.25 * (1 - k);
+    glow.emissiveIntensity = 1.3 + Math.sin(t * 2.4) * 0.5 + k * 1.5;
+    halo.material.opacity = 0.25 + Math.sin(t * 2.4) * 0.1 + burst * 0.5;
+    light.intensity = 2 + Math.sin(t * 2.4) * 0.8 + k * 3 + burst * 6;
+    sparkMat.opacity = burst;
+    for (const sp of sparks) {
+      sp.visible = burst > 0;
+      if (!sp.visible) continue;
+      const u = 1 - burst;
+      const { a, r, h, spin } = sp.userData;
+      sp.position.set(Math.cos(a + u * 2) * r * (0.4 + u), 0.7 + u * h, Math.sin(a + u * 2) * r * (0.4 + u));
+      sp.rotation.set(u * spin, u * spin * 1.3, 0);
+    }
   };
   return root;
 }
@@ -238,21 +288,27 @@ export function buildRuneterra({ width = 46, depth = 30, segX = 160, segZ = 104 
   const ridge = makeNoise(29);
   // continents et îles (coordonnées -1..1, x vers l'est, y vers le sud)
   const lands = [
-    { u: -0.42, v: -0.62, r: 0.36, region: 'freljord' },
-    { u: -0.12, v: -0.66, r: 0.25, region: 'freljord' },
-    { u: -0.6, v: -0.12, r: 0.3, region: 'demacia' },
-    { u: -0.15, v: -0.2, r: 0.32, region: 'noxus' },
-    { u: 0.18, v: -0.28, r: 0.26, region: 'noxus' },
-    { u: -0.1, v: 0.38, r: 0.44, region: 'shurima' },
-    { u: 0.28, v: 0.3, r: 0.3, region: 'shurima' },
-    { u: -0.45, v: 0.3, r: 0.22, region: 'targon' },
-    { u: 0.12, v: 0.72, r: 0.24, region: 'jungle' },
-    { u: 0.72, v: -0.32, r: 0.2, region: 'ionia' },
-    { u: 0.62, v: -0.12, r: 0.12, region: 'ionia' },
-    { u: 0.74, v: 0.32, r: 0.08, region: 'bilgewater' },
-    { u: 0.66, v: 0.42, r: 0.06, region: 'bilgewater' },
-    { u: 0.88, v: 0.72, r: 0.08, region: 'shadow' },
+    { u: -0.5, v: -0.66, r: 0.34, region: 'freljord' },
+    { u: -0.15, v: -0.72, r: 0.26, region: 'freljord' },
+    { u: 0.12, v: -0.78, r: 0.16, region: 'freljord' },
+    { u: -0.66, v: -0.2, r: 0.27, region: 'demacia' },
+    { u: -0.38, v: -0.08, r: 0.16, region: 'demacia' },
+    { u: -0.08, v: -0.3, r: 0.3, region: 'noxus' },
+    { u: 0.22, v: -0.32, r: 0.24, region: 'noxus' },
+    { u: 0.0, v: 0.03, r: 0.11, region: 'piltover' }, // Piltover et Zaun, sur l'isthme
+    { u: -0.08, v: 0.4, r: 0.4, region: 'shurima' },
+    { u: 0.24, v: 0.32, r: 0.26, region: 'shurima' },
+    { u: -0.47, v: 0.36, r: 0.2, region: 'targon' },
+    { u: 0.44, v: 0.12, r: 0.17, region: 'jungle' }, // Ixtal
+    { u: 0.12, v: 0.74, r: 0.2, region: 'jungle' },
+    { u: 0.72, v: -0.34, r: 0.19, region: 'ionia' },
+    { u: 0.6, v: -0.14, r: 0.1, region: 'ionia' },
+    { u: 0.86, v: -0.12, r: 0.07, region: 'ionia' },
+    { u: 0.76, v: 0.3, r: 0.08, region: 'bilgewater' },
+    { u: 0.67, v: 0.42, r: 0.06, region: 'bilgewater' },
+    { u: 0.86, v: 0.7, r: 0.09, region: 'shadow' },
   ];
+
   const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   /** Altitude, région et grain de bruit d'un point de la carte (u, v dans -1..1). */
   const sample = (u, v) => {
@@ -286,6 +342,8 @@ export function buildRuneterra({ width = 46, depth = 30, segX = 160, segZ = 104 
     if (region === 'freljord') out.copy(PAL.ice).lerp(PAL.rock, smooth(0.45, 0.7, n) * 0.4);
     else if (region === 'shurima') out.copy(PAL.desert).lerp(PAL.dune, smooth(0.4, 0.65, n));
     else if (region === 'shadow') out.copy(PAL.shadow).lerp(PAL.purple, n);
+    else if (region === 'jungle') out.copy(PAL.forest).lerp(PAL.grass, smooth(0.5, 0.7, n) * 0.5);
+    else if (region === 'piltover') out.copy(PAL.grass).lerp(PAL.rock, 0.45);
     else out.copy(PAL.grass).lerp(PAL.forest, smooth(0.45, 0.62, n));
     // plage, roche en altitude, neige au sommet
     out.lerp(PAL.rock, smooth(0.65, 1.0, h) * (region === 'freljord' ? 0.3 : 0.8));
@@ -337,4 +395,161 @@ export function buildRuneterra({ width = 46, depth = 30, segX = 160, segZ = 104 
   const group = new THREE.Group();
   group.add(terrain, sea);
   return group;
+}
+
+// --- Baron Nashor -----------------------------------------------------------------
+/**
+ * Le Baron Nashor : un ver géant violet qui sort du sol en S, épines sur le dos,
+ * crâne cornu à crête, yeux luisants et gueule pleine de crocs (environ 1,2 de haut).
+ * userData.animate(t, risen) : risen = 0 (enfoui) … 1 (dressé, il ondule).
+ */
+export function buildBaron() {
+  const skin = new THREE.MeshPhysicalMaterial({ color: 0x5b2d8e, roughness: 0.45, metalness: 0.1, clearcoat: 0.5, sheen: 0.6, sheenColor: 0xc89cff });
+  const belly = new THREE.MeshStandardMaterial({ color: 0x9a6ac8, roughness: 0.6 });
+  const spikeMat = new THREE.MeshStandardMaterial({ color: 0xd8a8ff, emissive: 0x7a2ad0, emissiveIntensity: 0.6, roughness: 0.3 });
+  const horn = new THREE.MeshStandardMaterial({ color: 0x2a1a3a, roughness: 0.4, metalness: 0.3 });
+  const tooth = new THREE.MeshStandardMaterial({ color: 0xf2ead8, roughness: 0.4 });
+  const eyeMat = new THREE.MeshStandardMaterial({ color: 0xf0d0ff, emissive: 0xc040ff, emissiveIntensity: 2.2 });
+
+  const root = new THREE.Group();
+  const body = new THREE.Group(); // tout ce qui bouge avec le ver
+  root.add(body);
+
+  // corps : un tube le long d'une courbe en S, épais en bas et fin vers la tête
+  const curve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0, -0.35, -0.05),
+    new THREE.Vector3(0.06, 0.15, -0.12),
+    new THREE.Vector3(-0.08, 0.5, 0.02),
+    new THREE.Vector3(0.02, 0.82, 0.16),
+    new THREE.Vector3(0, 0.98, 0.32),
+  ]);
+  const SEG = 48;
+  const RAD = 12;
+  const tube = new THREE.TubeGeometry(curve, SEG, 1, RAD, false);
+  const pos = tube.attributes.position;
+  const center = new THREE.Vector3();
+  const v = new THREE.Vector3();
+  for (let i = 0; i <= SEG; i++) {
+    const t = i / SEG;
+    curve.getPointAt(t, center);
+    const r = 0.17 * (1 - t * 0.55) + Math.sin(t * Math.PI * 7) * 0.006; // anneaux du ver
+    for (let j = 0; j <= RAD; j++) {
+      const k = i * (RAD + 1) + j;
+      v.fromBufferAttribute(pos, k).sub(center).normalize().multiplyScalar(r).add(center);
+      pos.setXYZ(k, v.x, v.y, v.z);
+    }
+  }
+  tube.computeVertexNormals();
+  const trunk = new THREE.Mesh(tube, skin);
+  trunk.castShadow = true;
+  body.add(trunk);
+  // plaques du ventre (côté avant) et épines du dos
+  for (let i = 1; i < 12; i++) {
+    const t = i / 13;
+    const p = curve.getPointAt(t);
+    const tan = curve.getTangentAt(t);
+    const r = 0.17 * (1 - t * 0.55);
+    const plate = new THREE.Mesh(new THREE.SphereGeometry(r * 0.9, 12, 6), belly);
+    plate.scale.set(1.25, 0.28, 0.42);
+    plate.position.copy(p).add(new THREE.Vector3(0, 0, r * 0.66));
+    plate.lookAt(plate.position.clone().add(tan));
+    body.add(plate);
+    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.035 * (1.2 - t * 0.6), 0.16 * (1.2 - t * 0.5), 5), spikeMat);
+    spike.position.copy(p).add(new THREE.Vector3(0, 0, -r * 0.95));
+    spike.rotation.x = -Math.PI / 2 + 0.5;
+    spike.castShadow = true;
+    body.add(spike);
+  }
+
+  // la tête, au bout du cou
+  const head = new THREE.Group();
+  head.position.copy(curve.getPointAt(1));
+  body.add(head);
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.14, 20, 14), skin);
+  skull.scale.set(1.0, 0.72, 1.5);
+  skull.position.set(0, 0.03, 0.08);
+  skull.castShadow = true;
+  const jaw = new THREE.Group(); // la mâchoire s'ouvre et se ferme
+  jaw.position.set(0, -0.02, 0.02);
+  const jawMesh = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), belly);
+  jawMesh.scale.set(1, 0.6, 1.6);
+  jawMesh.position.z = 0.08;
+  jaw.add(jawMesh);
+  for (let k = 0; k < 6; k++) {
+    const a = -0.7 + (k / 5) * 1.4;
+    const fang = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.06, 5), tooth);
+    fang.position.set(Math.sin(a) * 0.09, 0.02, 0.08 + Math.cos(a) * 0.14);
+    jaw.add(fang);
+    const upper = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.06, 5), tooth);
+    upper.rotation.x = Math.PI;
+    upper.position.set(Math.sin(a) * 0.1, -0.02, 0.12 + Math.cos(a) * 0.15);
+    head.add(upper);
+  }
+  // yeux luisants
+  for (const sgn of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.028, 12, 8), eyeMat);
+    eye.scale.set(1, 0.6, 1);
+    eye.position.set(sgn * 0.095, 0.075, 0.25);
+    head.add(eye);
+  }
+  // crête et cornes recourbées
+  for (let k = 0; k < 5; k++) {
+    const crest = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.18 - Math.abs(k - 2) * 0.03, 5), spikeMat);
+    crest.position.set((k - 2) * 0.05, 0.12, -0.06 - Math.abs(k - 2) * 0.01);
+    crest.rotation.set(-0.7, 0, (k - 2) * -0.3);
+    head.add(crest);
+  }
+  for (const sgn of [-1, 1]) {
+    const hornGroup = new THREE.Group();
+    let parent = hornGroup;
+    for (let k = 0; k < 4; k++) {
+      const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.022 * (1 - k / 4) + 0.004, 0.028 * (1 - k / 4) + 0.006, 0.07, 6), horn);
+      seg.position.y = 0.035;
+      const joint = new THREE.Group();
+      joint.position.y = k ? 0.07 : 0;
+      joint.rotation.z = sgn * -0.35;
+      joint.rotation.x = -0.25;
+      joint.add(seg);
+      parent.add(joint);
+      parent = joint;
+    }
+    hornGroup.position.set(sgn * 0.11, 0.06, -0.02);
+    hornGroup.rotation.z = sgn * -0.9;
+    head.add(hornGroup);
+  }
+  head.add(skull, jaw);
+  head.rotation.x = 0.25;
+
+  // gravats et lueur violette au pied
+  const glowRing = new THREE.Mesh(
+    new THREE.RingGeometry(0.15, 0.42, 40),
+    new THREE.MeshBasicMaterial({ color: 0xb070ff, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false }),
+  );
+  glowRing.rotation.x = -Math.PI / 2;
+  glowRing.position.y = 0.012;
+  root.add(glowRing);
+  const rubble = new THREE.Mesh(new THREE.DodecahedronGeometry(0.05, 0), new THREE.MeshStandardMaterial({ color: 0x4a4458, roughness: 0.9, flatShading: true }));
+  const rand = seeded(9);
+  for (let k = 0; k < 9; k++) {
+    const r = rubble.clone();
+    const a = (k / 9) * Math.PI * 2 + rand() * 0.4;
+    r.position.set(Math.cos(a) * (0.2 + rand() * 0.08), 0.02, Math.sin(a) * (0.2 + rand() * 0.08));
+    r.scale.setScalar(0.6 + rand() * 0.8);
+    r.rotation.set(rand() * 3, rand() * 3, 0);
+    r.castShadow = true;
+    root.add(r);
+  }
+
+  root.userData.animate = (t, risen) => {
+    // enfoui : seul le haut dépasse ; dressé : il ondule, ouvre la gueule
+    body.position.y = -0.75 * (1 - risen);
+    body.rotation.z = Math.sin(t * 1.1) * 0.06 * risen;
+    body.rotation.y = Math.sin(t * 0.6) * 0.25 * risen;
+    head.rotation.y = Math.sin(t * 0.9 + 1) * 0.3 * risen;
+    head.rotation.x = 0.25 + Math.sin(t * 1.3) * 0.08 * risen;
+    jaw.rotation.x = (0.15 + Math.max(0, Math.sin(t * 0.8)) * 0.35) * risen;
+    eyeMat.emissiveIntensity = 0.6 + risen * (1.6 + Math.sin(t * 3) * 0.6);
+    glowRing.material.opacity = 0.15 + risen * (0.3 + Math.sin(t * 2) * 0.1);
+  };
+  return root;
 }

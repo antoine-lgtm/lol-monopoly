@@ -2140,3 +2140,159 @@ body.reduce-motion .gv-pawn.is-current .gv-standee__body {
 }
 .gv-icon-btn:hover { color: #f0e6d2; border-color: #c89b3c; }
 .gv-icon-btn[aria-pressed="false"] { color: #5b6670; text-decoration: line-through; }
+
+/* =====================================================================
+   Cases du plateau de secours : même style que le plateau 3D
+   (cadre d'or, plaque de nom, prix en pastille, médaillons)
+   ===================================================================== */
+.gv-sq {
+  background:
+    repeating-linear-gradient(45deg, rgba(200, 170, 110, 0.05) 0 1px, transparent 1px 7px),
+    linear-gradient(180deg, #13222e, #0a141e);
+  border-color: rgba(200, 170, 110, 0.5);
+}
+.gv-sq::before {
+  /* cadre d'or intérieur + léger relief */
+  content: '';
+  position: absolute;
+  inset: 3px;
+  z-index: 3;
+  border: 1px solid rgba(232, 200, 120, 0.55);
+  border-radius: 3px;
+  box-shadow: inset 0 1px 0 rgba(255, 240, 210, 0.15), inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+.gv-sq__name {
+  font-family: var(--font-display, Cinzel, Georgia, serif);
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+.gv-sq:not(.gv-sq--corner) .gv-sq__name {
+  position: relative;
+  padding-top: 4px;
+}
+.gv-sq:not(.gv-sq--corner) .gv-sq__name::before {
+  /* filet d'or avec un petit losange au-dessus du nom */
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #e8c878, transparent);
+}
+.gv-sq:not(.gv-sq--corner) .gv-sq__price {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px 1px 3px;
+  border: 1px solid #c89b3c;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #1d2a36, #070d14);
+  color: #f0e6d2;
+  font-size: 9px;
+  line-height: 1.3;
+}
+.gv-sq:not(.gv-sq--corner) .gv-sq__price::before {
+  /* pièce d'or */
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff2b0, #e0a83a 60%, #8a5a18);
+}
+.gv-sq--tax[data-kind='sbires'] .gv-sq__price::before { display: none; }
+.gv-sq--property .gv-sq__band {
+  border-bottom: 2px solid #e8c878;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+/* cases spéciales : illustration dans un médaillon rond cerclé d'or, sur un halo coloré */
+.gv-sq.has-art:not(.gv-sq--corner) .gv-sq__art {
+  top: 12%;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  width: calc(var(--unit) * 0.68);
+  height: calc(var(--unit) * 0.68);
+  transform: translateX(-50%);
+  border-radius: 50%;
+  border: 2px solid #c89b3c;
+  box-shadow: 0 0 0 1px rgba(240, 230, 210, 0.3), 0 0 14px var(--glow, rgba(200, 170, 110, 0.6));
+  background: radial-gradient(circle at 50% 35%, #1e3040, #060c12);
+  object-fit: contain;
+  -webkit-mask: none;
+  mask: none;
+}
+.gv-sq.has-art:not(.gv-sq--corner) .gv-sq__inner::before { background: none; }
+.gv-sq[data-element='ocean'] { --glow: #3aa8ff; }
+.gv-sq[data-element='mountain'] { --glow: #c8925a; }
+.gv-sq[data-element='infernal'] { --glow: #ff6a3a; }
+.gv-sq[data-element='cloud'] { --glow: #bfe8ff; }
+.gv-sq[data-kind='hp'] { --glow: #ff4a5a; }
+.gv-sq[data-kind='mana'] { --glow: #4a8aff; }
+.gv-sq--chance, .gv-sq[data-kind='boutique'] { --glow: #ffd25a; }
+.gv-sq--chest { --glow: #2ad8e0; }
+.gv-sq[data-kind='sbires'] { --glow: #8ab4ff; }
+/* coins : halo et anneau décoratif */
+.gv-sq--corner .gv-sq__inner::before {
+  content: '';
+  position: absolute;
+  inset: 12%;
+  border: 1px solid rgba(232, 200, 120, 0.45);
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgba(232, 200, 120, 0.08), inset 0 0 30px rgba(10, 200, 185, 0.12);
+  pointer-events: none;
+}
+
+/* --- Récapitulatif de fin de partie --------------------------------------- */
+.gv-over__stats { width: min(860px, calc(100vw - 32px)); overflow-x: auto; }
+.gv-over__table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 6px;
+  font-size: 14px;
+  color: var(--gold-1, #f0e6d2);
+}
+.gv-over__table th {
+  padding: 0 10px 2px;
+  font: 700 11px/1.2 Barlow, Arial, sans-serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #c89b3c;
+  text-align: right;
+  white-space: nowrap;
+}
+.gv-over__table th:nth-child(-n + 2) { text-align: left; }
+.gv-over__table td {
+  padding: 9px 10px;
+  background: rgba(1, 10, 19, 0.82);
+  border-top: 1px solid rgba(200, 170, 110, 0.18);
+  border-bottom: 1px solid rgba(200, 170, 110, 0.18);
+  text-align: right;
+  white-space: nowrap;
+}
+.gv-over__table td:first-child {
+  border-left: 4px solid var(--c);
+  border-radius: 10px 0 0 10px;
+  text-align: left;
+  color: #a09b8c;
+}
+.gv-over__table td:last-child { border-radius: 0 10px 10px 0; border-right: 1px solid rgba(200, 170, 110, 0.18); }
+.gv-over__table .gv-over__name { text-align: left; font-weight: 700; }
+.gv-over__table tr.is-winner td { background: linear-gradient(90deg, rgba(200, 155, 60, 0.22), rgba(1, 10, 19, 0.85)); }
+.gv-over__table tr.is-me .gv-over__name::after { content: ' (toi)'; color: #a09b8c; font-weight: 400; }
+.gv-over__awards { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 8px 0 0; padding: 0; list-style: none; }
+.gv-over__awards li {
+  padding: 6px 12px;
+  border: 1px solid var(--c);
+  border-radius: 16px;
+  background: rgba(1, 10, 19, 0.8);
+  font-size: 13px;
+}
+.gv-over__awards b { color: #e8c878; font-weight: 700; }
+@media (max-width: 700px) {
+  .gv-over__title { font-size: 56px; }
+  .gv-over__panel { min-width: 0; padding: 0 16px; }
+}

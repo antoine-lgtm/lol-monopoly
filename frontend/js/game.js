@@ -124,7 +124,7 @@
         osc.stop(now + start + dur + 0.02);
         return osc;
       };
-      const noise = (start, dur, gainValue, freq) => {
+      const noise = (start, dur, gainValue, freq, type = 'bandpass', q = 1) => {
         const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
@@ -132,38 +132,76 @@
         const filter = ctx.createBiquadFilter();
         const gain = ctx.createGain();
         src.buffer = buffer;
-        filter.type = 'bandpass';
+        filter.type = type;
         filter.frequency.value = freq;
+        filter.Q.value = q;
         gain.gain.value = gainValue * volume;
         src.connect(filter).connect(gain).connect(ctx.destination);
         src.start(now + start);
+        return filter;
+      };
+      /** Cloche cristalline (partiels inharmoniques) : or, cartes, sorts. */
+      const bell = (freq, start, dur, gainValue) => {
+        tone(freq, start, dur, gainValue);
+        tone(freq * 2.76, start, dur * 0.5, gainValue * 0.35);
+        tone(freq * 5.4, start, dur * 0.25, gainValue * 0.15);
       };
       switch (kind) {
         case 'dice': // cliquetis des dés qui roulent
           for (let k = 0; k < 7; k++) noise(k * 0.11 + Math.random() * 0.04, 0.05, 0.5, 2200 + Math.random() * 1500);
           break;
-        case 'step':
-          tone(520 + Math.random() * 60, 0, 0.07, 0.05, 'triangle');
+        case 'step': // pas feutré sur la pierre
+          noise(0, 0.06, 0.35, 380 + Math.random() * 120, 'lowpass');
+          tone(140 + Math.random() * 20, 0, 0.06, 0.04, 'sine');
           break;
-        case 'gain': // pièces d'or
-          tone(1318, 0, 0.18, 0.08);
-          tone(1760, 0.07, 0.25, 0.07);
+        case 'gain': // pièces d'or qui tintent, comme à la boutique
+          bell(1568, 0, 0.35, 0.06);
+          bell(2093, 0.07, 0.4, 0.05);
+          for (let k = 0; k < 4; k++) noise(0.02 + k * 0.045, 0.04, 0.12, 6000 + k * 600, 'highpass');
           break;
         case 'loss':
-          tone(330, 0, 0.2, 0.06, 'triangle');
-          tone(247, 0.08, 0.28, 0.05, 'triangle');
+          tone(392, 0, 0.18, 0.05, 'triangle');
+          tone(294, 0.09, 0.3, 0.05, 'triangle');
+          noise(0, 0.12, 0.08, 1800);
           break;
-        case 'card':
-          noise(0, 0.35, 0.25, 900);
-          tone(660, 0.12, 0.3, 0.05);
+        case 'card': // souffle hextech puis carillon
+          noise(0, 0.45, 0.22, 700, 'bandpass', 0.7).frequency.exponentialRampToValueAtTime(3200, now + 0.4);
+          bell(880, 0.18, 0.6, 0.05);
+          bell(1320, 0.3, 0.7, 0.04);
           break;
-        case 'build':
-          tone(196, 0, 0.18, 0.09, 'square');
-          tone(294, 0.06, 0.22, 0.06, 'triangle');
+        case 'build': // coup de marteau puis note magique
+          noise(0, 0.08, 0.5, 900, 'lowpass');
+          tone(110, 0, 0.12, 0.12, 'square');
+          bell(1046, 0.1, 0.5, 0.045);
+          bell(1568, 0.2, 0.55, 0.035);
           break;
-        case 'baron':
-          tone(110, 0, 0.9, 0.12, 'sawtooth');
-          tone(82, 0.1, 1.1, 0.1, 'sawtooth');
+        case 'baron': { // rugissement grave du Baron
+          const roar = noise(0, 1.4, 0.55, 220, 'lowpass', 4);
+          roar.frequency.setValueAtTime(160, now);
+          roar.frequency.linearRampToValueAtTime(520, now + 0.35);
+          roar.frequency.exponentialRampToValueAtTime(90, now + 1.3);
+          tone(73, 0, 1.3, 0.13, 'sawtooth');
+          tone(55, 0.1, 1.4, 0.1, 'sawtooth');
+          break;
+        }
+        case 'turn': // « à toi de jouer » : deux notes claires
+          bell(784, 0, 0.5, 0.05);
+          bell(1175, 0.12, 0.7, 0.05);
+          break;
+        case 'trade':
+          bell(988, 0, 0.5, 0.045);
+          bell(1319, 0.1, 0.5, 0.04);
+          bell(1760, 0.2, 0.7, 0.035);
+          break;
+        case 'eliminated': // descente sombre
+          [392, 330, 262, 196].forEach((f, k) => tone(f, k * 0.14, 0.45, 0.06, 'triangle'));
+          break;
+        case 'victory':
+          [523, 659, 784, 1046].forEach((f, k) => bell(f, k * 0.13, 1.2, 0.055));
+          tone(131, 0, 1.6, 0.07, 'triangle');
+          break;
+        case 'defeat':
+          [440, 415, 349, 262].forEach((f, k) => tone(f, k * 0.22, 0.7, 0.05, 'sawtooth'));
           break;
         default:
       }
@@ -652,7 +690,8 @@
     for (let s = 0; s < Math.abs(fx.steps); s++) {
       pos = (pos + dir + 40) % 40;
       placePawn(fx.key, pos, { hop: true });
-      await sleep(190);
+      sfx('step');
+      await sleep(200);
     }
     flashLanding(fx.key, fx.to);
     await sleep(120);
@@ -706,6 +745,7 @@
           break;
         case 'card':
           sfx('card');
+          if (fx.deck === 'chest') b3?.openChest();
           showCard(fx);
           await sleep(900);
           break;
@@ -723,13 +763,17 @@
           break;
         case 'baron-spawn':
           App.toast('Le Baron Nashor apparaît dans la fosse !', 'info', 5000);
+          sfx('baron');
+          break;
+        case 'bankrupt':
+          sfx('eliminated');
           break;
         case 'trade-offer':
           if (fx.to === myKey()) sfx('card');
           break;
         case 'trade-done':
           if (fx.from === myKey() || fx.to === myKey()) {
-            sfx(fx.accepted ? 'gain' : 'loss');
+            sfx(fx.accepted ? 'trade' : 'loss');
             App.toast(fx.accepted ? 'Échange conclu !' : 'Échange refusé.', fx.accepted ? 'success' : 'info', 3500);
           }
           break;
@@ -1388,20 +1432,70 @@
     sub.className = 'gv-over__sub';
     const winner = state.players.find((p) => p.key === state.winner);
     sub.textContent = winner ? `${winner.name} domine la Faille en ${state.round} tours.` : 'Partie terminée.';
-    const ranking = document.createElement('ol');
-    ranking.className = 'gv-over__ranking';
-    [...state.players]
-      .sort((a, b) => (a.key === state.winner ? -1 : b.key === state.winner ? 1 : b.worth - a.worth))
-      .forEach((p) => {
-        const li = document.createElement('li');
-        li.style.setProperty('--c', p.color);
-        const n = document.createElement('span');
-        n.textContent = p.name;
-        const w = document.createElement('span');
-        w.textContent = p.bankrupt ? 'Éliminé' : `${fmt(p.worth)} Or`;
-        li.append(n, w);
-        ranking.append(li);
+    // classement : le vainqueur, puis les éliminés du dernier au premier ; statistiques de chacun
+    const stats = state.stats || {};
+    const ordered = [...state.players].sort((a, b) => {
+      const pa = stats[a.key]?.place ?? (a.key === state.winner ? 1 : 99);
+      const pb = stats[b.key]?.place ?? (b.key === state.winner ? 1 : 99);
+      return pa - pb || b.worth - a.worth;
+    });
+    const table = document.createElement('table');
+    table.className = 'gv-over__table';
+    const head = document.createElement('tr');
+    for (const label of ['#', 'Joueur', 'Fortune', 'Cases', 'Tours', 'Loyers touchés', 'Loyers payés', 'Échanges']) {
+      const th = document.createElement('th');
+      th.textContent = label;
+      head.append(th);
+    }
+    const thead = document.createElement('thead');
+    thead.append(head);
+    const tbody = document.createElement('tbody');
+    ordered.forEach((p, k) => {
+      const st = stats[p.key] || {};
+      const tr = document.createElement('tr');
+      tr.style.setProperty('--c', p.color);
+      tr.classList.toggle('is-winner', p.key === state.winner);
+      tr.classList.toggle('is-me', p.key === myKey());
+      const cells = [
+        k + 1,
+        p.name,
+        p.bankrupt ? `Éliminé${st.eliminatedRound ? ` (tour ${st.eliminatedRound})` : ''}` : `${fmt(p.worth)} Or`,
+        st.bought ?? '–',
+        st.built ?? '–',
+        st.rentEarned !== undefined ? `${fmt(st.rentEarned)} Or` : '–',
+        st.rentPaid !== undefined ? `${fmt(st.rentPaid)} Or` : '–',
+        st.trades ?? '–',
+      ];
+      cells.forEach((v, c) => {
+        const td = document.createElement('td');
+        td.textContent = v;
+        if (c === 1) td.className = 'gv-over__name';
+        tr.append(td);
       });
+      tbody.append(tr);
+    });
+    table.append(thead, tbody);
+    const ranking = document.createElement('div');
+    ranking.className = 'gv-over__stats';
+    ranking.append(table);
+    // petits titres honorifiques
+    const best = (field) => {
+      const top = [...state.players].sort((a, b) => (stats[b.key]?.[field] ?? 0) - (stats[a.key]?.[field] ?? 0))[0];
+      return top && stats[top.key]?.[field] ? top : null;
+    };
+    const awards = document.createElement('ul');
+    awards.className = 'gv-over__awards';
+    for (const [field, label] of [['rentEarned', 'Seigneur des loyers'], ['built', 'Grand bâtisseur'], ['trades', 'Roi du marchandage']]) {
+      const p = best(field);
+      if (!p) continue;
+      const li = document.createElement('li');
+      li.style.setProperty('--c', p.color);
+      const b = document.createElement('b');
+      b.textContent = label;
+      li.append(b, ` ${p.name}`);
+      awards.append(li);
+    }
+    if (awards.children.length) ranking.append(awards);
     const back = document.createElement('button');
     back.type = 'button';
     back.className = 'gv-btn gv-btn--primary';
@@ -1416,7 +1510,25 @@
   // Réception de l'état
   // ---------------------------------------------------------------------------
 
+  // Sons d'annonce : début de son tour, victoire ou défaite (une seule fois chacun)
+  let lastTurnCue = null;
+  let overCue = null;
+  function cueSounds() {
+    const turn = `${state.id}:${state.round}:${state.current}`;
+    if (state.phase === 'roll' && state.current === myKey() && turn !== lastTurnCue) {
+      if (lastTurnCue !== null) sfx('turn');
+      lastTurnCue = turn;
+    } else if (lastTurnCue === null) {
+      lastTurnCue = '';
+    }
+    if (state.phase === 'over' && overCue !== state.id) {
+      overCue = state.id;
+      if (me()) sfx(state.winner === myKey() ? 'victory' : 'defeat');
+    }
+  }
+
   function renderAll() {
+    cueSounds();
     renderTop();
     renderPlayers();
     renderSquares();
@@ -1434,11 +1546,15 @@
   function openBoard() {
     view.hidden = false;
     b3?.resume();
+    window.LolMusic?.setVolume((App.settings?.music ?? 35) / 100);
+    window.LolMusic?.start();
+    syncMusicButton();
     document.body.classList.add('in-game');
     fitCamera();
   }
 
   function closeBoard() {
+    window.LolMusic?.stop();
     view.hidden = true;
     b3?.pause();
     document.body.classList.remove('in-game');
@@ -1482,7 +1598,36 @@
   }
 
   $('#gv-settings').addEventListener('click', () => App.openSettings?.());
-  document.addEventListener('lolm:settings', (e) => b3?.setQuality(e.detail.quality || 'auto'));
+  document.addEventListener('lolm:settings', (e) => {
+    b3?.setQuality(e.detail.quality || 'auto');
+    const music = window.LolMusic;
+    if (!music) return;
+    music.setVolume((e.detail.music ?? 35) / 100);
+    if (!view.hidden && !music.playing) music.start();
+  });
+
+  // Musique : bouton ♪ (choix mémorisé) ; le navigateur n'autorise le son qu'après un clic
+  function syncMusicButton() {
+    const on = window.LolMusic?.enabled ?? false;
+    const btn = $('#gv-music');
+    btn.setAttribute('aria-pressed', String(on));
+    btn.title = on ? 'Couper la musique' : 'Activer la musique';
+  }
+  $('#gv-music').addEventListener('click', () => {
+    const music = window.LolMusic;
+    if (!music) return;
+    music.setEnabled(!music.enabled);
+    if (music.enabled) {
+      music.setVolume((App.settings?.music ?? 35) / 100);
+      music.start();
+    } else {
+      music.stop();
+    }
+    syncMusicButton();
+  });
+  document.addEventListener('pointerdown', () => {
+    if (App.audio?.state === 'suspended') App.audio.resume();
+  });
 
   $('#gv-forfeit').addEventListener('click', () => {
     if (window.confirm('Abandonner la partie ? Tes cases retourneront à la banque.')) send('game:forfeit');

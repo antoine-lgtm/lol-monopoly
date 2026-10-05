@@ -10,7 +10,7 @@
 import * as THREE from '/vendor/three/three.module.js';
 import { buildPawn } from './pawns3d.js';
 import { buildTowerStatue, animateStatues } from './tower3d.js';
-import { buildRock, buildHextechChest, buildRuneterra } from './props3d.js';
+import { buildRock, buildHextechChest, buildRuneterra, buildBaron } from './props3d.js';
 
 const BOARD_PX = 900;
 const S = BOARD_PX / 100; // côté du plateau en unités
@@ -46,20 +46,6 @@ function loadImage(sources) {
     };
     tryNext();
   });
-}
-
-/** Rasterise un SVG (ou une image) en texture nette. */
-async function imageTexture(sources, w, h) {
-  const img = await loadImage(sources);
-  if (!img) return null;
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return tex;
 }
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -1013,46 +999,121 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     const cy = y0 + h / 2;
     return toWorld(cx + (BOARD_PX / 2 - cx) * inward, cy + (BOARD_PX / 2 - cy) * inward, TOP + 0.05);
   };
-  // Fontaine : bassin de pierre, eau lumineuse et flèche de cristal
+  // Fontaine : deux bassins de pierre étagés, eau lumineuse, jets qui retombent et flèche de cristal
   {
     const c = cornerAt(0, -0.06);
-    const basin = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.2, 0.1, 20), new THREE.MeshStandardMaterial({ color: 0xc8c2b0, roughness: 0.6 }));
-    basin.position.set(c.x, c.y + 0.05, c.z);
-    const water = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.02, 20), new THREE.MeshStandardMaterial({ color: 0x5fe0f0, emissive: 0x2ab8d0, emissiveIntensity: 0.9, roughness: 0.1 }));
-    water.position.set(c.x, c.y + 0.1, c.z);
-    const spire = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.42, 6), new THREE.MeshStandardMaterial({ color: 0x9ff3f8, emissive: 0x0ac8b9, emissiveIntensity: 1.2 }));
-    spire.position.set(c.x, c.y + 0.32, c.z);
-    basin.castShadow = spire.castShadow = true;
+    const stone = new THREE.MeshStandardMaterial({ color: 0xcfc8b6, roughness: 0.6 });
+    const trim = new THREE.MeshStandardMaterial({ color: 0xc89b3c, metalness: 0.85, roughness: 0.3 });
+    const waterMat = new THREE.MeshStandardMaterial({ color: 0x7fe9f0, emissive: 0x2ab8d0, emissiveIntensity: 0.9, roughness: 0.1, transparent: true, opacity: 0.9 });
+    const g = new THREE.Group();
+    const add = (mesh, y) => { mesh.position.y = y; mesh.castShadow = true; mesh.receiveShadow = true; g.add(mesh); return mesh; };
+    add(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.33, 0.06, 8), stone), 0.03); // dalle octogonale
+    add(new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.24, 0.1, 24, 1, true), stone), 0.11).material.side = THREE.DoubleSide;
+    add(new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.018, 6, 32), trim), 0.16).rotation.x = Math.PI / 2;
+    add(new THREE.Mesh(new THREE.CylinderGeometry(0.245, 0.245, 0.02, 24), waterMat), 0.13);
+    add(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.2, 8), stone), 0.24); // colonne
+    add(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.08, 0.05, 16), stone), 0.35); // bassin du haut
+    add(new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.012, 6, 24), trim), 0.375).rotation.x = Math.PI / 2;
+    add(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.015, 16), waterMat), 0.37);
+    const spire = add(new THREE.Mesh(new THREE.OctahedronGeometry(0.07, 0), new THREE.MeshStandardMaterial({ color: 0x9ff3f8, emissive: 0x0ac8b9, emissiveIntensity: 1.3, roughness: 0.1 })), 0.52);
+    spire.scale.set(1, 2.2, 1);
+    // jets : gouttes lumineuses qui partent du bassin du haut et retombent dans celui du bas
+    const drops = [];
+    const dropGeo = new THREE.SphereGeometry(0.012, 6, 4);
+    const dropMat = new THREE.MeshBasicMaterial({ color: 0xbff8ff, transparent: true, opacity: 0.85 });
+    for (let k = 0; k < 24; k++) {
+      const d = new THREE.Mesh(dropGeo, dropMat);
+      d.userData = { a: (k / 24) * Math.PI * 2, phase: (k % 6) / 6 };
+      g.add(d);
+      drops.push(d);
+    }
+    g.position.set(c.x, c.y - 0.05, c.z);
+    scene.add(g);
     const light = new THREE.PointLight(0x5fe0f0, 2.5, 2, 2);
     light.position.set(c.x, c.y + 0.5, c.z);
-    scene.add(basin, water, spire, light);
-    ambient.push((t) => { spire.rotation.y = t; light.intensity = 2 + Math.sin(t * 3) * 0.8; });
+    scene.add(light);
+    ambient.push((t) => {
+      spire.rotation.y = t;
+      spire.position.y = 0.52 + Math.sin(t * 2) * 0.02;
+      light.intensity = 2 + Math.sin(t * 3) * 0.8;
+      for (const d of drops) {
+        const u = (t * 0.8 + d.userData.phase) % 1; // 0 -> 1 le long de l'arc
+        const r = 0.12 + u * 0.1;
+        d.position.set(Math.cos(d.userData.a) * r, 0.38 + Math.sin(u * Math.PI) * 0.08 - u * 0.24, Math.sin(d.userData.a) * r);
+      }
+    });
   }
-  // Prison : une cage en fer forgé (les prisonniers se tiennent dedans)
+  // Prison : socle de pierre, cage en fer forgé (les prisonniers se tiennent dedans), toit à pointe,
+  // chaînes et lanterne qui vacille
   {
     const c = cornerAt(10, 0.06);
     const iron = new THREE.MeshStandardMaterial({ color: 0x3a3e44, metalness: 0.7, roughness: 0.45 });
+    const stone = new THREE.MeshStandardMaterial({ color: 0x6a6e78, roughness: 0.85, flatShading: true });
     const cage = new THREE.Group();
     const barGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.5, 6);
     const size = 0.5;
+    const plinth = new THREE.Mesh(new THREE.BoxGeometry(size + 0.14, 0.05, size + 0.14), stone);
+    plinth.position.y = 0.025;
+    plinth.receiveShadow = true;
+    cage.add(plinth);
     for (let k = 0; k < 4; k++) {
-      for (let b = 0; b < 5; b++) {
+      for (let b = 1; b < 4; b++) {
         const bar = new THREE.Mesh(barGeo, iron);
         const tt = -size / 2 + (b / 4) * size;
         const [x, z] = [[tt, -size / 2], [size / 2, tt], [-tt, size / 2], [-size / 2, -tt]][k];
-        bar.position.set(x, 0.25, z);
+        bar.position.set(x, 0.3, z);
         bar.castShadow = true;
         cage.add(bar);
       }
     }
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(size + 0.06, 0.04, size + 0.06), iron);
-    roof.position.y = 0.52;
+    // piliers d'angle plus épais, coiffés d'une boule
+    for (const [x, z] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.56, 0.045), iron);
+      post.position.set((x * size) / 2, 0.3, (z * size) / 2);
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), iron);
+      knob.position.set((x * size) / 2, 0.6, (z * size) / 2);
+      post.castShadow = knob.castShadow = true;
+      cage.add(post, knob);
+    }
+    // traverses à mi-hauteur
+    for (const [x, z, ry] of [[0, -size / 2, 0], [0, size / 2, 0], [size / 2, 0, Math.PI / 2], [-size / 2, 0, Math.PI / 2]]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(size, 0.025, 0.025), iron);
+      rail.position.set(x, 0.32, z);
+      rail.rotation.y = ry;
+      cage.add(rail);
+    }
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(size * 0.78, 0.18, 4), iron);
+    roof.rotation.y = Math.PI / 4;
+    roof.position.y = 0.66;
     roof.castShadow = true;
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(size + 0.06, 0.03, size + 0.06), iron);
-    floor.position.y = 0.015;
-    cage.add(roof, floor);
+    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.12, 6), iron);
+    spike.position.y = 0.8;
+    cage.add(roof, spike);
+    // chaînes qui pendent d'un coin, lanterne à l'autre
+    const link = new THREE.TorusGeometry(0.018, 0.005, 4, 8);
+    for (let k = 0; k < 6; k++) {
+      const l = new THREE.Mesh(link, iron);
+      l.position.set(size / 2 + 0.03, 0.55 - k * 0.032, -size / 2 + 0.03);
+      l.rotation.y = k % 2 ? Math.PI / 2 : 0;
+      cage.add(l);
+    }
+    const lantern = new THREE.Group();
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.06), iron);
+    const fire = new THREE.Mesh(new THREE.OctahedronGeometry(0.022, 0), new THREE.MeshStandardMaterial({ color: 0xffd080, emissive: 0xff8a20, emissiveIntensity: 2.2 }));
+    fire.scale.y = 1.6;
+    lantern.add(frame, fire);
+    lantern.position.set(-size / 2 - 0.04, 0.5, size / 2 + 0.04);
+    cage.add(lantern);
+    const lanternLight = new THREE.PointLight(0xffa040, 1.2, 1.4, 2);
+    lanternLight.position.copy(lantern.position);
+    cage.add(lanternLight);
     cage.position.set(c.x, c.y - 0.05, c.z);
     scene.add(cage);
+    ambient.push((t) => {
+      const f = 0.85 + Math.sin(t * 13) * 0.08 + Math.sin(t * 7.3) * 0.07;
+      fire.scale.set(f, 1.6 * f, f);
+      lanternLight.intensity = 1.2 * f;
+    });
   }
   // Grab de Blitzcrank : le golem à vapeur en personne
   {
@@ -1129,8 +1190,9 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   makeDeck(['/assets/board/real/ping.png', '/assets/board/ping.svg'], 'PING SS', '#ffe680', '#c8901a',
     CORNER + 0.06 * cArea + 84, CORNER + cArea / 2 + 64);
   // Coffre hextech en 3D à la place du paquet de cartes « Coffre Hextech »
+  let chest = null;
   {
-    const chest = buildHextechChest();
+    chest = buildHextechChest();
     const pos = toWorld(BOARD_PX - CORNER - 0.06 * cArea - 84, CORNER + cArea / 2 - 64, 0);
     chest.position.copy(pos);
     chest.rotation.y = Math.PI / 4;
@@ -1358,15 +1420,12 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   scene.add(buildings);
   const animated = []; // objets animés (inhibiteurs, drapeaux, Baron)
 
-  let baronSprite = null;
-  imageTexture('/assets/board/baron.svg', 320, 320).then((tex) => {
-    baronSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, alphaTest: 0.05 }));
-    baronSprite.center.set(0.5, 0);
-    baronSprite.scale.set(0.85, 0.85, 1);
-    baronSprite.visible = false;
-    scene.add(baronSprite);
-    if (lastBuildings) setBuildings(lastBuildings);
-  });
+  // Le Baron Nashor en 3D (props3d.js) : enfoui avant son apparition, dressé ensuite
+  const baronModel = buildBaron();
+  baronModel.visible = false;
+  baronModel.scale.setScalar(0.9);
+  scene.add(baronModel);
+  const baronState = { risen: 0, target: 0 };
   const baronLight = new THREE.PointLight(0xb27cff, 0, 3, 2);
   scene.add(baronLight);
 
@@ -1420,16 +1479,15 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
       buildings.add(g);
       if (!f.mortgaged) animated.push({ kind: 'flag', obj: cloth, base: clothGeo.attributes.position.array.slice(), phase: Math.random() * 6 });
     }
-    if (baronSprite) {
-      baronSprite.visible = Boolean(baron);
-      if (baron) {
-        const pos = toWorld(baron.x, baron.y);
-        baronSprite.position.set(pos.x, TOP, pos.z);
-        baronSprite.material.opacity = baron.active ? 1 : 0.3;
-        baronLight.position.set(pos.x, 0.8, pos.z);
-        baronLight.intensity = baron.active ? 4 : 0;
-        baronSprite.userData.active = baron.active;
-      }
+    baronModel.visible = Boolean(baron);
+    if (baron) {
+      const pos = toWorld(baron.x, baron.y, TOP + 0.05);
+      baronModel.position.copy(pos);
+      baronModel.rotation.y = Math.atan2(-pos.x, -pos.z); // il regarde le centre du plateau
+      baronLight.position.set(pos.x, 0.9, pos.z);
+      baronState.target = baron.active ? 1 : 0;
+    } else {
+      baronLight.intensity = 0;
     }
   }
 
@@ -1677,12 +1735,41 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   const canvas = renderer.domElement;
   let drag = null;
   let dragged = false;
+  // Sur écran tactile : un doigt pour tourner, deux doigts pour zoomer (pincer)
+  canvas.style.touchAction = 'none';
+  const touches = new Map();
+  let pinch = null;
+  const spread = () => {
+    const [a, b] = [...touches.values()];
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  };
   canvas.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch') {
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touches.size === 2) {
+        pinch = { d: spread(), zoom: cam.tZoom ?? 1 };
+        drag = null;
+        dragged = true;
+        return;
+      }
+    }
     if (e.button !== 0) return;
     drag = { x: e.clientX, y: e.clientY, yaw: cam.tYaw, pitch: cam.tPitch };
     dragged = false;
   });
+  const endTouch = (e) => {
+    touches.delete(e.pointerId);
+    if (touches.size < 2) pinch = null;
+  };
+  window.addEventListener('pointerup', endTouch);
+  window.addEventListener('pointercancel', endTouch);
   window.addEventListener('pointermove', (e) => {
+    if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && touches.size === 2) {
+      cam.tZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, pinch.zoom * (spread() / Math.max(pinch.d, 1))));
+      hideHint();
+      return;
+    }
     if (!drag) return;
     const dx = e.clientX - drag.x;
     const dy = e.clientY - drag.y;
@@ -1867,9 +1954,10 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
         pos.needsUpdate = true;
       }
     }
-    if (baronSprite?.visible && baronSprite.userData.active) {
-      baronSprite.position.y = TOP + Math.sin(t * 2) * 0.06 + 0.06;
-      baronLight.intensity = 3 + Math.sin(t * 3) * 1.2;
+    if (baronModel.visible) {
+      baronState.risen += (baronState.target - baronState.risen) * 0.03;
+      baronModel.userData.animate(t, baronState.risen);
+      baronLight.intensity = baronState.risen * (3 + Math.sin(t * 3) * 1.2);
     }
     for (const animate of ambient) animate(t);
     animateStatues(t);
@@ -1914,6 +2002,8 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   setTimeout(buildWorld, 60);
 
   const api = {
+    /** Ouvre le coffre hextech du centre (carte Coffre Hextech tirée). */
+    openChest() { chest?.userData.open(); },
     /** 'auto' | 'high' | 'medium' | 'low' */
     setQuality(q) {
       autoQuality = q === 'auto' && !FORCE_HQ;

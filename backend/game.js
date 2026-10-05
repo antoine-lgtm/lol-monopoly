@@ -173,6 +173,11 @@ class Game {
     this.pendingIndex = null;
     this.baron = { active: false, taken: false, holder: null };
     this.supply = { towers: TOWER_SUPPLY, inhibs: INHIB_SUPPLY };
+    /** Statistiques de fin de partie, par joueur. */
+    this.stats = Object.fromEntries(this.players.map((p) => [p.key, {
+      bought: 0, built: 0, rentEarned: 0, rentPaid: 0, trades: 0, peakWorth: START_GOLD, eliminatedRound: null, place: null,
+    }]));
+    this.eliminated = 0;
     /** Échange proposé par le joueur dont c'est le tour, en attente de réponse. */
     this.trade = null;
     this.decks = {
@@ -398,6 +403,8 @@ class Game {
       const owner = this.player(st.owner);
       const rent = this.rentFor(index, this.dice ? this.dice[0] + this.dice[1] : 7);
       this.say(`${p.name} paye ${rent} Or de loyer à ${owner.name} (${sq.name}).`);
+      this.stats[p.key].rentPaid += rent;
+      this.stats[owner.key].rentEarned += rent;
       this.charge(p, rent, owner);
       return;
     }
@@ -533,6 +540,7 @@ class Game {
     this.props[this.pendingIndex] = { owner: key, level: 0, mortgaged: false };
     this.effect({ type: 'buy', key, index: this.pendingIndex });
     this.say(`${p.name} achète ${sq.name} pour ${sq.price} Or.`);
+    this.stats[key].bought += 1;
     this.pendingIndex = null;
     this.phase = 'end';
     this.settle();
@@ -595,6 +603,7 @@ class Game {
   }
 
   nextTurn() {
+    for (const p of this.alivePlayers()) this.stats[p.key].peakWorth = Math.max(this.stats[p.key].peakWorth, this.netWorth(p));
     const before = this.current;
     let next = before;
     do {
@@ -652,6 +661,7 @@ class Game {
     }
     p.gold -= cost;
     st.level += 1;
+    this.stats[key].built += 1;
     this.effect({ type: 'gold', key, amount: -cost });
     this.effect({ type: 'build', key, index, level: st.level });
     this.say(st.level === MAX_LEVEL
@@ -817,6 +827,8 @@ class Game {
     };
     move(from, to, t.give.gold);
     move(to, from, t.get.gold);
+    this.stats[from.key].trades += 1;
+    this.stats[to.key].trades += 1;
     this.effect({ type: 'trade-done', accepted: true, from: t.from, to: t.to, give: t.give, get: t.get });
     const part = ({ gold, props }) => [...props.map((i) => BOARD[i].name), ...(gold ? [`${gold} Or`] : [])].join(', ') || 'rien';
     this.say(`Échange conclu : ${from.name} donne ${part(t.give)} à ${to.name} contre ${part(t.get)}.`);
@@ -850,6 +862,9 @@ class Game {
     }
     p.owes = [];
     p.bankrupt = true;
+    this.eliminated += 1;
+    this.stats[p.key].eliminatedRound = this.round;
+    this.stats[p.key].place = this.players.length - this.eliminated + 1;
     p.gold = 0;
     p.baron = false;
     // toutes ses cases retournent à la banque, libres ; ses constructions rejoignent la réserve
@@ -868,6 +883,7 @@ class Game {
     if (alive.length <= 1) {
       this.phase = 'over';
       this.winner = alive[0]?.key ?? null;
+      if (alive[0]) this.stats[alive[0].key].place = 1;
       if (alive[0]) this.say(`Victoire de ${alive[0].name} !`);
       return;
     }
@@ -923,6 +939,7 @@ class Game {
       baron: { ...this.baron },
       winner: this.winner,
       supply: { ...this.supply },
+      stats: this.stats,
       trade: this.trade,
       players: this.players.map((p) => ({
         key: p.key,
