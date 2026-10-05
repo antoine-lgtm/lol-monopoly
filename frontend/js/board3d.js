@@ -14,7 +14,8 @@ const S = BOARD_PX / 100; // côté du plateau en unités
 const TEX = 4096; // résolution de la texture du dessus
 const K = TEX / BOARD_PX; // px plateau -> px texture
 
-const toWorld = (x, y) => new THREE.Vector3(x / 100 - S / 2, 0, y / 100 - S / 2);
+const TOP = 0.16; // dessus des tuiles (cases) ; le centre (la Faille) est en contrebas, à 0
+const toWorld = (x, y, h = TOP) => new THREE.Vector3(x / 100 - S / 2, h, y / 100 - S / 2);
 const lerp = (a, b, t) => a + (b - a) * t;
 const ease = (t) => 1 - (1 - t) ** 3;
 
@@ -107,11 +108,12 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   container.append(renderer.domElement);
 
   const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x050b12, 22, 48); // un peu de brume au loin : profondeur
   const { RoomEnvironment } = await import('/vendor/three-addons/environments/RoomEnvironment.js');
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   scene.environmentIntensity = 0.55;
-  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 200);
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
 
   // Lumières : ciel froid + soleil chaud qui projette les ombres, lueurs des deux Nexus
   scene.add(new THREE.HemisphereLight(0xcfe4ff, 0x1a1408, 1.05));
@@ -301,7 +303,9 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   drawTop();
 
   // --- Plateau : volume -----------------------------------------------------
-  const THICK = 0.32;
+  // Un socle épais, 40 tuiles en relief séparées par des rainures (une par case),
+  // et au centre, en contrebas, l'arène de la Faille.
+  const BASE = 0.36;
   const sideMat = (c1, c2) => {
     const cv = document.createElement('canvas');
     cv.width = 4;
@@ -314,33 +318,355 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     g.fillRect(0, 0, 4, 64);
     const tex = new THREE.CanvasTexture(cv);
     tex.colorSpace = THREE.SRGBColorSpace;
-    return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5, metalness: 0.4 });
+    return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.45, metalness: 0.35 });
   };
   const blueSide = sideMat('#3a8ad0', '#081a30');
   const redSide = sideMat('#d0504a', '#2e0a0a');
-  const topMat = new THREE.MeshStandardMaterial({ map: topTexture, roughness: 0.62, metalness: 0.05 });
+  const topMat = new THREE.MeshStandardMaterial({ map: topTexture, roughness: 0.58, metalness: 0.05 });
+  const slabTop = new THREE.MeshStandardMaterial({ color: 0x0b1118, roughness: 0.8 });
   const bottomMat = new THREE.MeshStandardMaterial({ color: 0x0a0d10 });
   // ordre des faces d'une boîte : +x, -x, +y, -y, +z, -z
-  const boardMesh = new THREE.Mesh(
-    new THREE.BoxGeometry(S, THICK, S),
-    [redSide, blueSide, topMat, bottomMat, blueSide, redSide],
+  const slab = new THREE.Mesh(
+    new THREE.BoxGeometry(S, BASE, S),
+    [redSide, blueSide, slabTop, bottomMat, blueSide, redSide],
   );
-  boardMesh.position.y = -THICK / 2;
-  boardMesh.receiveShadow = true;
-  boardMesh.castShadow = true;
-  scene.add(boardMesh);
+  slab.position.y = -BASE / 2;
+  slab.receiveShadow = true;
+  slab.castShadow = true;
+  scene.add(slab);
+
+  /** Fait correspondre le dessus (+y) d'une boîte à sa zone de la grande texture. */
+  function mapTopUV(geo, cx, cz) {
+    const pos = geo.attributes.position;
+    const uv = geo.attributes.uv;
+    for (let v = 8; v < 12; v++) { // les 4 sommets de la face +y
+      const x = pos.getX(v) + cx;
+      const z = pos.getZ(v) + cz;
+      uv.setXY(v, (x + S / 2) / S, 1 - (z + S / 2) / S);
+    }
+    uv.needsUpdate = true;
+  }
+
+  // Les tuiles : côtés à la couleur de la région pour les champions
+  const tileSideMats = new Map();
+  const tileSide = (color) => {
+    if (!tileSideMats.has(color)) {
+      tileSideMats.set(color, new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.15 }));
+    }
+    return tileSideMats.get(color);
+  };
+  const GAP = 3; // rainure entre deux tuiles (px plateau)
+  board.forEach((sq, i) => {
+    const { x0, y0, w, h } = squareRect(i);
+    const corner = cellOf(i).side === 'corner';
+    const height = corner ? TOP + 0.05 : TOP;
+    const geo = new THREE.BoxGeometry((w - GAP) / 100, height, (h - GAP) / 100);
+    const c = toWorld(x0 + w / 2, y0 + h / 2, 0);
+    mapTopUV(geo, c.x, c.z);
+    const side = tileSide(sq.type === 'property' ? new THREE.Color(groups[sq.group].color).multiplyScalar(0.55) : 0x18222e);
+    const tile = new THREE.Mesh(geo, [side, side, topMat, side, side, side]);
+    tile.position.set(c.x, height / 2, c.z);
+    tile.castShadow = true;
+    tile.receiveShadow = true;
+    scene.add(tile);
+  });
+
+  // Le centre : la carte de la Faille au fond de l'arène
+  const cMin = CORNER;
+  const cSize = BOARD_PX - 2 * CORNER;
+  const centerGeo = new THREE.PlaneGeometry(cSize / 100, cSize / 100);
+  {
+    const uv = centerGeo.attributes.uv;
+    for (let v = 0; v < uv.count; v++) {
+      uv.setXY(v, (cMin + uv.getX(v) * cSize) / BOARD_PX, 1 - (cMin + (1 - uv.getY(v)) * cSize) / BOARD_PX);
+    }
+  }
+  const centerPlane = new THREE.Mesh(centerGeo, topMat);
+  centerPlane.rotation.x = -Math.PI / 2;
+  centerPlane.position.y = 0.002;
+  centerPlane.receiveShadow = true;
+  scene.add(centerPlane);
 
   // Cadre doré tout autour
   const frameMat = new THREE.MeshStandardMaterial({ color: 0xc89b3c, metalness: 0.85, roughness: 0.3 });
-  const frameW = 0.09;
+  const frameW = 0.11;
+  const frameH = BASE + TOP + 0.06;
   [[0, -S / 2 - frameW / 2, S + frameW * 2, frameW], [0, S / 2 + frameW / 2, S + frameW * 2, frameW],
     [-S / 2 - frameW / 2, 0, frameW, S], [S / 2 + frameW / 2, 0, frameW, S]].forEach(([x, z, w, d]) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, THICK + 0.06, d), frameMat);
-    m.position.set(x, -THICK / 2 + 0.03, z);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, frameH, d), frameMat);
+    m.position.set(x, -BASE + frameH / 2, z);
     m.castShadow = true;
     m.receiveShadow = true;
     scene.add(m);
   });
+
+  // --- La Faille en relief (centre du plateau) -------------------------------
+  // Coordonnées « carte » 0..100 (comme la mini-carte) -> monde
+  const toRift = (mx, my, h = 0) => toWorld(cMin + (mx / 100) * cSize, cMin + (my / 100) * cSize, h);
+  const ambient = []; // objets animés du décor
+  const rand = (() => { let seed = 7; return () => ((seed = (seed * 16807) % 2147483647) / 2147483647); })();
+
+  // Rivière : un ruban d'eau qui suit la diagonale haut-gauche -> bas-droite
+  {
+    const bez = (p0, p1, p2, p3, t) => {
+      const u = 1 - t;
+      return p0 * u * u * u + 3 * p1 * u * u * t + 3 * p2 * u * t * t + p3 * t * t * t;
+    };
+    const segs = [[[-6, 6], [14, 16], [30, 30], [50, 50]], [[50, 50], [70, 70], [86, 84], [106, 94]]];
+    const pts = [];
+    for (const [a, b, c, d] of segs) {
+      for (let k = 0; k <= 24; k++) {
+        const t = k / 24;
+        pts.push([bez(a[0], b[0], c[0], d[0], t), bez(a[1], b[1], c[1], d[1], t)]);
+      }
+    }
+    const half = 6.5; // demi-largeur (unités carte)
+    const positions = [];
+    const uvs = [];
+    const index = [];
+    pts.forEach(([x, y], k) => {
+      const [nx, ny] = pts[Math.min(k + 1, pts.length - 1)];
+      const [px, py] = pts[Math.max(k - 1, 0)];
+      let tx = nx - px;
+      let ty = ny - py;
+      const len = Math.hypot(tx, ty) || 1;
+      tx /= len;
+      ty /= len;
+      for (const sgn of [-1, 1]) {
+        const v = toRift(Math.max(0, Math.min(100, x - ty * half * sgn)), Math.max(0, Math.min(100, y + tx * half * sgn)), 0.03);
+        positions.push(v.x, v.y, v.z);
+        uvs.push(sgn < 0 ? 0 : 1, k / 6);
+      }
+      if (k < pts.length - 1) {
+        const a = k * 2;
+        index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      }
+    });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geo.setIndex(index);
+    geo.computeVertexNormals();
+    // reflets qui coulent : petite texture de vaguelettes qui défile
+    const cv = document.createElement('canvas');
+    cv.width = 64;
+    cv.height = 256;
+    const g = cv.getContext('2d');
+    g.fillStyle = '#1b6f94';
+    g.fillRect(0, 0, 64, 256);
+    for (let k = 0; k < 40; k++) {
+      g.fillStyle = `rgba(190,240,255,${0.15 + rand() * 0.35})`;
+      g.fillRect(rand() * 56, rand() * 256, 4 + rand() * 10, 2 + rand() * 3);
+    }
+    const tex = new THREE.CanvasTexture(cv);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const water = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+      map: tex, transparent: true, opacity: 0.82, roughness: 0.08, metalness: 0.25,
+      emissive: 0x0a3a50, emissiveIntensity: 0.6, side: THREE.DoubleSide,
+    }));
+    water.receiveShadow = true;
+    scene.add(water);
+    ambient.push((t) => { tex.offset.y = -t * 0.25; });
+  }
+
+  // Jungle : arbres et rochers, hors des voies, de la rivière, des paquets et des bases
+  {
+    const spots = [];
+    const blocked = (x, y) => {
+      if (x < 13 || y < 13 || x > 87 || y > 87) return true; // voies du haut, du bas, des côtés
+      if (Math.abs(y - x) < 15) return true; // rivière
+      if (Math.abs(y - (100 - x)) < 13) return true; // voie du milieu + logo
+      if (Math.hypot(x - 19, y - 60) < 17 || Math.hypot(x - 81, y - 40) < 17) return true; // paquets
+      if (Math.hypot(x - 27, y - 22) < 10 || Math.hypot(x - 73, y - 78) < 10) return true; // fosses
+      return spots.some(([sx, sy]) => Math.hypot(sx - x, sy - y) < 4.2);
+    };
+    for (let k = 0; k < 900 && spots.length < 70; k++) {
+      const x = rand() * 100;
+      const y = rand() * 100;
+      if (!blocked(x, y)) spots.push([x, y]);
+    }
+    const trunkGeo = new THREE.CylinderGeometry(0.025, 0.035, 0.16, 6);
+    const leafGeo = new THREE.ConeGeometry(0.15, 0.32, 7);
+    const trunks = new THREE.InstancedMesh(trunkGeo, new THREE.MeshStandardMaterial({ color: 0x4a3420, roughness: 0.9 }), spots.length);
+    const leaves = new THREE.InstancedMesh(leafGeo, new THREE.MeshStandardMaterial({ color: 0x2f7a3a, roughness: 0.8 }), spots.length * 2);
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const sc = new THREE.Vector3();
+    spots.forEach(([x, y], k) => {
+      const pos = toRift(x, y, 0);
+      const size = 0.75 + rand() * 0.6;
+      sc.set(size, size, size);
+      m.compose(new THREE.Vector3(pos.x, 0.08 * size, pos.z), q, sc);
+      trunks.setMatrixAt(k, m);
+      m.compose(new THREE.Vector3(pos.x, 0.27 * size, pos.z), q, sc);
+      leaves.setMatrixAt(k * 2, m);
+      sc.multiplyScalar(0.72);
+      m.compose(new THREE.Vector3(pos.x, 0.42 * size, pos.z), q, sc);
+      leaves.setMatrixAt(k * 2 + 1, m);
+      leaves.setColorAt(k * 2, new THREE.Color().setHSL(0.33 + rand() * 0.06, 0.45, 0.24 + rand() * 0.08));
+      leaves.setColorAt(k * 2 + 1, new THREE.Color().setHSL(0.33 + rand() * 0.06, 0.45, 0.3 + rand() * 0.08));
+    });
+    trunks.castShadow = leaves.castShadow = true;
+    scene.add(trunks, leaves);
+
+    // Rochers : les murs de la jungle, le long de la rivière et des voies
+    const rockGeo = new THREE.DodecahedronGeometry(0.16, 0);
+    const rocks = new THREE.InstancedMesh(rockGeo, new THREE.MeshStandardMaterial({ color: 0x5a6258, roughness: 0.95, flatShading: true }), 26);
+    let n = 0;
+    for (let k = 0; k < 600 && n < 26; k++) {
+      const x = 14 + rand() * 72;
+      const y = 14 + rand() * 72;
+      const dRiver = Math.abs(y - x);
+      if (dRiver < 15 || dRiver > 22 || Math.abs(y - (100 - x)) < 13) continue;
+      if (Math.hypot(x - 19, y - 60) < 17 || Math.hypot(x - 81, y - 40) < 17) continue;
+      const pos = toRift(x, y, 0.04);
+      q.setFromEuler(new THREE.Euler(rand() * 3, rand() * 3, rand() * 3));
+      const s1 = 0.7 + rand() * 0.9;
+      sc.set(s1 * 1.4, s1 * 0.6, s1);
+      m.compose(pos, q, sc);
+      rocks.setMatrixAt(n++, m);
+    }
+    rocks.count = n;
+    rocks.castShadow = rocks.receiveShadow = true;
+    scene.add(rocks);
+  }
+
+  // Fosses du Baron (violette) et du Dragon (orange), creusées dans le sol
+  for (const [mx, my, color] of [[27, 22, 0x9b6cf0], [73, 78, 0xf08a3c]]) {
+    const c = toRift(mx, my, 0);
+    const rim = new THREE.Mesh(
+      new THREE.TorusGeometry(0.42, 0.07, 8, 32),
+      new THREE.MeshStandardMaterial({ color: 0x4a4a52, roughness: 0.9, flatShading: true }),
+    );
+    rim.rotation.x = -Math.PI / 2;
+    rim.position.set(c.x, 0.04, c.z);
+    rim.castShadow = rim.receiveShadow = true;
+    const pit = new THREE.Mesh(
+      new THREE.CircleGeometry(0.4, 32),
+      new THREE.MeshStandardMaterial({ color: 0x0b0710, emissive: color, emissiveIntensity: 0.35 }),
+    );
+    pit.rotation.x = -Math.PI / 2;
+    pit.position.set(c.x, 0.012, c.z);
+    scene.add(rim, pit);
+  }
+
+  // Nexus (cristaux) et tourelles des deux équipes
+  {
+    const nexusGeo = new THREE.OctahedronGeometry(0.22, 0);
+    const pedestalGeo = new THREE.CylinderGeometry(0.3, 0.38, 0.12, 8);
+    const turretGeo = new THREE.CylinderGeometry(0.05, 0.075, 0.3, 8);
+    const roofGeo = new THREE.ConeGeometry(0.085, 0.12, 8);
+    const stone = new THREE.MeshStandardMaterial({ color: 0x8a8a92, roughness: 0.6, metalness: 0.2 });
+    const teams = [
+      { color: 0x4aa8ff, nexus: [7, 93], turrets: [[8, 70], [8, 44], [30, 92], [56, 92], [24, 76], [36, 64]] },
+      { color: 0xff5a4a, nexus: [93, 7], turrets: [[92, 30], [92, 56], [70, 8], [44, 8], [76, 24], [64, 36]] },
+    ];
+    for (const team of teams) {
+      const glowMat = new THREE.MeshStandardMaterial({ color: team.color, emissive: team.color, emissiveIntensity: 1.4, roughness: 0.15, metalness: 0.1 });
+      const c = toRift(...team.nexus, 0);
+      const pedestal = new THREE.Mesh(pedestalGeo, stone);
+      pedestal.position.set(c.x, 0.06, c.z);
+      pedestal.castShadow = pedestal.receiveShadow = true;
+      const crystal = new THREE.Mesh(nexusGeo, glowMat);
+      crystal.scale.set(1, 1.7, 1);
+      crystal.position.set(c.x, 0.5, c.z);
+      crystal.castShadow = true;
+      scene.add(pedestal, crystal);
+      ambient.push((t) => {
+        crystal.rotation.y = t * 0.8;
+        crystal.position.y = 0.5 + Math.sin(t * 1.6) * 0.04;
+      });
+      for (const [mx, my] of team.turrets) {
+        const p = toRift(mx, my, 0);
+        const body = new THREE.Mesh(turretGeo, stone);
+        body.position.set(p.x, 0.15, p.z);
+        const roof = new THREE.Mesh(roofGeo, glowMat);
+        roof.position.set(p.x, 0.36, p.z);
+        body.castShadow = roof.castShadow = true;
+        scene.add(body, roof);
+      }
+    }
+  }
+
+  // --- Décors des coins -------------------------------------------------------
+  const cornerAt = (i, inward) => {
+    const { x0, y0, w, h } = squareRect(i);
+    const cx = x0 + w / 2;
+    const cy = y0 + h / 2;
+    return toWorld(cx + (BOARD_PX / 2 - cx) * inward, cy + (BOARD_PX / 2 - cy) * inward, TOP + 0.05);
+  };
+  // Fontaine : bassin de pierre, eau lumineuse et flèche de cristal
+  {
+    const c = cornerAt(0, -0.06);
+    const basin = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.2, 0.1, 20), new THREE.MeshStandardMaterial({ color: 0xc8c2b0, roughness: 0.6 }));
+    basin.position.set(c.x, c.y + 0.05, c.z);
+    const water = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.02, 20), new THREE.MeshStandardMaterial({ color: 0x5fe0f0, emissive: 0x2ab8d0, emissiveIntensity: 0.9, roughness: 0.1 }));
+    water.position.set(c.x, c.y + 0.1, c.z);
+    const spire = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.42, 6), new THREE.MeshStandardMaterial({ color: 0x9ff3f8, emissive: 0x0ac8b9, emissiveIntensity: 1.2 }));
+    spire.position.set(c.x, c.y + 0.32, c.z);
+    basin.castShadow = spire.castShadow = true;
+    const light = new THREE.PointLight(0x5fe0f0, 2.5, 2, 2);
+    light.position.set(c.x, c.y + 0.5, c.z);
+    scene.add(basin, water, spire, light);
+    ambient.push((t) => { spire.rotation.y = t; light.intensity = 2 + Math.sin(t * 3) * 0.8; });
+  }
+  // Prison : une cage en fer forgé (les prisonniers se tiennent dedans)
+  {
+    const c = cornerAt(10, 0.06);
+    const iron = new THREE.MeshStandardMaterial({ color: 0x3a3e44, metalness: 0.7, roughness: 0.45 });
+    const cage = new THREE.Group();
+    const barGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.5, 6);
+    const size = 0.5;
+    for (let k = 0; k < 4; k++) {
+      for (let b = 0; b < 5; b++) {
+        const bar = new THREE.Mesh(barGeo, iron);
+        const tt = -size / 2 + (b / 4) * size;
+        const [x, z] = [[tt, -size / 2], [size / 2, tt], [-tt, size / 2], [-size / 2, -tt]][k];
+        bar.position.set(x, 0.25, z);
+        bar.castShadow = true;
+        cage.add(bar);
+      }
+    }
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(size + 0.06, 0.04, size + 0.06), iron);
+    roof.position.y = 0.52;
+    roof.castShadow = true;
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(size + 0.06, 0.03, size + 0.06), iron);
+    floor.position.y = 0.015;
+    cage.add(roof, floor);
+    cage.position.set(c.x, c.y - 0.05, c.z);
+    scene.add(cage);
+  }
+  // Grab de Blitzcrank : le golem à vapeur en personne
+  {
+    const c = cornerAt(30, -0.05);
+    const yellow = new THREE.MeshStandardMaterial({ color: 0xe6b422, metalness: 0.6, roughness: 0.35 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x3a3226, metalness: 0.6, roughness: 0.5 });
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.2, 0.32, 14), yellow);
+    body.position.y = 0.2;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), yellow);
+    head.position.y = 0.36;
+    const eyes = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.035, 0.02), new THREE.MeshStandardMaterial({ color: 0x9ff3f8, emissive: 0x5fe0f0, emissiveIntensity: 1.5 }));
+    eyes.position.set(0, 0.4, 0.11);
+    const chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.14, 8), dark);
+    chimney.position.set(-0.08, 0.46, -0.06);
+    const armGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.24, 8);
+    const handGeo = new THREE.SphereGeometry(0.075, 12, 10);
+    for (const sgn of [-1, 1]) {
+      const arm = new THREE.Mesh(armGeo, dark);
+      arm.position.set(sgn * 0.22, 0.2, 0);
+      arm.rotation.z = sgn * 0.35;
+      const hand = new THREE.Mesh(handGeo, yellow);
+      hand.position.set(sgn * 0.26, 0.07, 0.02);
+      g.add(arm, hand);
+    }
+    g.add(body, head, eyes, chimney);
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    g.position.set(c.x, c.y - 0.05, c.z);
+    g.lookAt(0, c.y, 0);
+    scene.add(g);
+  }
 
   // --- Paquets de cartes ----------------------------------------------------
   async function makeDeck(art, label, colorA, colorB, px, py) {
@@ -417,6 +743,8 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     [0.12, 0.41], [0.12, 0.44], [0.07, 0.46], [0.1, 0.52], [0.105, 0.58], [0.09, 0.64], [0.05, 0.68], [0, 0.69],
   ].map(([x, y]) => new THREE.Vector2(x, y));
   const classicGeo = new THREE.LatheGeometry(pawnProfile, 28);
+  const standeeGeo = new THREE.PlaneGeometry(0.6, 1.0);
+  standeeGeo.translate(0, 0.5, 0);
 
   const pawns = new Map(); // key -> { group, body, ring, target, from, t0, dur, hop }
 
@@ -436,13 +764,20 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
       body = new THREE.Mesh(classicGeo, colorMat(color, { metalness: 0.35, roughness: 0.35 }));
       body.castShadow = true;
     } else {
-      body = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, alphaTest: 0.08 }));
-      body.center.set(0.5, 0);
-      body.scale.set(0.58, 0.97, 1);
+      // Figurine découpée : un panneau debout qui projette l'ombre de sa silhouette
+      // et pivote autour de son axe vertical pour faire face à la caméra.
+      body = new THREE.Mesh(standeeGeo, new THREE.MeshStandardMaterial({
+        transparent: true, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.55,
+      }));
+      body.userData.standee = true;
+      body.castShadow = true;
+      body.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, alphaTest: 0.5 });
       pawnTexture(pawn).then((tex) => {
         if (tex) {
           body.material.map = tex;
           body.material.needsUpdate = true;
+          body.customDepthMaterial.map = tex;
+          body.customDepthMaterial.needsUpdate = true;
         }
       });
     }
@@ -549,7 +884,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
       baronSprite.visible = Boolean(baron);
       if (baron) {
         const pos = toWorld(baron.x, baron.y);
-        baronSprite.position.set(pos.x, 0, pos.z);
+        baronSprite.position.set(pos.x, TOP, pos.z);
         baronSprite.material.opacity = baron.active ? 1 : 0.3;
         baronLight.position.set(pos.x, 0.8, pos.z);
         baronLight.intensity = baron.active ? 4 : 0;
@@ -583,7 +918,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
         colorMat(color, { emissive: color, emissiveIntensity: 0.55 }),
       );
       const c = toWorld(rx + rw / 2, ry + rh / 2);
-      strip.position.set(c.x, 0.018, c.z);
+      strip.position.set(c.x, TOP + 0.018, c.z);
       markers.add(strip);
       if (mortgaged) {
         const veil = new THREE.Mesh(
@@ -592,7 +927,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
         );
         veil.rotation.x = -Math.PI / 2;
         const vc = toWorld(x0 + w / 2, y0 + h / 2);
-        veil.position.set(vc.x, 0.004, vc.z);
+        veil.position.set(vc.x, TOP + 0.004, vc.z);
         markers.add(veil);
       }
     }
@@ -610,7 +945,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
       mesh.rotation.x = -Math.PI / 2;
       const { x, y } = squareCenter(index);
       const c = toWorld(x, y);
-      mesh.position.set(c.x, 0.008, c.z);
+      mesh.position.set(c.x, TOP + 0.008, c.z);
       scene.add(mesh);
       glowMats.set(index, { mesh, hover: 0, hoverStart: 0, inspected: false, pending: false, flash: 0, flashColor: null });
     }
@@ -703,7 +1038,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   }
 
   // --- Caméra ----------------------------------------------------------------
-  const cam = { yaw: 0, pitch: 52, dist: 13, tYaw: 0, tPitch: 52, tDist: 13, zoom: 1 };
+  const cam = { yaw: 0, pitch: 40, dist: 13, tYaw: 0, tPitch: 40, tDist: 13, zoom: 1 };
   function fitDistance() {
     // le canvas couvre tout l'écran, mais le plateau doit tenir entre les panneaux
     const { left, right, bottom = 0 } = sideSpace();
@@ -712,8 +1047,8 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     const aspect = w / Math.max(h, 1);
     const vFov = (camera.fov * Math.PI) / 180;
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
-    const need = S * 1.2;
-    const byH = (need * 0.82) / 2 / Math.tan(vFov / 2);
+    const need = S * 1.38;
+    const byH = (need * 0.74) / 2 / Math.tan(vFov / 2);
     const byW = need / 2 / Math.tan(hFov / 2);
     return Math.max(byH, byW) + 1.2;
   }
@@ -744,7 +1079,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
       Math.sin(pitch) * d,
       Math.cos(yaw) * Math.cos(pitch) * d,
     );
-    camera.lookAt(0, -0.2, 0.25);
+    camera.lookAt(0, 0, 0.45);
   }
 
   // Glisser pour tourner / incliner, molette pour zoomer
@@ -763,7 +1098,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     if (!dragged && Math.hypot(dx, dy) < 6) return;
     dragged = true;
     cam.tYaw = drag.yaw - dx * 0.3;
-    cam.tPitch = Math.max(18, Math.min(82, drag.pitch + dy * 0.25));
+    cam.tPitch = Math.max(14, Math.min(82, drag.pitch + dy * 0.25));
     api.onDrag?.();
   });
   window.addEventListener('pointerup', () => {
@@ -778,7 +1113,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   // --- Survol des cases (rayon souris -> plateau) ----------------------------
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
-  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -TOP);
   function squareAt(clientX, clientY) {
     const r = canvas.getBoundingClientRect();
     ndc.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
@@ -836,9 +1171,31 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   let running = true;
   let raf = 0;
   const tmp = new THREE.Vector3();
+  // Qualité adaptative : si l'image saccade, on baisse la résolution puis les ombres
+  const perf = { frames: 0, since: 0, level: 0 };
+  function adaptQuality(now) {
+    if (!perf.since) perf.since = now;
+    perf.frames++;
+    if (now - perf.since < 2500) return;
+    const fps = (perf.frames * 1000) / (now - perf.since);
+    perf.frames = 0;
+    perf.since = now;
+    if (fps >= 28 || perf.level >= 2) return;
+    perf.level++;
+    if (perf.level === 1) {
+      renderer.setPixelRatio(1);
+      resize();
+    } else {
+      renderer.shadowMap.enabled = false;
+      scene.traverse((o) => { if (o.material) [].concat(o.material).forEach((m) => { m.needsUpdate = true; }); });
+    }
+    console.info(`[plateau 3D] ${fps.toFixed(0)} images/s : qualité réduite (niveau ${perf.level}).`);
+  }
+
   function frame(now) {
     if (!running) return;
     raf = requestAnimationFrame(frame);
+    adaptQuality(now);
     updateCamera();
     const t = now / 1000;
 
@@ -849,15 +1206,19 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
         const e = ease(k);
         p.group.position.lerpVectors(p.from, p.target, e);
         p.group.position.y = p.hop ? Math.sin(Math.PI * k) * 0.28 : 0;
-        if (p.hop && p.body.isSprite) {
+        if (p.hop && p.body.userData.standee) {
           const squash = k > 0.8 ? 1 - (1 - k) * 0.5 : 1;
-          p.body.scale.set(0.58 * (k > 0.8 ? 1.06 : 0.96), 0.97 * (k > 0.8 ? squash * 0.94 : 1.04), 1);
+          p.body.scale.set(k > 0.8 ? 1.06 : 0.96, k > 0.8 ? squash * 0.94 : 1.04, 1);
         }
         if (k >= 1) {
           p.from = null;
           p.group.position.copy(p.target);
-          if (p.body.isSprite) p.body.scale.set(0.58, 0.97, 1);
+          if (p.body.userData.standee) p.body.scale.set(1, 1, 1);
         }
+      }
+      // la figurine se tourne vers la caméra (rotation verticale uniquement)
+      if (p.body.userData.standee) {
+        p.body.rotation.y = Math.atan2(camera.position.x - p.group.position.x, camera.position.z - p.group.position.z);
       }
       // le pion actif flotte et son anneau pulse
       const bob = p.current && !p.from ? Math.sin(t * 2.6) * 0.04 + 0.04 : 0;
@@ -866,7 +1227,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
       p.ring.scale.setScalar(p.current ? 1 + Math.sin(t * 4) * 0.08 : 1);
       if (key === labelKey) {
         tmp.copy(p.group.position);
-        tmp.y += (p.body.isSprite ? 1.1 : 0.85) + bob;
+        tmp.y += (p.body.userData.standee ? 1.12 : 0.85) + bob;
         tmp.project(camera);
         const r = container.getBoundingClientRect();
         label.style.transform = `translate(${((tmp.x + 1) / 2) * r.width}px, ${((1 - tmp.y) / 2) * r.height}px) translate(-50%, -100%)`;
@@ -888,9 +1249,10 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
       }
     }
     if (baronSprite?.visible && baronSprite.userData.active) {
-      baronSprite.position.y = Math.sin(t * 2) * 0.06 + 0.06;
+      baronSprite.position.y = TOP + Math.sin(t * 2) * 0.06 + 0.06;
       baronLight.intensity = 3 + Math.sin(t * 3) * 1.2;
     }
+    for (const animate of ambient) animate(t);
     blueNexus.intensity = 5 + Math.sin(t * 2) * 2;
     redNexus.intensity = 5 + Math.sin(t * 2 + Math.PI) * 2;
 
@@ -941,7 +1303,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     hideDice() { dice.forEach((d) => { d.visible = false; }); },
     setLabel,
     rotate(deg) { cam.tYaw += deg; },
-    resetCamera() { cam.tYaw = Math.round(cam.tYaw / 360) * 360; cam.tPitch = 52; cam.tZoom = 1; },
+    resetCamera() { cam.tYaw = Math.round(cam.tYaw / 360) * 360; cam.tPitch = 40; cam.tZoom = 1; },
     get dragging() { return dragged; },
     pause() { running = false; cancelAnimationFrame(raf); },
     resume() { if (!running) { running = true; raf = requestAnimationFrame(frame); } },

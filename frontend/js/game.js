@@ -344,10 +344,22 @@
   // le plateau CSS, qui reste construit en dessous.
   // ---------------------------------------------------------------------------
 
+  /**
+   * WebGL disponible ET accéléré par une carte graphique. Un rendu logiciel
+   * (SwiftShader, llvmpipe…) serait injouable : on garde alors le plateau CSS.
+   * `?3d=1` dans l'adresse force la 3D (tests), `?3d=0` la désactive.
+   */
   function webglAvailable() {
+    const force = new URLSearchParams(location.search).get('3d');
+    if (force === '0') return false;
     try {
       const c = document.createElement('canvas');
-      return Boolean(c.getContext('webgl2') || c.getContext('webgl'));
+      const gl = c.getContext('webgl2') || c.getContext('webgl');
+      if (!gl) return false;
+      if (force === '1') return true;
+      const info = gl.getExtension('WEBGL_debug_renderer_info');
+      const renderer = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : '';
+      return !/swiftshader|llvmpipe|software|basic render/i.test(renderer);
     } catch {
       return false;
     }
@@ -359,7 +371,8 @@
       const id = champId(sq);
       return [`assets/champions/loading/${id}_0.jpg`, ...imageSources('loading', id)];
     }
-    return specialArt(sq);
+    // pour la texture 3D : images locales seulement (dessin ou image officielle déposée)
+    return specialArt(sq)?.filter((src) => !src.startsWith('http')) ?? null;
   }
 
   async function setup3D() {
