@@ -349,20 +349,53 @@
    * (SwiftShader, llvmpipe…) serait injouable : on garde alors le plateau CSS.
    * `?3d=1` dans l'adresse force la 3D (tests), `?3d=0` la désactive.
    */
-  function webglAvailable() {
+  /** '' si le plateau 3D peut s'afficher, sinon la raison ('off', 'nogl', 'software'). */
+  function webglStatus() {
     const force = new URLSearchParams(location.search).get('3d');
-    if (force === '0') return false;
+    if (force === '0') return 'off';
     try {
       const c = document.createElement('canvas');
       const gl = c.getContext('webgl2') || c.getContext('webgl');
-      if (!gl) return false;
-      if (force === '1') return true;
+      if (!gl) return 'nogl';
+      if (force === '1') return '';
       const info = gl.getExtension('WEBGL_debug_renderer_info');
       const renderer = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : '';
-      return !/swiftshader|llvmpipe|software|basic render/i.test(renderer);
+      return /swiftshader|llvmpipe|software|basic render/i.test(renderer) ? 'software' : '';
     } catch {
-      return false;
+      return 'nogl';
     }
+  }
+
+  /** Bandeau qui explique pourquoi le plateau est plat, avec un bouton pour forcer la 3D. */
+  function notice3D(reason, detail = '') {
+    view.querySelector('.gv-3dnotice')?.remove();
+    if (!reason || reason === 'off') return;
+    const text = {
+      software: 'Plateau 3D désactivé : ton navigateur n’utilise pas la carte graphique (accélération matérielle coupée). Active-la dans les réglages de Chrome (Système → « Utiliser l’accélération graphique »), ou force la 3D (elle risque d’être lente).',
+      nogl: 'Plateau 3D indisponible : WebGL est désactivé dans ce navigateur.',
+      error: `Le plateau 3D n’a pas pu se charger${detail ? ` (${detail})` : ''}.`,
+    }[reason];
+    const box = document.createElement('div');
+    box.className = 'gv-3dnotice';
+    const p = document.createElement('p');
+    p.textContent = text;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'gv-3dnotice__btn';
+    btn.textContent = reason === 'error' ? 'Réessayer' : 'Forcer la 3D';
+    btn.addEventListener('click', () => {
+      const url = new URL(location.href);
+      url.searchParams.set('3d', '1');
+      location.href = url.toString();
+    });
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'gv-3dnotice__close';
+    close.setAttribute('aria-label', 'Fermer');
+    close.textContent = '×';
+    close.addEventListener('click', () => box.remove());
+    box.append(p, btn, close);
+    view.append(box);
   }
 
   /** Sources d'image d'une case pour la texture du plateau 3D. */
@@ -379,7 +412,9 @@
     b3?.dispose();
     b3 = null;
     view.classList.remove('is-webgl');
-    if (!webglAvailable()) return;
+    const status = webglStatus();
+    notice3D(status);
+    if (status) return;
     try {
       const mod = await import('./board3d.js');
       b3 = await mod.createBoard3D({
@@ -402,6 +437,7 @@
     } catch (err) {
       console.warn('[plateau] WebGL indisponible, plateau CSS utilisé.', err);
       b3 = null;
+      notice3D('error', err?.message?.slice(0, 120));
     }
   }
 
