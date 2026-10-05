@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8"><title>Pions 3D</title>
+<script type="importmap">{ "imports": { "three": "/vendor/three/three.module.js" } }</script>
+<style>body{margin:0;background:#0b1620}canvas{display:block}</style></head>
+<body><script type="module">
+import * as THREE from '/vendor/three/three.module.js';
+import { RoomEnvironment } from '/vendor/three-addons/environments/RoomEnvironment.js';
+import { buildPawn } from '/js/pawns3d.js';
+const r = new THREE.WebGLRenderer({ antialias: true });
+r.setSize(1400, 420); r.shadowMap.enabled = true; r.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.append(r.domElement);
+const scene = new THREE.Scene();
+scene.environment = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.55;
+scene.add(new THREE.HemisphereLight(0xcfe4ff, 0x1a1408, 1.0));
+const sun = new THREE.DirectionalLight(0xffe6c0, 2.2); sun.position.set(3, 6, 5); sun.castShadow = true; scene.add(sun);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 6), new THREE.MeshStandardMaterial({ color: 0x1a2a36 }));
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+const kinds = ['poro', 'teemo', 'ward', 'minion', 'zhonya', 'blade', 'tibbers', 'egg', 'classic'];
+const colors = ['#0ac8b9', '#e84057', '#b27cff', '#f0a030', '#6fd16a', '#0ac8b9', '#e84057', '#b27cff', '#f0a030'];
+kinds.forEach((k, i) => { const p = buildPawn(k, colors[i]); p.position.x = (i - 4) * 0.62; scene.add(p); });
+const cam = new THREE.PerspectiveCamera(30, 1400 / 420, 0.1, 50);
+cam.position.set(0, 1.0, 4.2); cam.lookAt(0, 0.3, 0);
+r.render(scene, cam);
+window.done = true;
+</script></body></html>

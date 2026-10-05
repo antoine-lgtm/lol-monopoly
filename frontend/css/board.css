@@ -1963,3 +1963,26 @@ body.reduce-motion .gv-pawn.is-current .gv-standee__body {
   right: 0;
   bottom: 0;
 }
+
+/* Aide caméra (plateau 3D), au-dessus des boutons de caméra */
+.gv-hint {
+  position: absolute;
+  left: 290px;
+  bottom: 74px;
+  z-index: 3;
+  padding: 7px 14px;
+  font-size: 13px;
+  color: var(--gold-1);
+  background: rgba(1, 10, 19, 0.82);
+  border: 1px solid var(--gold-4);
+  border-radius: 999px;
+  pointer-events: none;
+  transition: opacity 0.6s;
+  animation: fade-in 0.5s ease-out;
+}
+.gv-hint b {
+  color: var(--blue-2);
+}
+.gv-hint.is-hidden {
+  opacity: 0;
+}

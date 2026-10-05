@@ -8,6 +8,7 @@
  * (bas du plateau) vers +Z.
  */
 import * as THREE from '/vendor/three/three.module.js';
+import { buildPawn } from './pawns3d.js';
 
 const BOARD_PX = 900;
 const S = BOARD_PX / 100; // côté du plateau en unités
@@ -728,23 +729,11 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   };
 
   // --- Pions ----------------------------------------------------------------
-  const pawnTextures = new Map();
-  function pawnTexture(pawn) {
-    if (!pawnTextures.has(pawn)) pawnTextures.set(pawn, imageTexture(`/assets/pawns/${pawn}.svg`, 240, 400));
-    return pawnTextures.get(pawn);
-  }
   const ringGeo = new THREE.RingGeometry(0.17, 0.24, 40);
   const blobGeo = new THREE.CircleGeometry(0.22, 32);
   const blobMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.45, depthWrite: false });
 
-  // Pion classique : une vraie pièce d'échecs tournée, à la couleur du joueur
-  const pawnProfile = [
-    [0, 0], [0.2, 0], [0.2, 0.05], [0.16, 0.07], [0.14, 0.12], [0.1, 0.22], [0.075, 0.38],
-    [0.12, 0.41], [0.12, 0.44], [0.07, 0.46], [0.1, 0.52], [0.105, 0.58], [0.09, 0.64], [0.05, 0.68], [0, 0.69],
-  ].map(([x, y]) => new THREE.Vector2(x, y));
-  const classicGeo = new THREE.LatheGeometry(pawnProfile, 28);
-  const standeeGeo = new THREE.PlaneGeometry(0.6, 1.0);
-  standeeGeo.translate(0, 0.5, 0);
+
 
   const pawns = new Map(); // key -> { group, body, ring, target, from, t0, dur, hop }
 
@@ -759,28 +748,8 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = 0.006;
     group.add(blob, ring);
-    let body;
-    if (!pawn || pawn === 'classic') {
-      body = new THREE.Mesh(classicGeo, colorMat(color, { metalness: 0.35, roughness: 0.35 }));
-      body.castShadow = true;
-    } else {
-      // Figurine découpée : un panneau debout qui projette l'ombre de sa silhouette
-      // et pivote autour de son axe vertical pour faire face à la caméra.
-      body = new THREE.Mesh(standeeGeo, new THREE.MeshStandardMaterial({
-        transparent: true, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.55,
-      }));
-      body.userData.standee = true;
-      body.castShadow = true;
-      body.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, alphaTest: 0.5 });
-      pawnTexture(pawn).then((tex) => {
-        if (tex) {
-          body.material.map = tex;
-          body.material.needsUpdate = true;
-          body.customDepthMaterial.map = tex;
-          body.customDepthMaterial.needsUpdate = true;
-        }
-      });
-    }
+    // Pion modélisé en 3D (pawns3d.js), qui se tourne doucement vers la caméra
+    const body = buildPawn(pawn || 'classic', color);
     group.add(body);
     scene.add(group);
     p = { group, body, ring, from: null, target: null, t0: 0, dur: 0, hop: false, current: false, hidden: false };
@@ -1067,7 +1036,42 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   const ro = new ResizeObserver(resize);
   ro.observe(container);
 
+  // Clavier : ← → pour tourner, ↑ ↓ pour incliner, + − pour zoomer ; boutons maintenus
+  const keys = new Set();
+  let spinDir = 0;
+  const CAM_KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '=', '-'];
+  const onKeyDown = (e) => {
+    if (!running || !container.isConnected || container.closest('[hidden]')) return;
+    if (e.target.closest?.('input, textarea, select')) return;
+    if (!CAM_KEYS.includes(e.key)) return;
+    e.preventDefault();
+    keys.add(e.key);
+    hideHint();
+  };
+  const onKeyUp = (e) => keys.delete(e.key);
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+  window.addEventListener('blur', () => keys.clear());
+
+  // Petite aide affichée au début de la partie
+  const hint = document.createElement('div');
+  hint.className = 'gv-hint';
+  hint.innerHTML = '<b>Glisse</b> sur le plateau pour tourner · <b>molette</b> pour zoomer · <b>← → ↑ ↓</b> au clavier';
+  container.append(hint);
+  let hintTimer = 0; // démarre au premier affichage du plateau
+  function hideHint() {
+    clearTimeout(hintTimer);
+    hint.classList.add('is-hidden');
+  }
+
   function updateCamera() {
+    if (keys.has('ArrowLeft')) cam.tYaw -= 1.8;
+    if (keys.has('ArrowRight')) cam.tYaw += 1.8;
+    if (keys.has('ArrowUp')) cam.tPitch = Math.min(82, cam.tPitch + 0.9);
+    if (keys.has('ArrowDown')) cam.tPitch = Math.max(14, cam.tPitch - 0.9);
+    if (keys.has('+') || keys.has('=')) cam.tZoom = Math.min(2.4, (cam.tZoom ?? 1) * 1.012);
+    if (keys.has('-')) cam.tZoom = Math.max(0.7, (cam.tZoom ?? 1) / 1.012);
+    if (spinDir) cam.tYaw += spinDir * 1.8;
     cam.yaw = lerp(cam.yaw, cam.tYaw, 0.12);
     cam.pitch = lerp(cam.pitch, cam.tPitch, 0.12);
     cam.zoom = lerp(cam.zoom, cam.tZoom ?? 1, 0.15);
@@ -1097,6 +1101,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     const dy = e.clientY - drag.y;
     if (!dragged && Math.hypot(dx, dy) < 6) return;
     dragged = true;
+    hideHint();
     cam.tYaw = drag.yaw - dx * 0.3;
     cam.tPitch = Math.max(14, Math.min(82, drag.pitch + dy * 0.25));
     api.onDrag?.();
@@ -1195,6 +1200,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   function frame(now) {
     if (!running) return;
     raf = requestAnimationFrame(frame);
+    if (!hintTimer && container.offsetWidth) hintTimer = setTimeout(hideHint, 12000);
     adaptQuality(now);
     updateCamera();
     const t = now / 1000;
@@ -1206,19 +1212,22 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
         const e = ease(k);
         p.group.position.lerpVectors(p.from, p.target, e);
         p.group.position.y = p.hop ? Math.sin(Math.PI * k) * 0.28 : 0;
-        if (p.hop && p.body.userData.standee) {
+        if (p.hop) {
           const squash = k > 0.8 ? 1 - (1 - k) * 0.5 : 1;
-          p.body.scale.set(k > 0.8 ? 1.06 : 0.96, k > 0.8 ? squash * 0.94 : 1.04, 1);
+          p.body.scale.set(k > 0.8 ? 1.08 : 0.95, k > 0.8 ? squash * 0.9 : 1.06, k > 0.8 ? 1.08 : 0.95);
         }
         if (k >= 1) {
           p.from = null;
           p.group.position.copy(p.target);
-          if (p.body.userData.standee) p.body.scale.set(1, 1, 1);
+          p.body.scale.set(1, 1, 1);
         }
       }
-      // la figurine se tourne vers la caméra (rotation verticale uniquement)
-      if (p.body.userData.standee) {
-        p.body.rotation.y = Math.atan2(camera.position.x - p.group.position.x, camera.position.z - p.group.position.z);
+      // le pion se tourne doucement vers la caméra (rotation verticale uniquement)
+      {
+        const want = Math.atan2(camera.position.x - p.group.position.x, camera.position.z - p.group.position.z);
+        let diff = want - p.body.rotation.y;
+        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+        p.body.rotation.y += diff * 0.12;
       }
       // le pion actif flotte et son anneau pulse
       const bob = p.current && !p.from ? Math.sin(t * 2.6) * 0.04 + 0.04 : 0;
@@ -1227,7 +1236,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
       p.ring.scale.setScalar(p.current ? 1 + Math.sin(t * 4) * 0.08 : 1);
       if (key === labelKey) {
         tmp.copy(p.group.position);
-        tmp.y += (p.body.userData.standee ? 1.12 : 0.85) + bob;
+        tmp.y += 0.85 + bob;
         tmp.project(camera);
         const r = container.getBoundingClientRect();
         label.style.transform = `translate(${((tmp.x + 1) / 2) * r.width}px, ${((1 - tmp.y) / 2) * r.height}px) translate(-50%, -100%)`;
@@ -1302,7 +1311,9 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     rollDice,
     hideDice() { dice.forEach((d) => { d.visible = false; }); },
     setLabel,
-    rotate(deg) { cam.tYaw += deg; },
+    rotate(deg) { cam.tYaw += deg; hideHint(); },
+    /** Rotation continue (bouton maintenu) : -1, 0 ou 1. */
+    spin(dir) { spinDir = dir; if (dir) hideHint(); },
     resetCamera() { cam.tYaw = Math.round(cam.tYaw / 360) * 360; cam.tPitch = 40; cam.tZoom = 1; },
     get dragging() { return dragged; },
     pause() { running = false; cancelAnimationFrame(raf); },
@@ -1311,6 +1322,9 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
       running = false;
       cancelAnimationFrame(raf);
       ro.disconnect();
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      hint.remove();
       renderer.dispose();
       canvas.remove();
       label.remove();

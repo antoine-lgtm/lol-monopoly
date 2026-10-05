@@ -1295,9 +1295,33 @@
   }
   window.addEventListener('resize', () => { if (!view.hidden) fitCamera(); });
 
+  // En 3D : clic = quart de tour, bouton maintenu = rotation continue
+  let spinHold = null;
+  $$('.gv-cam__btn').forEach((btn) => {
+    const dir = btn.dataset.cam === 'left' ? -1 : btn.dataset.cam === 'right' ? 1 : 0;
+    btn.addEventListener('pointerdown', () => {
+      if (!b3 || !dir) return;
+      spinHold = { spinning: false, timer: setTimeout(() => { spinHold.spinning = true; b3.spin(dir); }, 260) };
+    });
+    const release = () => {
+      if (!spinHold) return;
+      clearTimeout(spinHold.timer);
+      if (spinHold.spinning) {
+        b3?.spin(0);
+        btn.dataset.spun = '1'; // le clic qui suit ne doit pas ajouter un quart de tour
+      }
+      spinHold = null;
+    };
+    btn.addEventListener('pointerup', release);
+    btn.addEventListener('pointerleave', release);
+  });
   $$('.gv-cam__btn').forEach((btn) => btn.addEventListener('click', () => {
     const action = btn.dataset.cam;
     if (b3) {
+      if (btn.dataset.spun) {
+        delete btn.dataset.spun;
+        return;
+      }
       if (action === 'reset') b3.resetCamera();
       else b3.rotate(action === 'left' ? -90 : 90);
       return;
