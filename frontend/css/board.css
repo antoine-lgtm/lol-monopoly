@@ -2267,7 +2267,7 @@ body.reduce-motion .gv-pawn.is-current .gv-standee__body {
 .gv-over__table th:nth-child(-n + 2) { text-align: left; }
 .gv-over__table td {
   padding: 9px 10px;
-  background: rgba(1, 10, 19, 0.82);
+  background: rgba(1, 10, 19, 0.94);
   border-top: 1px solid rgba(200, 170, 110, 0.18);
   border-bottom: 1px solid rgba(200, 170, 110, 0.18);
   text-align: right;

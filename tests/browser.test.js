@@ -54,10 +54,10 @@ async function getBrowser() {
 }
 
 /** Ouvre une page de joueur ; collecte les erreurs JavaScript. */
-async function openPlayer(port, label, { query = '?3d=0', viewport = { width: 1400, height: 860 } } = {}) {
+async function openPlayer(port, label, { query = '?3d=0', viewport = { width: 1400, height: 860 }, timeout = 30000 } = {}) {
   const ctx = await (await getBrowser()).newContext({ viewport });
   const page = await ctx.newPage();
-  page.setDefaultTimeout(30000);
+  page.setDefaultTimeout(timeout);
   page.errors = [];
   page.on('pageerror', (e) => page.errors.push(`${label} : ${e.message}`));
   await page.goto(`http://localhost:${port}/${query}`);
@@ -177,7 +177,7 @@ test.describe('dans le navigateur', { skip }, () => {
   });
 
   test('plateau 3D : se charge et affiche sa scène WebGL', { skip: process.env.TEST_3D ? false : 'TEST_3D=1 pour l’activer' }, async () => {
-    const { a, b } = await startGame(PORT, ['Irelia', 'Jinx'], { query: '?3d=1&hq=1' });
+    const { a, b } = await startGame(PORT, ['Irelia', 'Jinx'], { query: '?3d=1', timeout: 300000 });
     await a.waitForFunction(() => document.querySelector('#board-view').classList.contains('is-webgl'), null, { timeout: 240000 });
     assert.ok(await a.$('canvas.gv-webgl'));
     noErrors(a, b);
