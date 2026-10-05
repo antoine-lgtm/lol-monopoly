@@ -1337,7 +1337,6 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     p.t0 = performance.now();
     p.dur = glide ? 600 : hop ? 190 : 260;
     p.hop = hop;
-    if (current && (hop || glide)) follow = { key, until: performance.now() + 1500 };
   }
 
   // --- Constructions --------------------------------------------------------
@@ -1570,27 +1569,12 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   const PITCH = 34;
   const cam = { yaw: -70, pitch: 72, dist: 13, tYaw: 0, tPitch: PITCH, tDist: 13, zoom: 0.72, tZoom: 1 };
   let introUntil = 0; // fixé à la première image
-  // Suivi : quand le pion du joueur actif avance, la caméra se rapproche de lui
-  const focus = new THREE.Vector3(0, 0, 0.45);
-  const HOME = new THREE.Vector3(0, 0, 0.45);
-  const tmpFocus = new THREE.Vector3();
-  let follow = null; // { key, until }
-  // Caméra libre : dès qu'on déplace la vue, elle reste où on l'a mise (◎ ou R pour revenir)
-  const tFocus = HOME.clone();
-  let free = false;
-  const ZOOM_MIN = 0.6;
-  const ZOOM_MAX = 6;
-  const PITCH_MIN = 6;
-  const PITCH_MAX = 89;
-  const clampFocus = (v) => { v.x = Math.max(-5.2, Math.min(5.2, v.x)); v.z = Math.max(-5.2, Math.min(5.2, v.z)); return v; };
-  /** Déplace le point visé (dx vers la droite de l'écran, dz vers le haut de l'écran, en unités). */
-  function pan(dx, dz) {
-    const yaw = (cam.yaw * Math.PI) / 180;
-    tFocus.x += Math.cos(yaw) * dx - Math.sin(yaw) * dz;
-    tFocus.z += -Math.sin(yaw) * dx - Math.cos(yaw) * dz;
-    clampFocus(tFocus);
-    if (!free) { free = true; follow = null; }
-  }
+  // La caméra vise toujours le centre du plateau : on ne peut que tourner autour (et zoomer)
+  const focus = new THREE.Vector3(0, 0, 0);
+  const ZOOM_MIN = 0.75;
+  const ZOOM_MAX = 2.2;
+  const PITCH_MIN = 12;
+  const PITCH_MAX = 85;
   function fitDistance() {
     // le canvas couvre tout l'écran, mais le plateau doit tenir entre les panneaux
     const { left, right, bottom = 0 } = sideSpace();
@@ -1621,25 +1605,21 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   const ro = new ResizeObserver(resize);
   ro.observe(container);
 
-  // Clavier : ← → pour tourner, ↑ ↓ pour incliner, + − pour zoomer, ZQSD / WASD pour
-  // se déplacer (touches physiques : marche en AZERTY comme en QWERTY), R pour recentrer
+  // Clavier : ← → pour tourner, ↑ ↓ pour incliner, + − pour zoomer, R pour revenir à la vue de départ
   const keys = new Set();
   let spinDir = 0;
   const CAM_KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '=', '-'];
-  const MOVE_CODES = ['KeyW', 'KeyA', 'KeyS', 'KeyD'];
-  const keyOf = (e) => (MOVE_CODES.includes(e.code) ? e.code : e.key);
   const onKeyDown = (e) => {
     if (!running || !container.isConnected || container.closest('[hidden]')) return;
     if (e.target.closest?.('input, textarea, select, [contenteditable]')) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.code === 'KeyR') { api.resetCamera(); return; }
-    const k = keyOf(e);
-    if (!CAM_KEYS.includes(k) && !MOVE_CODES.includes(k)) return;
+    if (!CAM_KEYS.includes(e.key)) return;
     e.preventDefault();
-    keys.add(k);
+    keys.add(e.key);
     hideHint();
   };
-  const onKeyUp = (e) => { keys.delete(e.key); keys.delete(e.code); };
+  const onKeyUp = (e) => keys.delete(e.key);
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup', onKeyUp);
   window.addEventListener('blur', () => keys.clear());
@@ -1647,7 +1627,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   // Petite aide affichée au début de la partie
   const hint = document.createElement('div');
   hint.className = 'gv-hint';
-  hint.innerHTML = '<b>Glisse</b> pour tourner · <b>clic droit</b> ou <b>ZQSD</b> pour te déplacer · <b>molette</b> pour zoomer · <b>double-clic</b> pour t’approcher · <b>R</b> pour recentrer';
+  hint.innerHTML = '<b>Glisse</b> pour tourner autour du plateau · <b>molette</b> pour zoomer · <b>← → ↑ ↓</b> au clavier · <b>R</b> pour revenir';
   container.append(hint);
   let hintTimer = 0; // démarre au premier affichage du plateau
   function hideHint() {
@@ -1662,31 +1642,20 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     if (keys.has('ArrowDown')) cam.tPitch = Math.max(PITCH_MIN, cam.tPitch - 0.9);
     if (keys.has('+') || keys.has('=')) cam.tZoom = Math.min(ZOOM_MAX, (cam.tZoom ?? 1) * 1.015);
     if (keys.has('-')) cam.tZoom = Math.max(ZOOM_MIN, (cam.tZoom ?? 1) / 1.015);
-    {
-      const step = 0.012 * ((cam.base || 13) / cam.zoom) * 0.35; // plus vite quand on est loin
-      const mx = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
-      const mz = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
-      if (mx || mz) pan(mx * step, mz * step);
-    }
     if (spinDir) cam.tYaw += spinDir * 1.8;
     const now = performance.now();
     if (!introUntil) introUntil = now + 3200;
     const k = now < introUntil ? 0.022 : 0.12;
     cam.yaw = lerp(cam.yaw, cam.tYaw, k);
     cam.pitch = lerp(cam.pitch, cam.tPitch, k);
-    // pendant le suivi : on vise entre le centre et le pion, un peu plus près
-    const followed = !free && follow && now < follow.until && !drag ? pawns.get(follow.key) : null;
-    const want = free ? tFocus : followed ? tmpFocus.copy(followed.group.position).setY(0).lerp(HOME, 0.45) : HOME;
-    focus.lerp(want, free ? 0.16 : followed ? 0.05 : 0.03);
-    const boost = 1 + (0.16 * (1 - focus.distanceTo(HOME) / 4.5));
-    cam.zoom = lerp(cam.zoom, (cam.tZoom ?? 1) * (followed ? boost : 1), now < introUntil ? 0.03 : 0.08);
+    cam.zoom = lerp(cam.zoom, cam.tZoom ?? 1, now < introUntil ? 0.03 : 0.08);
     const d = (cam.base || 13) / cam.zoom;
     const yaw = (cam.yaw * Math.PI) / 180;
     const pitch = (cam.pitch * Math.PI) / 180;
     camera.position.set(
       focus.x + Math.sin(yaw) * Math.cos(pitch) * d,
       focus.y + Math.sin(pitch) * d,
-      focus.z - 0.45 + Math.cos(yaw) * Math.cos(pitch) * d,
+      focus.z + Math.cos(yaw) * Math.cos(pitch) * d,
     );
     camera.lookAt(focus);
   }
@@ -1695,12 +1664,9 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   const canvas = renderer.domElement;
   let drag = null;
   let dragged = false;
-  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   canvas.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0 && e.button !== 1 && e.button !== 2) return;
-    // clic gauche : tourner ; clic droit, molette ou Maj + clic : se déplacer
-    const panning = e.button !== 0 || e.shiftKey;
-    drag = { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, yaw: cam.tYaw, pitch: cam.tPitch, panning };
+    if (e.button !== 0) return;
+    drag = { x: e.clientX, y: e.clientY, yaw: cam.tYaw, pitch: cam.tPitch };
     dragged = false;
   });
   window.addEventListener('pointermove', (e) => {
@@ -1710,57 +1676,20 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     if (!dragged && Math.hypot(dx, dy) < 6) return;
     dragged = true;
     hideHint();
-    if (drag.panning) {
-      // on « attrape » le plateau : il suit la souris
-      const d = (cam.base || 13) / cam.zoom;
-      const sx = 0.0005 * d;
-      const sz = sx / Math.max(0.35, Math.sin((cam.pitch * Math.PI) / 180));
-      pan(-(e.clientX - drag.lx) * sx, (e.clientY - drag.ly) * sz);
-      drag.lx = e.clientX;
-      drag.ly = e.clientY;
-    } else {
-      cam.tYaw = drag.yaw - dx * 0.3;
-      cam.tPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, drag.pitch + dy * 0.25));
-    }
+    cam.tYaw = drag.yaw - dx * 0.3;
+    cam.tPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, drag.pitch + dy * 0.25));
     api.onDrag?.();
   });
   window.addEventListener('pointerup', () => {
     drag = null;
     setTimeout(() => { dragged = false; }, 0);
   });
-  /** Point du plateau sous la souris (null si on vise le ciel). */
-  const groundPoint = (clientX, clientY) => {
-    const r = canvas.getBoundingClientRect();
-    ndc.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
-    raycaster.setFromCamera(ndc, camera);
-    return raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3());
-  };
-  // molette : zoom vers le point visé par la souris
+  // molette : zoom (toujours centré sur le plateau)
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
     hideHint();
-    const zoomIn = e.deltaY < 0;
-    const before = cam.tZoom ?? 1;
-    cam.tZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, before * (zoomIn ? 1.1 : 0.91)));
-    if (zoomIn && cam.tZoom !== before) {
-      const p = groundPoint(e.clientX, e.clientY);
-      if (p) {
-        if (!free) { free = true; follow = null; tFocus.copy(focus); }
-        tFocus.lerp(p.setY(0), 0.16);
-        clampFocus(tFocus);
-      }
-    }
+    cam.tZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, (cam.tZoom ?? 1) * (e.deltaY < 0 ? 1.08 : 0.92)));
   }, { passive: false });
-  // double-clic : la caméra s'approche de l'endroit visé
-  canvas.addEventListener('dblclick', (e) => {
-    const p = groundPoint(e.clientX, e.clientY);
-    if (!p) return;
-    free = true;
-    follow = null;
-    tFocus.copy(clampFocus(p.setY(0)));
-    cam.tZoom = Math.min(ZOOM_MAX, Math.max(2.6, (cam.tZoom ?? 1) * 1.6));
-    hideHint();
-  });
 
   // --- Survol des cases (rayon souris -> plateau) ----------------------------
   const raycaster = new THREE.Raycaster();
@@ -1969,7 +1898,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     rotate(deg) { cam.tYaw += deg; hideHint(); },
     /** Rotation continue (bouton maintenu) : -1, 0 ou 1. */
     spin(dir) { spinDir = dir; if (dir) hideHint(); },
-    resetCamera() { cam.tYaw = Math.round(cam.tYaw / 360) * 360; cam.tPitch = PITCH; cam.tZoom = 1; follow = null; free = false; tFocus.copy(HOME); },
+    resetCamera() { cam.tYaw = Math.round(cam.tYaw / 360) * 360; cam.tPitch = PITCH; cam.tZoom = 1; },
     get dragging() { return dragged; },
     pause() { running = false; cancelAnimationFrame(raf); },
     resume() { if (!running) { running = true; raf = requestAnimationFrame(frame); } },
