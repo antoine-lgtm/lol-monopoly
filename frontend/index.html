@@ -614,6 +614,19 @@
         <span class="field__label">Volume des effets</span>
         <input class="field__range" id="setting-volume" name="volume" type="range" min="0" max="100" value="60">
       </label>
+      <label class="field field--inline">
+        <span class="field__label">Volume de la musique</span>
+        <input class="field__range" id="setting-music" name="music" type="range" min="0" max="100" value="35">
+      </label>
+      <label class="field field--inline">
+        <span class="field__label">Qualité du plateau 3D</span>
+        <select class="field__select" id="setting-quality" name="quality">
+          <option value="auto">Automatique</option>
+          <option value="high">Haute</option>
+          <option value="medium">Moyenne</option>
+          <option value="low">Basse (ordinateur lent)</option>
+        </select>
+      </label>
       <label class="field field--checkbox">
         <input id="setting-chat-timestamps" name="chatTimestamps" type="checkbox" checked>
         <span>Afficher l'heure dans le chat</span>
@@ -663,7 +676,11 @@
         <span class="gv-pill">Tour <b id="gv-round">1</b></span>
         <span class="gv-pill gv-pill--baron" id="gv-baron">Baron au 3ᵉ tour</span>
       </div>
-      <button class="gv-btn gv-btn--ghost" type="button" id="gv-forfeit">Abandonner</button>
+      <div class="gv-top__tools">
+        <button class="gv-icon-btn" type="button" id="gv-music" title="Musique" aria-pressed="true" aria-label="Musique">♪</button>
+        <button class="gv-icon-btn" type="button" id="gv-settings" title="Paramètres" aria-label="Paramètres">⚙</button>
+        <button class="gv-btn gv-btn--ghost" type="button" id="gv-forfeit">Abandonner</button>
+      </div>
     </header>
 
     <aside class="gv-players" id="gv-players" aria-label="Joueurs"></aside>

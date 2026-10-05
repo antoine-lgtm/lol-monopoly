@@ -3728,3 +3728,13 @@ body.hide-chat-time .chat__time {
 .banners:has(.role-picker__list:not([hidden])) {
   z-index: 4;
 }
+
+.field__select {
+  flex: 0 0 180px;
+  padding: 6px 8px;
+  border: 1px solid var(--gold-5, #785a28);
+  border-radius: 4px;
+  background: #0a1620;
+  color: var(--gold-1, #f0e6d2);
+  font: inherit;
+}

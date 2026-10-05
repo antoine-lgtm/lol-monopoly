@@ -17,6 +17,13 @@ const S = BOARD_PX / 100; // côté du plateau en unités
 const TEX = 4096; // résolution de la texture du dessus
 const K = TEX / BOARD_PX; // px plateau -> px texture
 
+/** Réglages des niveaux de qualité du plateau 3D. */
+const QUALITY = {
+  high: { ratio: 2, bloom: true, shadows: true, shadowSize: 3072, dust: true, world: true },
+  medium: { ratio: 1.25, bloom: true, shadows: true, shadowSize: 2048, dust: true, world: true },
+  low: { ratio: 1, bloom: false, shadows: false, shadowSize: 1024, dust: false, world: false },
+};
+
 const TOP = 0.16; // dessus des tuiles (cases) ; le centre (la Faille) est en contrebas, à 0
 const BASE_Y = 0.36; // épaisseur du socle sous les cases
 const toWorld = (x, y, h = TOP) => new THREE.Vector3(x / 100 - S / 2, h, y / 100 - S / 2);
@@ -97,7 +104,7 @@ function wrapText(ctx, text, maxWidth) {
  * @param {(sq, i) => string[]|null} opts.squareArt   sources d'image d'une case
  * @param {(sq) => string} opts.priceLabel
  */
-export async function createBoard3D({ container, board, groups, geo, squareArt, priceLabel, sideSpace = () => ({ left: 0, right: 0, bottom: 0 }) }) {
+export async function createBoard3D({ container, board, groups, geo, squareArt, priceLabel, sideSpace = () => ({ left: 0, right: 0, bottom: 0 }), quality: initialQuality = 'auto' }) {
   const { cellOf, track, CORNER, UNIT } = geo;
 
   // --- Rendu ----------------------------------------------------------------
@@ -1142,12 +1149,16 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   }
 
   // En contrebas, la carte de Runeterra en relief : le plateau flotte au-dessus du monde
-  {
-    const world = buildRuneterra();
+  // (construite juste après la première image, pour que le plateau apparaisse plus vite)
+  let world = null;
+  const buildWorld = () => {
+    if (world) return;
+    world = buildRuneterra();
     world.position.y = -5;
     world.scale.set(0.8, 0.7, 0.8);
+    world.visible = QUALITY[quality].world;
     scene.add(world);
-  }
+  };
 
   // --- Vagues de sbires -----------------------------------------------------
   // Toutes les 16 s, chaque Nexus envoie 3 sbires dans chaque voie ; ils se
@@ -1172,7 +1183,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     const bodies = new THREE.InstancedMesh(bodyGeo, new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0.3 }), count);
     const hats = new THREE.InstancedMesh(hatGeo, new THREE.MeshStandardMaterial({ color: 0xd4a84a, metalness: 0.8, roughness: 0.3 }), count);
     for (let k = 0; k < count; k++) bodies.setColorAt(k, new THREE.Color(k < count / 2 ? 0x3a8ae8 : 0xe0483c));
-    bodies.castShadow = hats.castShadow = true;
+    bodies.castShadow = hats.castShadow = false; // trop petits pour qu'on voie leur ombre
     bodies.frustumCulled = hats.frustumCulled = false;
     scene.add(bodies, hats);
     const pointAt = (lane, d, out) => {
@@ -1229,6 +1240,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   }
 
   // --- Poussière magique qui flotte autour du plateau --------------------------
+  let dust = null;
   {
     const N = 200;
     const positions = new Float32Array(N * 3);
@@ -1254,13 +1266,14 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     grad.addColorStop(1, 'rgba(255,255,255,0)');
     g.fillStyle = grad;
     g.fillRect(0, 0, 64, 64);
-    const dust = new THREE.Points(geo, new THREE.PointsMaterial({
+    dust = new THREE.Points(geo, new THREE.PointsMaterial({
       size: 0.1, map: new THREE.CanvasTexture(cv), vertexColors: true, transparent: true,
       depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.85,
     }));
     dust.frustumCulled = false;
     scene.add(dust);
     ambient.push((t) => {
+      if (!dust.visible) return;
       seeds.forEach((s, k) => {
         positions[k * 3] = s.x + Math.sin(t * 0.4 + s.phase) * 0.25;
         positions[k * 3 + 1] = -0.2 + ((s.y + t * s.speed) % 3.2);
@@ -1752,30 +1765,45 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   let running = true;
   let raf = 0;
   const tmp = new THREE.Vector3();
-  // Qualité adaptative : si l'image saccade, on baisse la résolution puis les ombres
-  const perf = { frames: 0, since: 0, level: 0 };
-  const FORCE_HQ = new URLSearchParams(location.search).get('hq') === '1'; // ?hq=1 : jamais de baisse
+  // --- Qualité -----------------------------------------------------------------
+  // high / medium / low, ou auto : on part de high (medium sur mobile) et on baisse
+  // d'un cran tant que l'image saccade (moins de 28 images/s).
+  const FORCE_HQ = new URLSearchParams(location.search).get('hq') === '1'; // ?hq=1 : toujours au maximum
   if (FORCE_HQ) window.__boardTop = topCanvas; // pour les captures de test
+  let autoQuality = FORCE_HQ ? false : initialQuality === 'auto';
+  let quality = FORCE_HQ ? 'high'
+    : QUALITY[initialQuality] ? initialQuality
+      : matchMedia('(pointer: coarse)').matches ? 'medium' : 'high';
+  function applyQuality() {
+    const q = QUALITY[quality];
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.ratio));
+    bloomOn = q.bloom;
+    if (renderer.shadowMap.enabled !== q.shadows || sun.shadow.mapSize.x !== q.shadowSize) {
+      renderer.shadowMap.enabled = q.shadows;
+      sun.shadow.mapSize.set(q.shadowSize, q.shadowSize);
+      sun.shadow.map?.dispose();
+      sun.shadow.map = null;
+      scene.traverse((o) => { if (o.material) [].concat(o.material).forEach((m) => { m.needsUpdate = true; }); });
+    }
+    if (dust) dust.visible = q.dust;
+    if (world) world.visible = q.world;
+    resize();
+  }
+  const perf = { frames: 0, since: 0 };
   function adaptQuality(now) {
-    if (FORCE_HQ) return;
+    if (!autoQuality) return;
     if (!perf.since) perf.since = now;
     perf.frames++;
     if (now - perf.since < 2500) return;
     const fps = (perf.frames * 1000) / (now - perf.since);
     perf.frames = 0;
     perf.since = now;
-    if (fps >= 28 || perf.level >= 2) return;
-    perf.level++;
-    if (perf.level === 1) {
-      renderer.setPixelRatio(1);
-      bloomOn = false; // le halo coûte cher : on l'enlève en premier
-      resize();
-    } else {
-      renderer.shadowMap.enabled = false;
-      scene.traverse((o) => { if (o.material) [].concat(o.material).forEach((m) => { m.needsUpdate = true; }); });
-    }
-    console.info(`[plateau 3D] ${fps.toFixed(0)} images/s : qualité réduite (niveau ${perf.level}).`);
+    if (fps >= 28 || quality === 'low') return;
+    quality = quality === 'high' ? 'medium' : 'low';
+    applyQuality();
+    console.info(`[plateau 3D] ${fps.toFixed(0)} images/s : qualité ${quality}.`);
   }
+  applyQuality();
 
   function frame(now) {
     if (!running) return;
@@ -1813,7 +1841,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
       const bob = p.current && !p.from ? Math.sin(t * 2.6) * 0.04 + 0.04 : 0;
       p.body.position.y = bob;
       // petite animation propre à chaque pion (décalée pour qu'ils ne bougent pas en même temps)
-      if (perf.level < 2) p.body.userData.animate?.(t + p.phase, p.current);
+      if (quality !== 'low') p.body.userData.animate?.(t + p.phase, p.current);
       p.ring.material.opacity = p.current ? 0.65 + Math.sin(t * 4) * 0.3 : 0.75;
       p.ring.scale.setScalar(p.current ? 1 + Math.sin(t * 4) * 0.08 : 1);
       if (key === labelKey) {
@@ -1883,8 +1911,18 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     else renderer.render(scene, camera);
   }
   raf = requestAnimationFrame(frame);
+  setTimeout(buildWorld, 60);
 
   const api = {
+    /** 'auto' | 'high' | 'medium' | 'low' */
+    setQuality(q) {
+      autoQuality = q === 'auto' && !FORCE_HQ;
+      if (QUALITY[q]) quality = q;
+      else if (autoQuality) quality = matchMedia('(pointer: coarse)').matches ? 'medium' : 'high';
+      perf.since = 0;
+      perf.frames = 0;
+      applyQuality();
+    },
     setPawn,
     setBuildings,
     setOwners,

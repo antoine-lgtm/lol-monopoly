@@ -15,7 +15,7 @@
   const ICON_COUNT = 30; // même valeur que le serveur
   const STORAGE_SESSION = 'lolm.session';
   const STORAGE_SETTINGS = 'lolm.settings';
-  const DEFAULT_SETTINGS = { volume: 60, chatTimestamps: true, inviteSound: true, reduceMotion: false };
+  const DEFAULT_SETTINGS = { volume: 60, music: 35, quality: 'auto', chatTimestamps: true, inviteSound: true, reduceMotion: false };
 
   // Le stockage local peut être indisponible (navigation privée…) : on ne plante jamais dessus.
   const store = {
@@ -190,9 +190,12 @@
     document.body.classList.toggle('hide-chat-time', !App.settings.chatTimestamps);
   }
 
+  App.openSettings = () => openSettings();
   function openSettings() {
     const form = $('#settings-form');
     form.elements.volume.value = App.settings.volume;
+    form.elements.music.value = App.settings.music;
+    form.elements.quality.value = App.settings.quality;
     form.elements.chatTimestamps.checked = App.settings.chatTimestamps;
     form.elements.inviteSound.checked = App.settings.inviteSound;
     form.elements.reduceMotion.checked = App.settings.reduceMotion;
@@ -203,12 +206,15 @@
     const form = event.currentTarget;
     App.settings = {
       volume: Number(form.elements.volume.value),
+      music: Number(form.elements.music.value),
+      quality: form.elements.quality.value,
       chatTimestamps: form.elements.chatTimestamps.checked,
       inviteSound: form.elements.inviteSound.checked,
       reduceMotion: form.elements.reduceMotion.checked,
     };
     store.set(STORAGE_SETTINGS, App.settings);
     applySettings();
+    document.dispatchEvent(new CustomEvent('lolm:settings', { detail: App.settings }));
     App.toast('Paramètres enregistrés.', 'success');
   });
 

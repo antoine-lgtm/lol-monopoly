@@ -424,6 +424,7 @@
         geo: { cellOf, track, CORNER, UNIT },
         squareArt,
         priceLabel,
+        quality: App.settings?.quality || 'auto',
         sideSpace: () => ({
           left: ($('.gv-players')?.offsetWidth || 250) + 30,
           right: ($('.gv-side')?.offsetWidth || 300) + 30,
@@ -1479,6 +1480,9 @@
       if (!res?.ok) App.toast(res?.error || 'Action impossible.', 'error');
     });
   }
+
+  $('#gv-settings').addEventListener('click', () => App.openSettings?.());
+  document.addEventListener('lolm:settings', (e) => b3?.setQuality(e.detail.quality || 'auto'));
 
   $('#gv-forfeit').addEventListener('click', () => {
     if (window.confirm('Abandonner la partie ? Tes cases retourneront à la banque.')) send('game:forfeit');

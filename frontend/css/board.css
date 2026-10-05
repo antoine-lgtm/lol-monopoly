@@ -2124,3 +2124,19 @@ body.reduce-motion .gv-pawn.is-current .gv-standee__body {
 .gv-trade__note { margin: 12px 0 0; color: #8a96a0; font-size: 12px; }
 .gv-trade__foot { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
 .gv-supply { margin: 0 0 10px; color: #a09b8c; font-size: 12px; letter-spacing: 0.02em; }
+
+/* Boutons musique / paramètres de la barre du haut */
+.gv-top__tools { display: flex; align-items: center; gap: 8px; justify-self: end; }
+.gv-icon-btn {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(200, 155, 60, 0.55);
+  border-radius: 50%;
+  background: rgba(10, 20, 30, 0.8);
+  color: #cdbe91;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.gv-icon-btn:hover { color: #f0e6d2; border-color: #c89b3c; }
+.gv-icon-btn[aria-pressed="false"] { color: #5b6670; text-decoration: line-through; }

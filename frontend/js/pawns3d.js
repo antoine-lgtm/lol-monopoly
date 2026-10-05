@@ -10,6 +10,16 @@
  * l'animation est alors plus marquée).
  */
 import * as THREE from '/vendor/three/three.module.js';
+import { mergeGeometries } from '/vendor/three-addons/utils/BufferGeometryUtils.js';
+
+/** Fusionne des petites pièces identiques en un seul objet (moins de dessins par image). */
+function merged(geo, params, transforms) {
+  const m = new THREE.Matrix4();
+  const parts = transforms.map(({ pos, rotY = 0, scale = 1 }) => geo.clone().applyMatrix4(
+    m.compose(pos, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rotY), new THREE.Vector3(scale, scale, scale)),
+  ));
+  return mesh(mergeGeometries(parts), params);
+}
 
 const mats = new Map();
 /** Matériau partagé (mêmes paramètres = même matériau). */
@@ -85,14 +95,10 @@ function poro() {
   const body = mesh(new THREE.SphereGeometry(0.19, 28, 20), fur, 0, 0, 0);
   fluffy.add(body);
   // duvet : des petites boules de poils tout autour du corps
-  const puff = new THREE.SphereGeometry(0.055, 10, 8);
-  for (const p of fibonacci(46)) {
-    if (p.z > 0.2 && p.y > -0.55 && p.y < 0.75 && Math.abs(p.x) < 0.85) continue; // on dégage le visage
-    const tuft = mesh(puff, fur);
-    tuft.position.copy(p).multiplyScalar(0.175);
-    tuft.scale.setScalar(0.75 + Math.abs(Math.sin(p.x * 9)) * 0.45);
-    fluffy.add(tuft);
-  }
+  const tufts = fibonacci(46)
+    .filter((p) => !(p.z > 0.2 && p.y > -0.55 && p.y < 0.75 && Math.abs(p.x) < 0.85)) // on dégage le visage
+    .map((p) => ({ pos: p.clone().multiplyScalar(0.175), scale: 0.75 + Math.abs(Math.sin(p.x * 9)) * 0.45 }));
+  fluffy.add(merged(new THREE.SphereGeometry(0.055, 10, 8), fur, tufts));
   fluffy.position.y = 0.22;
   fluffy.scale.set(1.08, 0.95, 1);
   g.add(fluffy);
@@ -156,13 +162,11 @@ function teemo() {
   const under = mesh(new THREE.CircleGeometry(0.21, 28), { color: 0x4a2470, side: THREE.DoubleSide }, 0, -0.002, 0);
   under.rotation.x = Math.PI / 2;
   top.add(cap, rim, under);
-  const gill = new THREE.BoxGeometry(0.13, 0.008, 0.006);
-  for (let k = 0; k < 20; k++) {
-    const a = (k / 20) * Math.PI * 2;
-    const l = mesh(gill, { color: 0x6a3a96, roughness: 0.8 }, Math.cos(a) * 0.13, -0.006, Math.sin(a) * 0.13);
-    l.rotation.y = -a;
-    top.add(l);
-  }
+  top.add(merged(new THREE.BoxGeometry(0.13, 0.008, 0.006), { color: 0x6a3a96, roughness: 0.8 },
+    Array.from({ length: 20 }, (_, k) => {
+      const a = (k / 20) * Math.PI * 2;
+      return { pos: new THREE.Vector3(Math.cos(a) * 0.13, -0.006, Math.sin(a) * 0.13), rotY: -a };
+    })));
   const spot = { color: 0x8dff6a, emissive: 0x3aa828, emissiveIntensity: 0.7, roughness: 0.35 };
   [[0.1, 0.12, 0.1, 0.05], [-0.12, 0.1, 0.09, 0.045], [0.03, 0.15, -0.12, 0.052], [-0.05, 0.18, 0.02, 0.038], [0.15, 0.08, -0.06, 0.04], [-0.13, 0.08, -0.1, 0.035]]
     .forEach(([x, y, z, r]) => {
