@@ -2296,3 +2296,63 @@ body.reduce-motion .gv-pawn.is-current .gv-standee__body {
   .gv-over__title { font-size: 56px; }
   .gv-over__panel { min-width: 0; padding: 0 16px; }
 }
+
+/* =====================================================================
+   Téléphone : joueurs en bandeau en haut, plateau en pleine largeur,
+   journal / cases / chat dans un tiroir en bas
+   ===================================================================== */
+@media (max-width: 760px) {
+  .gv-top { height: 48px; gap: 8px; padding: 0 8px; }
+  .gv-top__brand { font-size: 0; gap: 0; }
+  .gv-top__logo { font-size: 14px; }
+  .gv-top__info { gap: 6px; margin: 0 auto 0 0; min-width: 0; }
+  .gv-pill { padding: 4px 8px; font-size: 11px; white-space: nowrap; }
+  #gv-baron { max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+  .gv-top__tools { gap: 6px; }
+  .gv-icon-btn { width: 30px; height: 30px; font-size: 14px; }
+  #gv-forfeit { padding: 6px 8px; font-size: 10px; letter-spacing: 0.04em; }
+
+  .gv-players {
+    top: 52px;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    flex-direction: row;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .gv-player { flex: 0 0 auto; min-width: 128px; padding: 6px 8px; column-gap: 8px; row-gap: 2px; border-radius: 10px; }
+  .gv-player__name { font-size: 13px; }
+  .gv-player__gold { font-size: 12px; }
+  .gv-player__owned { display: none; }
+  .gv-player__tags { gap: 3px; }
+  .gv-tag { font-size: 9px; padding: 1px 5px; }
+
+  .gv-scene { top: 112px; left: 0; right: 0; bottom: 168px; }
+  .board-view.is-webgl .gv-scene { top: 0; bottom: 0; }
+  .gv-actions { left: 8px; right: 8px; bottom: 54px; }
+  .gv-actions__buttons { flex-wrap: wrap; justify-content: center; }
+  .gv-btn { padding: 10px 14px; font-size: 12px; }
+  .gv-cam { left: auto; right: 8px; bottom: 150px; transform: scale(0.85); transform-origin: right bottom; }
+  .gv-hint { display: none; }
+  .gv-cardfx { left: 0; right: 0; top: 22%; }
+  .gv-inspect { top: 112px; left: 8px; right: 8px; width: auto; max-width: 380px; margin: 0 auto; }
+
+  .gv-side {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    height: 46px;
+    border-radius: 14px 14px 0 0;
+    transition: height 0.25s var(--ease, ease);
+    z-index: 7;
+  }
+  .gv-side.is-open { height: 58vh; }
+  .gv-side__tab { padding: 14px 4px; font-size: 12px; }
+
+  body.in-game .notifications { bottom: 120px; left: 8px; right: 8px; width: auto; }
+  .gv-3dnotice { top: 112px; }
+}

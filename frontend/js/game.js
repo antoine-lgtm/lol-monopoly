@@ -463,11 +463,13 @@
         squareArt,
         priceLabel,
         quality: App.settings?.quality || 'auto',
-        sideSpace: () => ({
-          left: ($('.gv-players')?.offsetWidth || 250) + 30,
-          right: ($('.gv-side')?.offsetWidth || 300) + 30,
-          bottom: 110, // barre d'actions
-        }),
+        sideSpace: () => (isPhone()
+          ? { left: 0, right: 0, bottom: 170 } // téléphone : panneaux en haut et en bas
+          : {
+            left: ($('.gv-players')?.offsetWidth || 250) + 30,
+            right: ($('.gv-side')?.offsetWidth || 300) + 30,
+            bottom: 110, // barre d'actions
+          }),
       });
       view.classList.add('is-webgl');
       b3.onHover = hoverSquare;
@@ -1642,7 +1644,18 @@
       list.scrollTop = list.scrollHeight;
     }
   }
-  $$('.gv-side__tab').forEach((tab) => tab.addEventListener('click', () => showTab(tab.dataset.gvTab)));
+  // Sur téléphone, le panneau (journal, cases, chat) est un tiroir en bas de l'écran :
+  // toucher un onglet l'ouvre, retoucher l'onglet actif le referme.
+  const isPhone = () => matchMedia('(max-width: 760px)').matches;
+  $$('.gv-side__tab').forEach((tab) => tab.addEventListener('click', () => {
+    const side = $('.gv-side');
+    if (isPhone() && tab.classList.contains('is-active') && side.classList.contains('is-open')) {
+      side.classList.remove('is-open');
+      return;
+    }
+    side.classList.add('is-open');
+    showTab(tab.dataset.gvTab);
+  }));
 
   // Fermer la fiche / la carte avec Échap ou un clic
   $('#gv-cardfx').addEventListener('click', () => { $('#gv-cardfx').hidden = true; });
