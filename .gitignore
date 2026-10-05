@@ -4,3 +4,6 @@ node_modules/
 
 # Illustrations Riot téléchargées par npm start (non versionnées)
 frontend/assets/champions/
+
+# Sauvegarde des parties (serveur)
+data/

@@ -924,6 +924,23 @@ class Game {
     }
   }
 
+  // --- Sauvegarde ----------------------------------------------------------------
+
+  /** État complet (pour la sauvegarde sur disque). */
+  toJSON() {
+    const { random, fx, ...rest } = this;
+    return rest;
+  }
+
+  /** Recrée une partie à partir de toJSON(). */
+  static fromJSON(data, { random = Math.random } = {}) {
+    const game = Object.create(Game.prototype);
+    Object.assign(game, structuredClone(data));
+    game.random = random;
+    game.fx = [];
+    return game;
+  }
+
   // --- Sérialisation -----------------------------------------------------------
 
   /** État public envoyé à tous les joueurs. Les effets sont vidés après envoi. */

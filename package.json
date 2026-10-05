@@ -9,7 +9,10 @@
     "start": "node backend/server.js",
     "predev": "node tools/download-champions.js",
     "dev": "node --watch backend/server.js",
-    "images": "node tools/download-champions.js"
+    "images": "node tools/download-champions.js",
+    "test": "node --test tests/rules.test.js",
+    "test:browser": "node --test --test-concurrency=1 tests/browser.test.js",
+    "test:all": "npm test && npm run test:browser"
   },
   "engines": {
     "node": ">=18"
@@ -18,5 +21,8 @@
     "express": "^4.21.2",
     "socket.io": "^4.8.1",
     "three": "^0.169.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0"
   }
 }

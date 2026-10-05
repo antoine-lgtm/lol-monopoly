@@ -9,6 +9,7 @@
  * une partie est créée sur `lobby:start` et vit dans `lobby.game`.
  */
 
+const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const crypto = require('crypto');
@@ -725,6 +726,107 @@ io.on('connection', (socket) => {
 });
 
 // ---------------------------------------------------------------------------
+// Sauvegarde sur disque : joueurs, amis, salons et parties survivent à un
+// redémarrage du serveur. SAVE_FILE=off pour la désactiver (tests).
+// ---------------------------------------------------------------------------
+
+const SAVE_FILE = process.env.SAVE_FILE === 'off' ? null
+  : path.resolve(process.env.SAVE_FILE || path.join(__dirname, '..', 'data', 'save.json'));
+let lastSaved = '';
+
+function snapshot() {
+  return JSON.stringify({
+    version: 1,
+    users: [...users.values()].map((u) => ({
+      key: u.key,
+      name: u.name,
+      icon: u.icon,
+      lobbyId: u.lobbyId,
+      friends: [...u.friends],
+      incomingRequests: [...u.incomingRequests],
+    })),
+    lobbies: [...lobbies.values()].map((l) => ({
+      id: l.id,
+      code: l.code,
+      ownerKey: l.ownerKey,
+      status: l.status,
+      open: l.open,
+      slots: l.slots,
+      chat: l.chat,
+      game: l.game ? l.game.toJSON() : null,
+    })),
+  });
+}
+
+function saveNow() {
+  if (!SAVE_FILE) return;
+  try {
+    const json = snapshot();
+    if (json === lastSaved) return;
+    fs.mkdirSync(path.dirname(SAVE_FILE), { recursive: true });
+    const tmp = `${SAVE_FILE}.tmp`;
+    fs.writeFileSync(tmp, json);
+    fs.renameSync(tmp, SAVE_FILE); // écriture atomique : jamais de fichier à moitié écrit
+    lastSaved = json;
+  } catch (err) {
+    console.error('[sauvegarde]', err.message);
+  }
+}
+
+function loadSave() {
+  if (!SAVE_FILE || !fs.existsSync(SAVE_FILE)) return;
+  try {
+    const data = JSON.parse(fs.readFileSync(SAVE_FILE, 'utf8'));
+    for (const l of data.lobbies || []) {
+      const lobby = {
+        ...l,
+        invites: new Map(),
+        autoplayTimer: null,
+        game: l.game ? Game.fromJSON(l.game) : null,
+      };
+      lobbies.set(lobby.id, lobby);
+      lobbyCodes.set(lobby.code, lobby.id);
+    }
+    for (const u of data.users || []) {
+      const user = {
+        key: u.key,
+        name: u.name,
+        icon: u.icon,
+        socketId: null,
+        lobbyId: u.lobbyId && lobbies.has(u.lobbyId) ? u.lobbyId : null,
+        friends: new Set(u.friends),
+        incomingRequests: new Set(u.incomingRequests),
+        disconnectTimer: null,
+        chatTimestamps: [],
+      };
+      users.set(user.key, user);
+      // comme après une déconnexion : on garde sa place un moment, le temps qu'il revienne
+      user.disconnectTimer = setTimeout(() => {
+        user.disconnectTimer = null;
+        if (user.socketId) return;
+        const current = currentLobby(user);
+        if (current && current.status === 'lobby') removeFromLobby(user);
+      }, RECONNECT_GRACE_MS * 4);
+    }
+    // les parties reprennent : les joueurs absents jouent automatiquement après le délai habituel
+    for (const lobby of lobbies.values()) if (lobby.game && lobby.status === 'in-game') scheduleAutoplay(lobby);
+    lastSaved = snapshot();
+    console.log(`Sauvegarde chargée : ${users.size} joueurs, ${lobbies.size} salons.`);
+  } catch (err) {
+    console.error('[sauvegarde] fichier illisible, on repart de zéro :', err.message);
+  }
+}
+
+if (SAVE_FILE) {
+  loadSave();
+  setInterval(saveNow, 3_000).unref();
+  for (const signal of ['SIGINT', 'SIGTERM']) {
+    process.on(signal, () => {
+      saveNow();
+      process.exit(0);
+    });
+  }
+}
 
 server.listen(PORT, () => {
   console.log(`LoL Monopoly en écoute sur http://localhost:${PORT}`);
