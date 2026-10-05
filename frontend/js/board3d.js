@@ -748,11 +748,12 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = 0.006;
     group.add(blob, ring);
+    group.scale.setScalar(1.2);
     // Pion modélisé en 3D (pawns3d.js), qui se tourne doucement vers la caméra
     const body = buildPawn(pawn || 'classic', color);
     group.add(body);
     scene.add(group);
-    p = { group, body, ring, from: null, target: null, t0: 0, dur: 0, hop: false, current: false, hidden: false };
+    p = { group, body, ring, from: null, target: null, t0: 0, dur: 0, hop: false, current: false, hidden: false, phase: pawns.size * 1.7 };
     pawns.set(key, p);
     return p;
   }
@@ -1232,6 +1233,8 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
       // le pion actif flotte et son anneau pulse
       const bob = p.current && !p.from ? Math.sin(t * 2.6) * 0.04 + 0.04 : 0;
       p.body.position.y = bob;
+      // petite animation propre à chaque pion (décalée pour qu'ils ne bougent pas en même temps)
+      if (perf.level < 2) p.body.userData.animate?.(t + p.phase, p.current);
       p.ring.material.opacity = p.current ? 0.65 + Math.sin(t * 4) * 0.3 : 0.75;
       p.ring.scale.setScalar(p.current ? 1 + Math.sin(t * 4) * 0.08 : 1);
       if (key === labelKey) {

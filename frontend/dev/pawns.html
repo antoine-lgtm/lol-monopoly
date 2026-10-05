@@ -18,9 +18,16 @@ const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 6), new THREE.MeshStand
 floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
 const kinds = ['poro', 'teemo', 'ward', 'minion', 'zhonya', 'blade', 'tibbers', 'egg', 'classic'];
 const colors = ['#0ac8b9', '#e84057', '#b27cff', '#f0a030', '#6fd16a', '#0ac8b9', '#e84057', '#b27cff', '#f0a030'];
-kinds.forEach((k, i) => { const p = buildPawn(k, colors[i]); p.position.x = (i - 4) * 0.62; scene.add(p); });
+const pawns = kinds.map((k, i) => { const p = buildPawn(k, colors[i]); p.position.x = (i - 4) * 0.62; scene.add(p); return p; });
 const cam = new THREE.PerspectiveCamera(30, 1400 / 420, 0.1, 50);
 cam.position.set(0, 1.0, 4.2); cam.lookAt(0, 0.3, 0);
-r.render(scene, cam);
-window.done = true;
+const fixed = new URLSearchParams(location.search).get('t');
+function loop(now) {
+  const t = fixed != null ? Number(fixed) : now / 1000;
+  pawns.forEach((p, i) => p.userData.animate?.(t + i * 1.7, true));
+  r.render(scene, cam);
+  window.done = true;
+  if (fixed == null) requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
 </script></body></html>
