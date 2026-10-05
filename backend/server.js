@@ -50,6 +50,9 @@ const io = new Server(server, {
 });
 
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
+// Three.js (plateau 3D) servi depuis node_modules : pas besoin d'Internet pour jouer
+app.use('/vendor/three', express.static(path.join(__dirname, '..', 'node_modules', 'three', 'build')));
+app.use('/vendor/three-addons', express.static(path.join(__dirname, '..', 'node_modules', 'three', 'examples', 'jsm')));
 app.get('/health', (_req, res) => res.json({ ok: true, users: users.size, lobbies: lobbies.size }));
 
 // ---------------------------------------------------------------------------

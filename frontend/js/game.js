@@ -33,6 +33,7 @@
   const shownPos = new Map(); // key -> case affichée (pendant les animations)
   let inspected = null; // case ouverte dans la fiche
   let inspectByHover = false; // fiche ouverte au survol : elle se ferme quand la souris quitte la case
+  let b3 = null; // plateau WebGL (board3d.js) ; null = plateau CSS de secours
 
   const fmt = (n) => new Intl.NumberFormat('fr-FR').format(n);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -339,6 +340,59 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Plateau en vraie 3D (WebGL). Si le navigateur ne sait pas faire, on garde
+  // le plateau CSS, qui reste construit en dessous.
+  // ---------------------------------------------------------------------------
+
+  function webglAvailable() {
+    try {
+      const c = document.createElement('canvas');
+      return Boolean(c.getContext('webgl2') || c.getContext('webgl'));
+    } catch {
+      return false;
+    }
+  }
+
+  /** Sources d'image d'une case pour la texture du plateau 3D. */
+  function squareArt(sq) {
+    if (sq.type === 'property') {
+      const id = champId(sq);
+      return [`assets/champions/loading/${id}_0.jpg`, ...imageSources('loading', id)];
+    }
+    return specialArt(sq);
+  }
+
+  async function setup3D() {
+    b3?.dispose();
+    b3 = null;
+    view.classList.remove('is-webgl');
+    if (!webglAvailable()) return;
+    try {
+      const mod = await import('./board3d.js');
+      b3 = await mod.createBoard3D({
+        container: scene,
+        board,
+        groups,
+        geo: { cellOf, track, CORNER, UNIT },
+        squareArt,
+        priceLabel,
+        sideSpace: () => ({
+          left: ($('.gv-players')?.offsetWidth || 250) + 30,
+          right: ($('.gv-side')?.offsetWidth || 300) + 30,
+          bottom: 110, // barre d'actions
+        }),
+      });
+      view.classList.add('is-webgl');
+      b3.onHover = hoverSquare;
+      b3.onClick = (i) => { if (matchMedia('(hover: none)').matches) openInspect(i); };
+      b3.onDrag = () => hoverSquare(null);
+    } catch (err) {
+      console.warn('[plateau] WebGL indisponible, plateau CSS utilisé.', err);
+      b3 = null;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Pièces debout : pions, tours, Baron
   // ---------------------------------------------------------------------------
 
@@ -363,6 +417,16 @@
     el.style.setProperty('--x', `${x + Math.cos(angle) * r}px`);
     el.style.setProperty('--y', `${y + Math.sin(angle) * r}px`);
     shownPos.set(key, index);
+    b3?.setPawn(key, {
+      x: x + Math.cos(angle) * r,
+      y: y + Math.sin(angle) * r,
+      color: p?.color,
+      pawn: p?.pawn,
+      hop,
+      glide: el.classList.contains('is-gliding'),
+      current: p?.key === state.current,
+      hidden: Boolean(p?.bankrupt),
+    });
     if (hop) {
       sfx('step');
       el.classList.remove('is-hopping');
@@ -394,6 +458,8 @@
     }
     // Repositionne tout le monde pour bien répartir les pions sur une même case
     for (const p of state.players) placePawn(p.key, shownPos.get(p.key));
+    const current = state.players.find((p) => p.key === state.current);
+    b3?.setLabel(state.phase === 'over' ? null : current?.key, current?.name, current?.color);
   }
 
   function syncBuildings() {
@@ -434,6 +500,23 @@
       el.classList.toggle('is-active', state.baron.active);
       piecesEl.append(el);
     }
+    if (b3) b3.setBuildings(buildingsFor3D());
+  }
+
+  /** Mêmes constructions que ci-dessus, en coordonnées plateau pour la scène 3D. */
+  function buildingsFor3D() {
+    const towers = [];
+    const inhibs = [];
+    const flags = [];
+    for (const [i, st] of Object.entries(state.props)) {
+      const index = Number(i);
+      const color = state.players.find((p) => p.key === st.owner)?.color || '#c8aa6e';
+      if (st.level === 5) inhibs.push({ ...bandPoint(index, 0.5), color });
+      else for (let t = 0; t < st.level; t++) towers.push({ ...bandPoint(index, st.level === 1 ? 0.5 : t / (st.level - 1)), color });
+      flags.push({ ...flagPoint(index), color, mortgaged: st.mortgaged });
+    }
+    const baron = state.baron.taken ? null : { ...centerOf(20, 0.9), active: state.baron.active };
+    return { towers, inhibs, flags, baron };
   }
 
   // ---------------------------------------------------------------------------
@@ -453,6 +536,7 @@
 
   function showDice(values, animate) {
     if (!values) return;
+    b3?.rollDice(values, animate);
     diceEl.classList.add('is-visible');
     spins += 2;
     $$('.gv-die', diceEl).forEach((die, d) => {
@@ -495,6 +579,7 @@
     const sq = squares[index];
     const p = state.players.find((q) => q.key === key);
     if (!sq) return;
+    b3?.flash(index, p?.color || '#c8aa6e');
     sq.style.setProperty('--land', p?.color || '#c8aa6e');
     sq.classList.remove('is-landed');
     void sq.offsetWidth;
@@ -609,6 +694,14 @@
       if (owner) el.style.setProperty('--owner', owner.color);
       else el.style.removeProperty('--owner');
     });
+    if (b3) {
+      b3.setOwners(Object.entries(state.props).map(([i, st]) => ({
+        index: Number(i),
+        color: state.players.find((p) => p.key === st.owner)?.color || '#c8aa6e',
+        mortgaged: st.mortgaged,
+      })));
+      b3.setPending(state.pendingIndex);
+    }
   }
 
   function renderPlayers() {
@@ -928,6 +1021,7 @@
     box.append(card);
     box.hidden = false;
     squares.forEach((el, i) => el.classList.toggle('is-inspected', i === index));
+    b3?.setInspected(index);
   }
 
   function closeInspect() {
@@ -935,6 +1029,7 @@
     inspectByHover = false;
     $('#gv-inspect').hidden = true;
     squares.forEach((el) => el.classList.remove('is-inspected'));
+    b3?.setInspected(null);
   }
 
   // Fiche d'une case : on garde la souris 2 secondes dessus (un contour se remplit
@@ -942,34 +1037,41 @@
   // Pour construire ou hypothéquer, la fiche ouverte depuis « Mes cases » reste affichée.
   const HOVER_DELAY = 2000;
   let hoverTimer = 0;
-  let hovered = null;
+  let hoveredIndex = null; // case dont le contour se remplit
+  let pointerIndex = null; // case sous la souris
 
   function cancelHover() {
     clearTimeout(hoverTimer);
-    hovered?.classList.remove('is-hovering');
-    hovered = null;
+    if (hoveredIndex !== null) squares[hoveredIndex]?.classList.remove('is-hovering');
+    b3?.setHover(null);
+    hoveredIndex = null;
   }
 
-  boardEl.addEventListener('pointerover', (event) => {
-    const sq = event.target.closest('.gv-sq');
-    if (!sq || sq === hovered || event.pointerType === 'touch') return;
+  /** La souris arrive sur une case (index) ou quitte les cases (null). Plateau CSS ou 3D. */
+  function hoverSquare(index) {
+    if (index === pointerIndex) return;
+    const previous = pointerIndex;
+    pointerIndex = index;
+    // la fiche ouverte au survol disparaît quand on quitte sa case
+    if (inspectByHover && previous !== null && previous === inspected && index !== inspected) closeInspect();
     cancelHover();
-    if (drag || Number(sq.dataset.index) === inspected) return;
-    hovered = sq;
-    sq.classList.add('is-hovering');
+    if (index === null || index === inspected || drag || b3?.dragging) return;
+    hoveredIndex = index;
+    squares[index]?.classList.add('is-hovering');
+    b3?.setHover(index);
     hoverTimer = setTimeout(() => {
-      const index = Number(sq.dataset.index);
       cancelHover();
       openInspect(index);
       inspectByHover = true;
     }, HOVER_DELAY);
+  }
+
+  boardEl.addEventListener('pointerover', (event) => {
+    const sq = event.target.closest('.gv-sq');
+    if (sq && event.pointerType !== 'touch') hoverSquare(Number(sq.dataset.index));
   });
   boardEl.addEventListener('pointerout', (event) => {
-    if (hovered && !hovered.contains(event.relatedTarget)) cancelHover();
-    const sq = event.target.closest('.gv-sq');
-    if (inspectByHover && sq && Number(sq.dataset.index) === inspected && !sq.contains(event.relatedTarget)) {
-      closeInspect();
-    }
+    if (!event.relatedTarget?.closest?.('.gv-sq')) hoverSquare(null);
   });
   // Sur écran tactile, pas de survol : on garde le toucher pour ouvrir la fiche
   boardEl.addEventListener('click', (event) => {
@@ -1044,12 +1146,14 @@
 
   function openBoard() {
     view.hidden = false;
+    b3?.resume();
     document.body.classList.add('in-game');
     fitCamera();
   }
 
   function closeBoard() {
     view.hidden = true;
+    b3?.pause();
     document.body.classList.remove('in-game');
     closeInspect();
     App.showView('lobby');
@@ -1065,8 +1169,10 @@
         groups = next.groups;
         state = next;
         buildBoard();
+        await setup3D();
         showDice(next.dice || [5, 2], false);
         diceEl.classList.toggle('is-visible', Boolean(next.dice));
+        if (!next.dice) b3?.hideDice();
         renderAll();
         if (next.phase !== 'over') openBoard();
         return;
@@ -1178,6 +1284,11 @@
 
   $$('.gv-cam__btn').forEach((btn) => btn.addEventListener('click', () => {
     const action = btn.dataset.cam;
+    if (b3) {
+      if (action === 'reset') b3.resetCamera();
+      else b3.rotate(action === 'left' ? -90 : 90);
+      return;
+    }
     if (action === 'left') cam.yaw -= 90;
     if (action === 'right') cam.yaw += 90;
     if (action === 'reset') {
@@ -1190,7 +1301,7 @@
 
   let drag = null;
   scene.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || b3) return; // en 3D, la caméra est gérée par board3d.js
     drag = { x: event.clientX, y: event.clientY, yaw: cam.yaw, tilt: cam.tilt };
     dragMoved = false;
   });
@@ -1215,6 +1326,7 @@
     setTimeout(() => { dragMoved = false; }, 0);
   });
   scene.addEventListener('wheel', (event) => {
+    if (b3) return;
     event.preventDefault();
     cam.zoom = Math.max(0.6, Math.min(1.8, cam.zoom * (event.deltaY > 0 ? 0.92 : 1.08)));
     applyCamera();
