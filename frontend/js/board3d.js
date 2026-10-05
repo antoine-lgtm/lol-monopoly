@@ -16,6 +16,7 @@ const TEX = 4096; // résolution de la texture du dessus
 const K = TEX / BOARD_PX; // px plateau -> px texture
 
 const TOP = 0.16; // dessus des tuiles (cases) ; le centre (la Faille) est en contrebas, à 0
+const BASE_Y = 0.36; // épaisseur du socle sous les cases
 const toWorld = (x, y, h = TOP) => new THREE.Vector3(x / 100 - S / 2, h, y / 100 - S / 2);
 const lerp = (a, b, t) => a + (b - a) * t;
 const ease = (t) => 1 - (1 - t) ** 3;
@@ -108,20 +109,46 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   renderer.domElement.className = 'gv-webgl';
   container.append(renderer.domElement);
 
+  // Post-traitement : léger halo (bloom) autour des cristaux, gemmes et lumières
+  const { EffectComposer } = await import('/vendor/three-addons/postprocessing/EffectComposer.js');
+  const { RenderPass } = await import('/vendor/three-addons/postprocessing/RenderPass.js');
+  const { UnrealBloomPass } = await import('/vendor/three-addons/postprocessing/UnrealBloomPass.js');
+  const { OutputPass } = await import('/vendor/three-addons/postprocessing/OutputPass.js');
+  const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }));
+  let bloomOn = true;
+
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0x050b12, 22, 48); // un peu de brume au loin : profondeur
+  // Fond : halo bleu nuit derrière le plateau, bords sombres (vignette)
+  {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 512;
+    const g = cv.getContext('2d');
+    const grad = g.createRadialGradient(256, 230, 20, 256, 256, 360);
+    grad.addColorStop(0, '#1b2f44');
+    grad.addColorStop(0.45, '#0c1726');
+    grad.addColorStop(1, '#03060b');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 512, 512);
+    const bg = new THREE.CanvasTexture(cv);
+    bg.colorSpace = THREE.SRGBColorSpace;
+    scene.background = bg;
+  }
   const { RoomEnvironment } = await import('/vendor/three-addons/environments/RoomEnvironment.js');
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   scene.environmentIntensity = 0.55;
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
+  composer.addPass(new RenderPass(scene, camera));
+  composer.addPass(new UnrealBloomPass(new THREE.Vector2(256, 256), 0.32, 0.4, 0.9));
+  composer.addPass(new OutputPass());
 
   // Lumières : ciel froid + soleil chaud qui projette les ombres, lueurs des deux Nexus
   scene.add(new THREE.HemisphereLight(0xcfe4ff, 0x1a1408, 1.05));
   const sun = new THREE.DirectionalLight(0xffe6c0, 2.1);
   sun.position.set(5, 11, 7);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(3072, 3072);
   Object.assign(sun.shadow.camera, { left: -7, right: 7, top: 7, bottom: -7, near: 1, far: 30 });
   sun.shadow.bias = -0.0005;
   sun.shadow.normalBias = 0.02;
@@ -131,11 +158,15 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   const redNexus = new THREE.PointLight(0xff5040, 6, 4.5, 2);
   redNexus.position.set(3, 0.6, -3);
   scene.add(blueNexus, redNexus);
+  // Lumière de contour (derrière, froide) : détache les reliefs du fond
+  const rim = new THREE.DirectionalLight(0x8fb8ff, 0.9);
+  rim.position.set(-6, 5, -9);
+  scene.add(rim);
 
   // Sol qui reçoit l'ombre du plateau
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.ShadowMaterial({ opacity: 0.45 }));
   ground.rotation.x = -Math.PI / 2;
-  ground.position.y = -0.9;
+  ground.position.y = -BASE_Y - 0.13;
   ground.receiveShadow = true;
   scene.add(ground);
 
@@ -303,7 +334,8 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   };
   const blueSide = sideMat('#3a8ad0', '#081a30');
   const redSide = sideMat('#d0504a', '#2e0a0a');
-  const topMat = new THREE.MeshStandardMaterial({ map: topTexture, roughness: 0.58, metalness: 0.05 });
+  // dessus vernis : un léger reflet glisse sur les cases quand on tourne
+  const topMat = new THREE.MeshPhysicalMaterial({ map: topTexture, roughness: 0.55, metalness: 0.05, clearcoat: 0.45, clearcoatRoughness: 0.25 });
   const slabTop = new THREE.MeshStandardMaterial({ color: 0x0b1118, roughness: 0.8 });
   const bottomMat = new THREE.MeshStandardMaterial({ color: 0x0a0d10 });
   // ordre des faces d'une boîte : +x, -x, +y, -y, +z, -z
@@ -395,17 +427,45 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   scene.add(centerPlane);
 
   // Cadre doré tout autour
-  const frameMat = new THREE.MeshStandardMaterial({ color: 0xc89b3c, metalness: 0.85, roughness: 0.3 });
+  const frameMat = new THREE.MeshPhysicalMaterial({ color: 0xc89b3c, metalness: 0.95, roughness: 0.22, clearcoat: 0.5, clearcoatRoughness: 0.2 });
   const frameW = 0.11;
   const frameH = BASE + TOP + 0.06;
-  [[0, -S / 2 - frameW / 2, S + frameW * 2, frameW], [0, S / 2 + frameW / 2, S + frameW * 2, frameW],
-    [-S / 2 - frameW / 2, 0, frameW, S], [S / 2 + frameW / 2, 0, frameW, S]].forEach(([x, z, w, d]) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, frameH, d), frameMat);
-    m.position.set(x, -BASE + frameH / 2, z);
-    m.castShadow = true;
-    m.receiveShadow = true;
-    scene.add(m);
-  });
+  // Cadre doré biseauté (un seul anneau extrudé, arêtes arrondies) et plinthe sombre en dessous
+  {
+    const ring = (outer, inner) => {
+      const shape = new THREE.Shape();
+      shape.moveTo(-outer, -outer); shape.lineTo(outer, -outer); shape.lineTo(outer, outer); shape.lineTo(-outer, outer); shape.closePath();
+      const hole = new THREE.Path();
+      hole.moveTo(-inner, -inner); hole.lineTo(-inner, inner); hole.lineTo(inner, inner); hole.lineTo(inner, -inner); hole.closePath();
+      shape.holes.push(hole);
+      return shape;
+    };
+    const bevel = 0.045;
+    const frameGeo = new THREE.ExtrudeGeometry(ring(S / 2 + frameW - bevel, S / 2 + 0.004), {
+      depth: frameH - bevel * 2, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 4, curveSegments: 1,
+    });
+    frameGeo.rotateX(-Math.PI / 2);
+    const frame = new THREE.Mesh(frameGeo, frameMat);
+    frame.position.y = -BASE + bevel;
+    frame.castShadow = frame.receiveShadow = true;
+    scene.add(frame);
+    const plinthMat = new THREE.MeshPhysicalMaterial({ color: 0x141b24, roughness: 0.35, metalness: 0.5, clearcoat: 0.6 });
+    const pb = 0.03;
+    const plinthGeo = new THREE.ExtrudeGeometry(ring(S / 2 + frameW + 0.16 - pb, S / 2 - 0.5), {
+      depth: 0.12 - pb * 2, bevelEnabled: true, bevelThickness: pb, bevelSize: pb, bevelSegments: 3, curveSegments: 1,
+    });
+    plinthGeo.rotateX(-Math.PI / 2);
+    const plinth = new THREE.Mesh(plinthGeo, plinthMat);
+    plinth.position.y = -BASE - 0.12 + pb;
+    plinth.castShadow = plinth.receiveShadow = true;
+    scene.add(plinth);
+    // liseré doré en haut de la plinthe
+    const lipGeo = new THREE.ExtrudeGeometry(ring(S / 2 + frameW + 0.17, S / 2 + frameW + 0.12), { depth: 0.012, bevelEnabled: false });
+    lipGeo.rotateX(-Math.PI / 2);
+    const lip = new THREE.Mesh(lipGeo, frameMat);
+    lip.position.y = -BASE - 0.006;
+    scene.add(lip);
+  }
 
   // Ornements des quatre coins du cadre : piliers dorés surmontés d'une gemme
   const cornerGems = [];
@@ -444,121 +504,6 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
       scene.add(line, mold);
     }
     cornerGems.glowLine = glowLine;
-  }
-
-  // Socle de pierre runique sous le plateau, cerclé d'un anneau hextech lumineux
-  const pedestalRing = (() => {
-    const R = 8.4;
-    const cv = document.createElement('canvas');
-    cv.width = cv.height = 1024;
-    const g = cv.getContext('2d');
-    const grad = g.createRadialGradient(512, 512, 120, 512, 512, 512);
-    grad.addColorStop(0, '#1a222c');
-    grad.addColorStop(0.75, '#121920');
-    grad.addColorStop(1, '#0a0e13');
-    g.fillStyle = grad;
-    g.fillRect(0, 0, 1024, 1024);
-    // dalles : cercles et rayons gravés
-    g.strokeStyle = 'rgba(200,170,110,0.18)';
-    g.lineWidth = 3;
-    for (const r of [400, 470, 500]) { g.beginPath(); g.arc(512, 512, r, 0, Math.PI * 2); g.stroke(); }
-    for (let k = 0; k < 48; k++) {
-      const a = (k / 48) * Math.PI * 2;
-      g.beginPath();
-      g.moveTo(512 + Math.cos(a) * 400, 512 + Math.sin(a) * 400);
-      g.lineTo(512 + Math.cos(a) * 470, 512 + Math.sin(a) * 470);
-      g.stroke();
-    }
-    // runes dorées entre les deux cercles extérieurs
-    g.fillStyle = 'rgba(200,170,110,0.55)';
-    g.font = '600 22px Cinzel, Georgia, serif';
-    g.textAlign = 'center';
-    const glyphs = 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ';
-    for (let k = 0; k < 72; k++) {
-      const a = (k / 72) * Math.PI * 2;
-      g.save();
-      g.translate(512 + Math.cos(a) * 486, 512 + Math.sin(a) * 486);
-      g.rotate(a + Math.PI / 2);
-      g.fillText(glyphs[k % glyphs.length], 0, 8);
-      g.restore();
-    }
-    const tex = new THREE.CanvasTexture(cv);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 8;
-    const stone = new THREE.MeshStandardMaterial({ color: 0x2a323c, roughness: 0.85, metalness: 0.1 });
-    const top = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.75, metalness: 0.15 });
-    const H = 0.5;
-    const dais = new THREE.Mesh(new THREE.CylinderGeometry(R, R + 0.35, H, 96, 1), [stone, top, stone]);
-    dais.position.y = -BASE - H / 2 - 0.001;
-    dais.receiveShadow = true;
-    scene.add(dais);
-    const lip = new THREE.Mesh(new THREE.TorusGeometry(R, 0.05, 8, 128), frameMat);
-    lip.rotation.x = -Math.PI / 2;
-    lip.position.y = -BASE;
-    scene.add(lip);
-    const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(R * 0.79, 0.025, 8, 160),
-      new THREE.MeshStandardMaterial({ color: 0x5fe0f0, emissive: 0x0ac8b9, emissiveIntensity: 1.6 }),
-    );
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.y = -BASE + 0.01;
-    scene.add(ring);
-    return ring;
-  })();
-
-  // Le logo, peint en lettres d'or au-dessus de la Faille (lisible même sur la rivière)
-  {
-    const W = 5.2;
-    const H = 1.7;
-    const cv = document.createElement('canvas');
-    cv.width = 2048;
-    cv.height = Math.round((2048 * H) / W);
-    const g = cv.getContext('2d');
-    const u = 2048 / W / 100; // px plateau -> px de ce calque
-    const draw = () => {
-      g.clearRect(0, 0, cv.width, cv.height);
-      g.save();
-      g.translate(cv.width / 2, cv.height / 2);
-      g.textAlign = 'center';
-      g.shadowColor = 'rgba(0,0,0,0.85)';
-      g.shadowBlur = 30;
-      g.fillStyle = '#c8aa6e';
-      g.font = `600 ${Math.round(18 * u)}px Cinzel, Georgia, serif`;
-      g.fillText('L E A G U E   O F', 0, -40 * u);
-      const grad = g.createLinearGradient(0, -40 * u, 0, 22 * u);
-      grad.addColorStop(0, '#fff6de');
-      grad.addColorStop(0.6, '#c89b3c');
-      grad.addColorStop(1, '#785a28');
-      g.fillStyle = grad;
-      g.font = `800 ${Math.round(66 * u)}px Cinzel, Georgia, serif`;
-      g.fillText('MONOPOLY', 0, 22 * u);
-      g.shadowBlur = 0;
-      g.lineWidth = 2;
-      g.strokeStyle = 'rgba(60,40,10,0.9)';
-      g.strokeText('MONOPOLY', 0, 22 * u);
-      g.shadowBlur = 30;
-      g.fillStyle = '#7fe9f0';
-      g.font = `600 ${Math.round(13 * u)}px Barlow, Arial, sans-serif`;
-      g.fillText('F A I L L E   D E   L ’ I N V O C A T E U R', 0, 50 * u);
-      g.restore();
-      logoTex.needsUpdate = true;
-    };
-    const logoTex = new THREE.CanvasTexture(cv);
-    logoTex.colorSpace = THREE.SRGBColorSpace;
-    logoTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    draw();
-    if (document.fonts?.ready) document.fonts.ready.then(draw);
-    const logo = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshStandardMaterial({
-      map: logoTex, transparent: true, depthWrite: false, roughness: 0.35, metalness: 0.6,
-      emissive: 0xffffff, emissiveMap: logoTex, emissiveIntensity: 0.25,
-      polygonOffset: true, polygonOffsetFactor: -2,
-    }));
-    logo.rotation.x = -Math.PI / 2;
-    const holder = new THREE.Group();
-    holder.rotation.y = Math.PI / 4;
-    holder.position.y = 0.045;
-    holder.add(logo);
-    scene.add(holder);
   }
 
   // --- La Faille en relief (centre du plateau) -------------------------------
@@ -631,69 +576,6 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     ambient.push((t) => { tex.offset.y = -t * 0.25; });
   }
 
-  // Jungle : arbres et rochers, hors des voies, de la rivière, des paquets et des bases
-  {
-    const spots = [];
-    const blocked = (x, y) => {
-      if (x < 13 || y < 13 || x > 87 || y > 87) return true; // voies du haut, du bas, des côtés
-      if (Math.abs(y - x) < 15) return true; // rivière
-      if (Math.abs(y - (100 - x)) < 13) return true; // voie du milieu
-      if (Math.abs(y - (100 - x)) < 24 && Math.abs(x - 50) < 34) return true; // logo
-      if (Math.hypot(x - 19, y - 60) < 17 || Math.hypot(x - 81, y - 40) < 17) return true; // paquets
-      if (Math.hypot(x - 27, y - 22) < 10 || Math.hypot(x - 73, y - 78) < 10) return true; // fosses
-      return spots.some(([sx, sy]) => Math.hypot(sx - x, sy - y) < 4.2);
-    };
-    for (let k = 0; k < 900 && spots.length < 70; k++) {
-      const x = rand() * 100;
-      const y = rand() * 100;
-      if (!blocked(x, y)) spots.push([x, y]);
-    }
-    const trunkGeo = new THREE.CylinderGeometry(0.025, 0.035, 0.16, 6);
-    const leafGeo = new THREE.ConeGeometry(0.15, 0.32, 7);
-    const trunks = new THREE.InstancedMesh(trunkGeo, new THREE.MeshStandardMaterial({ color: 0x4a3420, roughness: 0.9 }), spots.length);
-    const leaves = new THREE.InstancedMesh(leafGeo, new THREE.MeshStandardMaterial({ color: 0x2f7a3a, roughness: 0.8 }), spots.length * 2);
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const sc = new THREE.Vector3();
-    spots.forEach(([x, y], k) => {
-      const pos = toRift(x, y, 0);
-      const size = 0.75 + rand() * 0.6;
-      sc.set(size, size, size);
-      m.compose(new THREE.Vector3(pos.x, 0.08 * size, pos.z), q, sc);
-      trunks.setMatrixAt(k, m);
-      m.compose(new THREE.Vector3(pos.x, 0.27 * size, pos.z), q, sc);
-      leaves.setMatrixAt(k * 2, m);
-      sc.multiplyScalar(0.72);
-      m.compose(new THREE.Vector3(pos.x, 0.42 * size, pos.z), q, sc);
-      leaves.setMatrixAt(k * 2 + 1, m);
-      leaves.setColorAt(k * 2, new THREE.Color().setHSL(0.33 + rand() * 0.06, 0.45, 0.24 + rand() * 0.08));
-      leaves.setColorAt(k * 2 + 1, new THREE.Color().setHSL(0.33 + rand() * 0.06, 0.45, 0.3 + rand() * 0.08));
-    });
-    trunks.castShadow = leaves.castShadow = true;
-    scene.add(trunks, leaves);
-
-    // Rochers : les murs de la jungle, le long de la rivière et des voies
-    const rockGeo = new THREE.DodecahedronGeometry(0.16, 0);
-    const rocks = new THREE.InstancedMesh(rockGeo, new THREE.MeshStandardMaterial({ color: 0x5a6258, roughness: 0.95, flatShading: true }), 26);
-    let n = 0;
-    for (let k = 0; k < 600 && n < 26; k++) {
-      const x = 14 + rand() * 72;
-      const y = 14 + rand() * 72;
-      const dRiver = Math.abs(y - x);
-      if (dRiver < 15 || dRiver > 22 || Math.abs(y - (100 - x)) < 13) continue;
-      if (Math.hypot(x - 19, y - 60) < 17 || Math.hypot(x - 81, y - 40) < 17) continue;
-      const pos = toRift(x, y, 0.04);
-      q.setFromEuler(new THREE.Euler(rand() * 3, rand() * 3, rand() * 3));
-      const s1 = 0.7 + rand() * 0.9;
-      sc.set(s1 * 1.4, s1 * 0.6, s1);
-      m.compose(pos, q, sc);
-      rocks.setMatrixAt(n++, m);
-    }
-    rocks.count = n;
-    rocks.castShadow = rocks.receiveShadow = true;
-    scene.add(rocks);
-  }
-
   // Fosses du Baron (violette) et du Dragon (orange), creusées dans le sol
   for (const [mx, my, color] of [[27, 22, 0x9b6cf0], [73, 78, 0xf08a3c]]) {
     const c = toRift(mx, my, 0);
@@ -749,6 +631,189 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
         scene.add(body, roof);
       }
     }
+  }
+
+  // --- Pièce centrale : le Nexus géant ----------------------------------------
+  // Un autel octogonal à trois étages, cerclé du logo gravé, au-dessus duquel
+  // flotte un grand cristal hextech entouré d'anneaux d'or et d'éclats.
+  {
+    const stone = new THREE.MeshPhysicalMaterial({ color: 0x8c8a86, roughness: 0.55, metalness: 0.15, clearcoat: 0.2 });
+    const darkStone = new THREE.MeshStandardMaterial({ color: 0x3c4450, roughness: 0.6, metalness: 0.3 });
+    const gold = frameMat;
+    const glowMat = new THREE.MeshStandardMaterial({ color: 0x9ff3f8, emissive: 0x0ac8b9, emissiveIntensity: 1.6 });
+    const altar = new THREE.Group();
+    // étages
+    let y = 0;
+    for (const [r, h, mat] of [[1.0, 0.12, darkStone], [0.8, 0.12, stone], [0.58, 0.1, stone]]) {
+      const tier = new THREE.Mesh(new THREE.CylinderGeometry(r, r + 0.05, h, 8), mat);
+      tier.rotation.y = Math.PI / 8;
+      tier.position.y = y + h / 2;
+      tier.castShadow = tier.receiveShadow = true;
+      const trim = new THREE.Mesh(new THREE.CylinderGeometry(r + 0.012, r + 0.012, 0.022, 8, 1, true), gold);
+      trim.rotation.y = Math.PI / 8;
+      trim.position.y = y + h - 0.012;
+      altar.add(tier, trim);
+      y += h;
+    }
+    // filet lumineux sur le premier étage
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(1.03, 1.03, 0.018, 8, 1, true), glowMat);
+    band.rotation.y = Math.PI / 8;
+    band.position.y = 0.05;
+    altar.add(band);
+    // quatre obélisques aux angles, pointe lumineuse
+    const pylons = [];
+    for (let k = 0; k < 4; k++) {
+      const a = Math.PI / 4 + (k * Math.PI) / 2;
+      const ob = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.06, 0.42, 4), stone);
+      ob.position.set(Math.cos(a) * 0.88, 0.12 + 0.21, Math.sin(a) * 0.88);
+      ob.rotation.y = Math.PI / 4;
+      ob.castShadow = true;
+      const cap = new THREE.Mesh(new THREE.OctahedronGeometry(0.05, 0), glowMat);
+      cap.position.set(ob.position.x, 0.6, ob.position.z);
+      cap.scale.y = 1.5;
+      altar.add(ob, cap);
+      pylons.push(cap);
+    }
+    // socle du cristal : couronne d'or à griffes
+    const cradle = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.34, 0.08, 8), gold);
+    cradle.position.y = y + 0.04;
+    cradle.castShadow = true;
+    altar.add(cradle);
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2;
+      const claw = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.2, 4), gold);
+      claw.position.set(Math.cos(a) * 0.27, y + 0.16, Math.sin(a) * 0.27);
+      claw.rotation.set(Math.sin(a) * -0.45, 0, Math.cos(a) * 0.45);
+      claw.castShadow = true;
+      altar.add(claw);
+    }
+    // colonne de lumière entre le socle et le cristal
+    const beam = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.1, 0.2, 0.6, 24, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0x5fe0f0, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
+    );
+    beam.position.y = y + 0.38;
+    altar.add(beam);
+    // le cristal (facettes nettes), légèrement translucide
+    const crystalMat = new THREE.MeshPhysicalMaterial({
+      color: 0x2fc8f0, emissive: 0x0a90c0, emissiveIntensity: 0.9, roughness: 0.08, metalness: 0.25,
+      clearcoat: 1, clearcoatRoughness: 0.05, flatShading: true,
+    });
+    const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.38, 1), crystalMat);
+    crystal.scale.set(0.85, 1.9, 0.85);
+    crystal.castShadow = true;
+    const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.12, 0), new THREE.MeshBasicMaterial({ color: 0xe8ffff }));
+    core.scale.y = 1.8;
+    const crystalY = y + 1.05;
+    crystal.position.y = core.position.y = crystalY;
+    altar.add(crystal, core);
+    // anneaux d'or qui tournent autour
+    const rings = [0.6, 0.74].map((r, k) => {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(r, 0.018, 8, 64), gold);
+      ring.position.y = crystalY;
+      ring.castShadow = true;
+      ring.userData.tilt = k ? -0.5 : 0.45;
+      altar.add(ring);
+      return ring;
+    });
+    // éclats en orbite
+    const shardGeo = new THREE.OctahedronGeometry(0.05, 0);
+    const shards = Array.from({ length: 7 }, (_, k) => {
+      const sh = new THREE.Mesh(shardGeo, crystalMat);
+      sh.scale.y = 1.8;
+      sh.userData = { r: 0.86 + (k % 2) * 0.1, phase: (k / 7) * Math.PI * 2, h: (k % 3) * 0.12 - 0.12 };
+      altar.add(sh);
+      return sh;
+    });
+    const light = new THREE.PointLight(0x5fe0f0, 6, 5, 1.6);
+    light.position.y = crystalY;
+    altar.add(light);
+    scene.add(altar);
+
+    // le logo gravé en cercle autour de l'autel, en lettres d'or
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 2048;
+    const g = cv.getContext('2d');
+    const R_IN = 1.08;
+    const R_OUT = 1.62;
+    const px = 1024 / R_OUT; // px par unité
+    const drawLogo = () => {
+      g.clearRect(0, 0, 2048, 2048);
+      g.save();
+      g.translate(1024, 1024);
+      // anneau sombre + filets dorés
+      g.beginPath();
+      g.arc(0, 0, R_OUT * px - 6, 0, Math.PI * 2);
+      g.arc(0, 0, R_IN * px + 4, 0, Math.PI * 2, true);
+      g.fillStyle = 'rgba(6,12,20,0.78)';
+      g.fill();
+      g.strokeStyle = '#c89b3c';
+      for (const [r, w] of [[R_OUT * px - 10, 8], [R_OUT * px - 34, 3], [R_IN * px + 12, 6], [R_IN * px + 32, 3]]) {
+        g.lineWidth = w;
+        g.beginPath();
+        g.arc(0, 0, r, 0, Math.PI * 2);
+        g.stroke();
+      }
+      // texte le long du cercle
+      const text = 'LEAGUE OF MONOPOLY  ✦  FAILLE DE L’INVOCATEUR  ✦  ';
+      const radius = ((R_IN + R_OUT) / 2) * px - 34;
+      g.font = '700 118px Cinzel, Georgia, serif';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      const grad = g.createLinearGradient(0, -radius, 0, radius);
+      grad.addColorStop(0, '#fff2cc');
+      grad.addColorStop(0.5, '#c89b3c');
+      grad.addColorStop(1, '#f0d890');
+      g.fillStyle = grad;
+      const total = g.measureText(text).width;
+      const scale = (2 * Math.PI * radius) / total; // on étire pour faire le tour complet
+      let angle = -Math.PI / 2;
+      for (const ch of text) {
+        const w = g.measureText(ch).width * scale;
+        g.save();
+        g.rotate(angle + w / 2 / radius);
+        g.translate(0, -radius);
+        g.fillText(ch, 0, 0);
+        g.restore();
+        angle += w / radius;
+      }
+      g.restore();
+      logoTex.needsUpdate = true;
+    };
+    const logoTex = new THREE.CanvasTexture(cv);
+    logoTex.colorSpace = THREE.SRGBColorSpace;
+    logoTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    drawLogo();
+    if (document.fonts?.ready) document.fonts.ready.then(drawLogo);
+    const ringGeo = new THREE.RingGeometry(R_IN, R_OUT, 96, 1);
+    const logo = new THREE.Mesh(ringGeo, new THREE.MeshStandardMaterial({
+      map: logoTex, transparent: true, depthWrite: false, roughness: 0.35, metalness: 0.5,
+      emissive: 0xffffff, emissiveMap: logoTex, emissiveIntensity: 0.2, polygonOffset: true, polygonOffsetFactor: -2,
+    }));
+    logo.rotation.x = -Math.PI / 2;
+    logo.rotation.z = Math.PI / 4; // le titre face à la Fontaine (coin de départ)
+    logo.position.y = 0.045;
+    logo.receiveShadow = true;
+    scene.add(logo);
+
+    ambient.push((t) => {
+      crystal.rotation.y = t * 0.45;
+      crystal.position.y = core.position.y = crystalY + Math.sin(t * 1.2) * 0.05;
+      crystalMat.emissiveIntensity = 0.75 + Math.sin(t * 2) * 0.2;
+      rings.forEach((r, k) => {
+        r.rotation.set(Math.PI / 2 + r.userData.tilt + Math.sin(t * 0.7 + k) * 0.15, t * (k ? -0.6 : 0.5), 0);
+        r.position.y = crystal.position.y;
+      });
+      shards.forEach((sh) => {
+        const { r, phase, h } = sh.userData;
+        const a = t * 0.5 + phase;
+        sh.position.set(Math.cos(a) * r, crystalY + h + Math.sin(t * 1.5 + phase) * 0.06, Math.sin(a) * r);
+        sh.rotation.y = t * 2 + phase;
+      });
+      pylons.forEach((c, k) => { c.position.y = 0.6 + Math.sin(t * 2 + k) * 0.025; });
+      light.intensity = 5 + Math.sin(t * 2) * 1.5;
+      beam.material.opacity = 0.18 + Math.sin(t * 3) * 0.06;
+    });
   }
 
   // --- Décors des coins -------------------------------------------------------
@@ -882,7 +947,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   {
     const LANES = [
       [[12, 86], [11.5, 60], [11.5, 11.5], [60, 11.5], [86, 12]], // haut
-      [[14, 90], [90, 14]], // milieu
+      [[18, 92], [32, 72], [27, 50], [33, 33], [50, 27], [72, 32], [92, 18]], // milieu : contourne l'autel
       [[16, 89], [40, 88.5], [88.5, 88.5], [88.5, 40], [89, 16]], // bas
     ].map((pts) => {
       const world = pts.map(([x, y]) => toRift(x, y, 0));
@@ -957,7 +1022,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
 
   // --- Poussière magique qui flotte autour du plateau --------------------------
   {
-    const N = 320;
+    const N = 200;
     const positions = new Float32Array(N * 3);
     const colors = new Float32Array(N * 3);
     const seeds = [];
@@ -982,7 +1047,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     g.fillStyle = grad;
     g.fillRect(0, 0, 64, 64);
     const dust = new THREE.Points(geo, new THREE.PointsMaterial({
-      size: 0.13, map: new THREE.CanvasTexture(cv), vertexColors: true, transparent: true,
+      size: 0.1, map: new THREE.CanvasTexture(cv), vertexColors: true, transparent: true,
       depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.85,
     }));
     dust.frustumCulled = false;
@@ -998,7 +1063,6 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   }
 
   ambient.push((t) => {
-    pedestalRing.material.emissiveIntensity = 1.2 + Math.sin(t * 1.5) * 0.5;
     cornerGems.glowLine.emissiveIntensity = 0.9 + Math.sin(t * 1.5) * 0.35;
     cornerGems.forEach((gem, k) => {
       gem.rotation.y = t * 0.9 + k;
@@ -1069,6 +1133,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     p.t0 = performance.now();
     p.dur = glide ? 600 : hop ? 190 : 260;
     p.hop = hop;
+    if (current && (hop || glide)) follow = { key, until: performance.now() + 1500 };
   }
 
   // --- Constructions --------------------------------------------------------
@@ -1302,7 +1367,15 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   }
 
   // --- Caméra ----------------------------------------------------------------
-  const cam = { yaw: 0, pitch: 40, dist: 13, tYaw: 0, tPitch: 40, tDist: 13, zoom: 1 };
+  // Ouverture : la caméra descend en tournant vers le plateau pendant ~3 s
+  const PITCH = 34;
+  const cam = { yaw: -70, pitch: 72, dist: 13, tYaw: 0, tPitch: PITCH, tDist: 13, zoom: 0.72, tZoom: 1 };
+  let introUntil = 0; // fixé à la première image
+  // Suivi : quand le pion du joueur actif avance, la caméra se rapproche de lui
+  const focus = new THREE.Vector3(0, 0, 0.45);
+  const HOME = new THREE.Vector3(0, 0, 0.45);
+  const tmpFocus = new THREE.Vector3();
+  let follow = null; // { key, until }
   function fitDistance() {
     // le canvas couvre tout l'écran, mais le plateau doit tenir entre les panneaux
     const { left, right, bottom = 0 } = sideSpace();
@@ -1320,6 +1393,8 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     const { clientWidth: w, clientHeight: h } = container;
     if (!w || !h) return;
     renderer.setSize(w, h, false);
+    composer.setPixelRatio(renderer.getPixelRatio());
+    composer.setSize(w, h);
     camera.aspect = w / h;
     // décale le centre de l'image au milieu de l'espace libre entre les panneaux
     const { left, right, bottom = 0 } = sideSpace();
@@ -1367,18 +1442,26 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     if (keys.has('+') || keys.has('=')) cam.tZoom = Math.min(2.4, (cam.tZoom ?? 1) * 1.012);
     if (keys.has('-')) cam.tZoom = Math.max(0.7, (cam.tZoom ?? 1) / 1.012);
     if (spinDir) cam.tYaw += spinDir * 1.8;
-    cam.yaw = lerp(cam.yaw, cam.tYaw, 0.12);
-    cam.pitch = lerp(cam.pitch, cam.tPitch, 0.12);
-    cam.zoom = lerp(cam.zoom, cam.tZoom ?? 1, 0.15);
+    const now = performance.now();
+    if (!introUntil) introUntil = now + 3200;
+    const k = now < introUntil ? 0.022 : 0.12;
+    cam.yaw = lerp(cam.yaw, cam.tYaw, k);
+    cam.pitch = lerp(cam.pitch, cam.tPitch, k);
+    // pendant le suivi : on vise entre le centre et le pion, un peu plus près
+    const followed = follow && now < follow.until && !drag ? pawns.get(follow.key) : null;
+    const want = followed ? tmpFocus.copy(followed.group.position).setY(0).lerp(HOME, 0.45) : HOME;
+    focus.lerp(want, followed ? 0.05 : 0.03);
+    const boost = 1 + (0.16 * (1 - focus.distanceTo(HOME) / 4.5));
+    cam.zoom = lerp(cam.zoom, (cam.tZoom ?? 1) * (followed ? boost : 1), now < introUntil ? 0.03 : 0.08);
     const d = (cam.base || 13) / cam.zoom;
     const yaw = (cam.yaw * Math.PI) / 180;
     const pitch = (cam.pitch * Math.PI) / 180;
     camera.position.set(
-      Math.sin(yaw) * Math.cos(pitch) * d,
-      Math.sin(pitch) * d,
-      Math.cos(yaw) * Math.cos(pitch) * d,
+      focus.x + Math.sin(yaw) * Math.cos(pitch) * d,
+      focus.y + Math.sin(pitch) * d,
+      focus.z - 0.45 + Math.cos(yaw) * Math.cos(pitch) * d,
     );
-    camera.lookAt(0, 0, 0.45);
+    camera.lookAt(focus);
   }
 
   // Glisser pour tourner / incliner, molette pour zoomer
@@ -1473,7 +1556,9 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   const tmp = new THREE.Vector3();
   // Qualité adaptative : si l'image saccade, on baisse la résolution puis les ombres
   const perf = { frames: 0, since: 0, level: 0 };
+  const FORCE_HQ = new URLSearchParams(location.search).get('hq') === '1'; // ?hq=1 : jamais de baisse
   function adaptQuality(now) {
+    if (FORCE_HQ) return;
     if (!perf.since) perf.since = now;
     perf.frames++;
     if (now - perf.since < 2500) return;
@@ -1484,6 +1569,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     perf.level++;
     if (perf.level === 1) {
       renderer.setPixelRatio(1);
+      bloomOn = false; // le halo coûte cher : on l'enlève en premier
       resize();
     } else {
       renderer.shadowMap.enabled = false;
@@ -1593,7 +1679,8 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
       if (k >= 1) diceAnim = null;
     }
 
-    renderer.render(scene, camera);
+    if (bloomOn) composer.render();
+    else renderer.render(scene, camera);
   }
   raf = requestAnimationFrame(frame);
 
@@ -1611,7 +1698,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     rotate(deg) { cam.tYaw += deg; hideHint(); },
     /** Rotation continue (bouton maintenu) : -1, 0 ou 1. */
     spin(dir) { spinDir = dir; if (dir) hideHint(); },
-    resetCamera() { cam.tYaw = Math.round(cam.tYaw / 360) * 360; cam.tPitch = 40; cam.tZoom = 1; },
+    resetCamera() { cam.tYaw = Math.round(cam.tYaw / 360) * 360; cam.tPitch = PITCH; cam.tZoom = 1; follow = null; },
     get dragging() { return dragged; },
     pause() { running = false; cancelAnimationFrame(raf); },
     resume() { if (!running) { running = true; raf = requestAnimationFrame(frame); } },
