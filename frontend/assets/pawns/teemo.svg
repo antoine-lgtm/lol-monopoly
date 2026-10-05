@@ -1,10 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 100"><defs><linearGradient id="gold" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7a5a20"/><stop offset=".35" stop-color="#f0d890"/><stop offset=".6" stop-color="#c89b3c"/><stop offset="1" stop-color="#5a4018"/></linearGradient>
-<radialGradient id="cap" cx="40%" cy="30%" r="80%"><stop offset="0" stop-color="#c58cff"/><stop offset=".6" stop-color="#7a3fc0"/><stop offset="1" stop-color="#3a1468"/></radialGradient>
-<linearGradient id="stem" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d9caa0"/><stop offset=".5" stop-color="#fff6de"/><stop offset="1" stop-color="#b8a070"/></linearGradient></defs>
-<ellipse cx="30" cy="94" rx="21" ry="5" fill="#2a1e0c"/><path d="M9 90 C9 86 51 86 51 90 L51 93 C51 97 9 97 9 93 Z" fill="url(#gold)"/>
-<path d="M22 56 C22 70 20 80 16 89 L44 89 C40 80 38 70 38 56 Z" fill="url(#stem)"/>
-<path d="M4 58 C4 32 16 16 30 16 C44 16 56 32 56 58 C46 62 14 62 4 58 Z" fill="url(#cap)"/>
-<g fill="#7dff6a" opacity=".9"><circle cx="20" cy="34" r="5"/><circle cx="38" cy="28" r="4"/><circle cx="44" cy="46" r="5.5"/><circle cx="14" cy="50" r="3.5"/><circle cx="29" cy="47" r="3"/></g>
-<path d="M10 40 C14 28 22 22 28 20" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" opacity=".45"/>
-<ellipse cx="25" cy="72" rx="2" ry="3" fill="#2a1e0c"/><ellipse cx="35" cy="72" rx="2" ry="3" fill="#2a1e0c"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 100">
+<defs>
+<linearGradient id="gold" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6a4a14"/><stop offset=".3" stop-color="#f6e2a0"/><stop offset=".55" stop-color="#c89b3c"/><stop offset="1" stop-color="#4a3410"/></linearGradient>
+<linearGradient id="goldTop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2c0"/><stop offset="1" stop-color="#b8892c"/></linearGradient>
+<radialGradient id="shine" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+
+<radialGradient id="cap" cx="38%" cy="28%" r="80%"><stop offset="0" stop-color="#d9a8ff"/><stop offset=".55" stop-color="#8445cc"/><stop offset="1" stop-color="#341060"/></radialGradient>
+<radialGradient id="spot" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#d8ff9a"/><stop offset="1" stop-color="#3cc23a"/></radialGradient>
+<linearGradient id="stem" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#c8b480"/><stop offset=".45" stop-color="#fff6de"/><stop offset="1" stop-color="#a08858"/></linearGradient>
+</defs>
+<ellipse cx="30" cy="95" rx="22" ry="4.5" fill="#000" opacity=".45"/>
+<path d="M8 89.5 C8 85.5 52 85.5 52 89.5 V93 C52 97.5 8 97.5 8 93 Z" fill="url(#gold)" stroke="#0b0f14" stroke-width="1.2"/>
+<ellipse cx="30" cy="89.5" rx="22" ry="3.6" fill="url(#goldTop)" stroke="#0b0f14" stroke-width="1"/>
+
+<path d="M22 55 C22 69 20 79 15 88.5 L45 88.5 C40 79 38 69 38 55 Z" fill="url(#stem)" stroke="#0b0f14" stroke-width="1.4"/>
+<path d="M24 62 C25 70 24 78 21 86" fill="none" stroke="#fff" stroke-width="1.5" opacity=".6" stroke-linecap="round"/>
+<ellipse cx="25" cy="71" rx="2.2" ry="3.2" fill="#0b0f14"/><ellipse cx="35" cy="71" rx="2.2" ry="3.2" fill="#0b0f14"/>
+<circle cx="25.6" cy="70" r=".8" fill="#fff"/><circle cx="35.6" cy="70" r=".8" fill="#fff"/>
+<path d="M2 57 C2 30 15 13 30 13 C45 13 58 30 58 57 C50 63 10 63 2 57 Z" fill="url(#cap)" stroke="#0b0f14" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M6 58 C14 61 46 61 54 58" fill="none" stroke="#2a0c4a" stroke-width="2" opacity=".6"/>
+<g stroke="#1c5a14" stroke-width=".9"><circle cx="19" cy="33" r="5.5" fill="url(#spot)"/><circle cx="38" cy="25" r="4.2" fill="url(#spot)"/><circle cx="45" cy="44" r="6" fill="url(#spot)"/><circle cx="12" cy="49" r="3.6" fill="url(#spot)"/><circle cx="29" cy="46" r="3.2" fill="url(#spot)"/></g>
+<path d="M9 40 C13 27 21 20 28 18" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" opacity=".5"/>
+<g fill="#b8ff7a" opacity=".85"><circle cx="8" cy="20" r="1.4"/><circle cx="52" cy="15" r="1.1"/><circle cx="55" cy="30" r=".9"/></g>
 </svg>

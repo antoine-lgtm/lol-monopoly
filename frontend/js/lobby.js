@@ -381,6 +381,8 @@
     minion: 'Sbire',
     zhonya: 'Sablier de Zhonya',
     blade: 'Lame de Doran',
+    tibbers: 'Tibbers',
+    egg: 'Œuf d’Anivia',
     classic: 'Pion classique',
   };
   const pawnImage = (pawn) => `assets/pawns/${pawn}.svg`;

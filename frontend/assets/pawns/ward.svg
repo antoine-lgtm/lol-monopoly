@@ -1,12 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 100"><defs><linearGradient id="gold" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7a5a20"/><stop offset=".35" stop-color="#f0d890"/><stop offset=".6" stop-color="#c89b3c"/><stop offset="1" stop-color="#5a4018"/></linearGradient>
-<radialGradient id="eye" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#fffbe0"/><stop offset=".45" stop-color="#ffe14a"/><stop offset="1" stop-color="#c88a10"/></radialGradient>
-<linearGradient id="wood" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3a5a2a"/><stop offset=".5" stop-color="#6fa04a"/><stop offset="1" stop-color="#2a4420"/></linearGradient>
-<radialGradient id="halo" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffe14a" stop-opacity=".6"/><stop offset="1" stop-color="#ffe14a" stop-opacity="0"/></radialGradient></defs>
-<ellipse cx="30" cy="94" rx="21" ry="5" fill="#2a1e0c"/><path d="M9 90 C9 86 51 86 51 90 L51 93 C51 97 9 97 9 93 Z" fill="url(#gold)"/>
-<circle cx="30" cy="26" r="24" fill="url(#halo)"/>
-<path d="M26 40 H34 L36 89 H24 Z" fill="url(#wood)"/>
-<path d="M18 46 C22 44 26 46 26 50 M42 46 C38 44 34 46 34 50" fill="none" stroke="#4a7a32" stroke-width="3" stroke-linecap="round"/>
-<path d="M30 6 C40 12 46 20 46 28 C46 36 38 42 30 42 C22 42 14 36 14 28 C14 20 20 12 30 6 Z" fill="#2a4420" stroke="url(#gold)" stroke-width="2.5"/>
-<ellipse cx="30" cy="28" rx="11" ry="9" fill="url(#eye)"/>
-<ellipse cx="30" cy="28" rx="3" ry="7" fill="#3a2404"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 100">
+<defs>
+<linearGradient id="gold" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6a4a14"/><stop offset=".3" stop-color="#f6e2a0"/><stop offset=".55" stop-color="#c89b3c"/><stop offset="1" stop-color="#4a3410"/></linearGradient>
+<linearGradient id="goldTop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2c0"/><stop offset="1" stop-color="#b8892c"/></linearGradient>
+<radialGradient id="shine" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+
+<radialGradient id="eye" cx="45%" cy="40%" r="60%"><stop offset="0" stop-color="#fffbe0"/><stop offset=".4" stop-color="#ffe14a"/><stop offset="1" stop-color="#b87a08"/></radialGradient>
+<linearGradient id="wood" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2a4420"/><stop offset=".45" stop-color="#7ab452"/><stop offset="1" stop-color="#1c3014"/></linearGradient>
+<radialGradient id="halo" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffe14a" stop-opacity=".55"/><stop offset="1" stop-color="#ffe14a" stop-opacity="0"/></radialGradient>
+<linearGradient id="shell" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3a6a2a"/><stop offset="1" stop-color="#14240e"/></linearGradient>
+</defs>
+<ellipse cx="30" cy="95" rx="22" ry="4.5" fill="#000" opacity=".45"/>
+<path d="M8 89.5 C8 85.5 52 85.5 52 89.5 V93 C52 97.5 8 97.5 8 93 Z" fill="url(#gold)" stroke="#0b0f14" stroke-width="1.2"/>
+<ellipse cx="30" cy="89.5" rx="22" ry="3.6" fill="url(#goldTop)" stroke="#0b0f14" stroke-width="1"/>
+
+<circle cx="30" cy="27" r="26" fill="url(#halo)"/>
+<path d="M26 40 H34 L36.5 88.5 H23.5 Z" fill="url(#wood)" stroke="#0b0f14" stroke-width="1.3"/>
+<path d="M25 52 C18 50 14 46 13 40 C17 43 21 44 26 44 M35 52 C42 50 46 46 47 40 C43 43 39 44 34 44" fill="#5a9a3a" stroke="#0b0f14" stroke-width="1.1"/>
+<path d="M24 68 C20 66 17 63 16 59 C19 61 22 61 25 61" fill="#5a9a3a" stroke="#0b0f14" stroke-width="1"/>
+<path d="M30 4 C41 10 47 19 47 28 C47 37 39 43 30 43 C21 43 13 37 13 28 C13 19 19 10 30 4 Z" fill="url(#shell)" stroke="url(#gold)" stroke-width="3"/>
+<path d="M30 4 C41 10 47 19 47 28 C47 37 39 43 30 43 C21 43 13 37 13 28 C13 19 19 10 30 4 Z" fill="none" stroke="#0b0f14" stroke-width=".8"/>
+<ellipse cx="30" cy="27" rx="12" ry="9.5" fill="url(#eye)" stroke="#0b0f14" stroke-width="1"/>
+<ellipse cx="30" cy="27" rx="3.2" ry="7.5" fill="#2a1802"/>
+<ellipse cx="26" cy="23.5" rx="3" ry="2" fill="#fff" opacity=".85"/>
+<g fill="#fff3a0"><circle cx="9" cy="12" r="1.3"/><circle cx="52" cy="18" r="1.1"/><circle cx="50" cy="6" r=".9"/></g>
 </svg>

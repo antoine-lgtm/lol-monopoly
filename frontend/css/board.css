@@ -1877,3 +1877,47 @@ body.reduce-motion .gv-flag .gv-standee__body {
   background: var(--pawn-img) center / contain no-repeat;
   filter: drop-shadow(0 0 4px color-mix(in srgb, var(--c) 80%, transparent));
 }
+
+/* =====================================================================
+   Pions plus vivants : plus grands, le pion actif flotte avec une aura,
+   petit écrasement en retombant à chaque saut
+   ===================================================================== */
+.gv-pawn:not([data-pawn='classic']) {
+  --w: 44px;
+  --h: 74px;
+}
+.gv-pawn:not([data-pawn='classic']) .gv-pawn__label {
+  transform: rotateZ(calc(var(--yaw, 0deg) * -1)) rotateX(-90deg) translate(-50%, -104px);
+}
+.gv-pawn .gv-standee__body {
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.8));
+}
+/* Pion du joueur actif : il flotte doucement, entouré d'une aura à sa couleur */
+.gv-pawn.is-current .gv-standee__body {
+  animation: pawn-idle 2.4s ease-in-out infinite;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--c) 85%, transparent)) drop-shadow(0 0 1px rgba(0, 0, 0, 0.8));
+}
+@keyframes pawn-idle {
+  50% { translate: 0 0 7px; }
+}
+/* Saut d'une case à l'autre : on monte, puis on s'écrase un peu à l'atterrissage */
+.gv-pawn.is-hopping .gv-standee__body {
+  animation: pawn-hop2 0.19s ease-out;
+}
+@keyframes pawn-hop2 {
+  /* le pion est debout le long de l'axe Z du plateau : c'est Z qu'on écrase */
+  0% { translate: 0 0 0; scale: 1 1 1; }
+  45% { translate: 0 0 20px; scale: 0.94 0.94 1.06; }
+  85% { translate: 0 0 0; scale: 1.08 1.08 0.9; }
+  100% { translate: 0 0 0; scale: 1 1 1; }
+}
+/* L'anneau sous le pion actif s'élargit en rythme */
+.gv-pawn .gv-standee__shadow {
+  left: calc(var(--w) * -0.7);
+  top: calc(var(--w) * -0.4);
+  width: calc(var(--w) * 1.4);
+  height: calc(var(--w) * 0.8);
+}
+body.reduce-motion .gv-pawn.is-current .gv-standee__body {
+  animation: none;
+}

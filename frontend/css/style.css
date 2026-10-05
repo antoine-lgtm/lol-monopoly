@@ -3720,3 +3720,11 @@ body.hide-chat-time .chat__time {
   opacity: 0.3;
   cursor: not-allowed;
 }
+.pawn-picker__list {
+  grid-template-columns: repeat(3, 66px);
+}
+/* Liste de pions ou de rôles ouverte : les colonnes passent au-dessus de la barre FIND MATCH */
+.banners:has(.pawn-picker__list:not([hidden])),
+.banners:has(.role-picker__list:not([hidden])) {
+  z-index: 4;
+}

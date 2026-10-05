@@ -25,7 +25,7 @@ const MAX_PLAYERS = 5;
 const MIN_PLAYERS_TO_START = Number(process.env.MIN_PLAYERS) || 2;
 const ROLES = ['TOP', 'JGL', 'MID', 'ADC', 'SUPP'];
 // Pions du plateau (images dans frontend/assets/pawns/) : un pion différent par joueur
-const PAWNS = ['poro', 'teemo', 'ward', 'minion', 'zhonya', 'blade', 'classic'];
+const PAWNS = ['poro', 'teemo', 'ward', 'minion', 'zhonya', 'blade', 'tibbers', 'egg', 'classic'];
 const ICON_COUNT = 30; // icônes d'invocateur disponibles côté client (0..29)
 const CHAT_MAX_LENGTH = 300;
 const CHAT_HISTORY_SIZE = 50;

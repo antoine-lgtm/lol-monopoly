@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 100">
+<defs>
+<linearGradient id="gold" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6a4a14"/><stop offset=".3" stop-color="#f6e2a0"/><stop offset=".55" stop-color="#c89b3c"/><stop offset="1" stop-color="#4a3410"/></linearGradient>
+<linearGradient id="goldTop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2c0"/><stop offset="1" stop-color="#b8892c"/></linearGradient>
+<radialGradient id="shine" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+
+<radialGradient id="ice" cx="38%" cy="30%" r="75%"><stop offset="0" stop-color="#f4fcff"/><stop offset=".5" stop-color="#9ad8f4"/><stop offset="1" stop-color="#2a6a9a"/></radialGradient>
+<linearGradient id="crystal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e8faff"/><stop offset="1" stop-color="#4aa0d8"/></linearGradient>
+</defs>
+<ellipse cx="30" cy="95" rx="22" ry="4.5" fill="#000" opacity=".45"/>
+<path d="M8 89.5 C8 85.5 52 85.5 52 89.5 V93 C52 97.5 8 97.5 8 93 Z" fill="url(#gold)" stroke="#0b0f14" stroke-width="1.2"/>
+<ellipse cx="30" cy="89.5" rx="22" ry="3.6" fill="url(#goldTop)" stroke="#0b0f14" stroke-width="1"/>
+
+<path d="M30 14 C44 14 52 38 52 58 C52 76 42 88 30 88 C18 88 8 76 8 58 C8 38 16 14 30 14 Z" fill="url(#ice)" stroke="#0b0f14" stroke-width="1.5"/>
+<path d="M14 50 L21 46 L27 52 L34 45 L41 51 L47 47" fill="none" stroke="#e8faff" stroke-width="1.6" stroke-linejoin="round" opacity=".9"/>
+<path d="M12 66 L19 63 L25 68 L32 62 L39 67 L48 63" fill="none" stroke="#2a6a9a" stroke-width="1.3" stroke-linejoin="round" opacity=".7"/>
+<path d="M22 22 L18 8 L26 18 Z M30 16 L31 2 L34 16 Z M38 20 L44 7 L41 21 Z" fill="url(#crystal)" stroke="#0b0f14" stroke-width="1"/>
+<path d="M8 60 L1 54 L9 52 Z M52 58 L59 51 L52 50 Z" fill="url(#crystal)" stroke="#0b0f14" stroke-width="1"/>
+<ellipse cx="22" cy="34" rx="5" ry="9" fill="url(#shine)" opacity=".75" transform="rotate(-18 22 34)"/>
+<g fill="#ffffff"><circle cx="10" cy="22" r="1.2"/><circle cx="50" cy="28" r="1"/><circle cx="54" cy="12" r="1.3"/></g>
+</svg>
