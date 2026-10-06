@@ -336,6 +336,7 @@
     if (action === 'settings') openSettings();
     if (action === 'add-friend') openAddFriend();
     if (action === 'rules') App.openRules?.();
+    if (action === 'history') App.openHistory?.();
   });
 
   // ---------------------------------------------------------------------------

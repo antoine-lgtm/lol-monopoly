@@ -135,6 +135,15 @@ test.describe('dans le navigateur', { skip }, () => {
     assert.equal(title, 'VICTOIRE');
     const rows = await a.$$eval('.gv-over__table tbody tr', (trs) => trs.length);
     assert.equal(rows, 2);
+    // revoir la partie : le lecteur de replay s'ouvre, puis on le quitte
+    await a.click('.gv-over__buttons .gv-btn:not(.gv-btn--primary)');
+    await a.waitForSelector('#gv-replay:not([hidden])');
+    await a.waitForFunction(() => /Tour \d+ · \d+\/\d+/.test(document.querySelector('#gv-replay-label').textContent));
+    await a.click('[data-replay="quit"]');
+    await a.waitForSelector('#board-view[hidden]', { state: 'attached' });
+    // et elle apparaît dans l'historique
+    await a.click('.square-btn--stats');
+    await a.waitForSelector('#history-list .history-item');
     noErrors(a, b);
   });
 

@@ -347,8 +347,8 @@
               <button class="round-btn round-btn--icon round-btn--rules" type="button" data-action="rules" title="Règles">
                 <span class="visually-hidden">Règles</span>
               </button>
-              <button class="square-btn square-btn--stats" type="button" title="Classement" disabled>
-                <span class="visually-hidden">Classement</span>
+              <button class="square-btn square-btn--stats" type="button" title="Historique : revoir mes 10 dernières parties" data-action="history">
+                <span class="visually-hidden">Historique des parties</span>
               </button>
               <!-- Salon ouvert : n'importe qui avec le code peut entrer -->
               <label class="party-toggle" title="Salon ouvert">
@@ -565,6 +565,19 @@
     </div>
   </dialog>
 
+  <!-- Historique : les 10 dernières parties, à revoir -->
+  <dialog class="modal modal--wide hextech-frame" id="modal-history" aria-labelledby="modal-history-title">
+    <div class="modal__body">
+      <h2 class="modal__title" id="modal-history-title">Historique des parties</h2>
+      <p class="rules__who">Tes 10 dernières parties : revois-les coup par coup.</p>
+      <ul class="history-list" id="history-list"></ul>
+      <p class="social__empty" id="history-empty" hidden>Aucune partie terminée pour l’instant.</p>
+      <div class="modal__actions">
+        <button class="btn btn--secondary" type="button" data-close-modal>Fermer</button>
+      </div>
+    </div>
+  </dialog>
+
   <!-- Skin (icône d'invocateur + pion) -->
   <dialog class="modal modal--wide hextech-frame" id="modal-skin" aria-labelledby="modal-skin-title">
     <form method="dialog" class="modal__body" id="skin-form">
@@ -618,6 +631,8 @@
         <label class="field field--checkbox"><input type="checkbox" name="herald"><span>Héraut de la Faille (tour 8)</span></label>
         <label class="field field--checkbox"><input type="checkbox" name="passives"><span>Pouvoir de chaque pion</span></label>
         <label class="field field--checkbox"><input type="checkbox" name="events"><span>Événements de la Faille (tous les 4 tours)</span></label>
+        <label class="field field--checkbox"><input type="checkbox" name="teams"><span>Équipes 2 contre 2 (4 joueurs, bots compris)</span></label>
+        <label class="field field--checkbox"><input type="checkbox" name="objective"><span>Victoire à l'objectif : 3 groupes complets détruisent le Nexus</span></label>
         <label class="field field--checkbox"><input type="checkbox" name="fountainDouble"><span>Double gain en s'arrêtant sur la Fontaine</span></label>
         <label class="field field--inline"><span class="field__label">Chrono par tour</span>
           <select class="field__select" name="turnTimer"><option value="0">Pas de chrono</option><option value="30">30 secondes</option><option value="60">60 secondes</option><option value="90">90 secondes</option></select>
@@ -765,9 +780,11 @@
         <button class="gv-side__tab is-active" type="button" data-gv-tab="log">Journal</button>
         <button class="gv-side__tab" type="button" data-gv-tab="mine">Mes cases</button>
         <button class="gv-side__tab" type="button" data-gv-tab="chat">Chat</button>
+        <button class="gv-side__tab" type="button" data-gv-tab="stats">Stats</button>
       </div>
       <ol class="gv-log" id="gv-log" data-gv-panel="log"></ol>
       <div class="gv-mine" id="gv-mine" data-gv-panel="mine" hidden></div>
+      <div class="gv-stats" id="gv-stats" data-gv-panel="stats" hidden></div>
       <div class="gv-chat" data-gv-panel="chat" hidden>
         <ol class="gv-chat__list" id="gv-chat-list"></ol>
         <form class="gv-chat__form" id="gv-chat-form" autocomplete="off">
@@ -779,6 +796,19 @@
     <div class="gv-inspect" id="gv-inspect" hidden></div>
     <div class="gv-cardfx" id="gv-cardfx" hidden></div>
     <div class="gv-over" id="gv-over" hidden></div>
+    <!-- Lecteur de replay (partie terminée revue coup par coup) -->
+    <div class="gv-replay" id="gv-replay" hidden>
+      <span class="gv-replay__badge">Replay</span>
+      <button class="gv-replay__btn" type="button" data-replay="toggle" title="Lecture / pause">⏸</button>
+      <button class="gv-replay__btn" type="button" data-replay="next" title="Aller au tour suivant">⏭ Tour</button>
+      <span class="gv-replay__speeds" role="group" aria-label="Vitesse">
+        <button class="gv-replay__btn is-active" type="button" data-speed="1">×1</button>
+        <button class="gv-replay__btn" type="button" data-speed="2">×2</button>
+        <button class="gv-replay__btn" type="button" data-speed="4">×4</button>
+      </span>
+      <span class="gv-replay__progress"><span class="gv-replay__bar"><span id="gv-replay-fill"></span></span><span id="gv-replay-label"></span></span>
+      <button class="gv-replay__btn gv-replay__btn--quit" type="button" data-replay="quit" title="Quitter le replay">✕</button>
+    </div>
   </section>
 
   <!-- =====================================================================
@@ -814,6 +844,11 @@
             <span class="pawn-picker__label">Pion</span>
           </button>
           <ul class="pawn-picker__list" role="listbox" hidden></ul>
+        </div>
+        <!-- Équipe (mode 2 contre 2) -->
+        <div class="team-picker" hidden>
+          <button class="team-picker__btn" type="button" data-team="blue">Bleue</button>
+          <button class="team-picker__btn" type="button" data-team="red">Rouge</button>
         </div>
         <!-- Skins du pion (débloqués en jouant) -->
         <div class="skin-picker" hidden></div>

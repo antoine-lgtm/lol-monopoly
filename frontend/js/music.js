@@ -5,11 +5,15 @@
  * basse ronde, notes de harpe qui s'égrènent au hasard dans l'accord, et un tambour grave
  * discret à chaque mesure, le tout dans une réverbération de grande salle.
  *
- * window.LolMusic.start() / stop() / setVolume(0..1) / setEnabled(bool) / enabled
+ * Trois intensités (setIntensity) : 0 calme ; 1 tension (Baron, Ancien, événement) : plus rapide,
+ * tambours, harmonie plus sombre ; 2 climax (fin de partie, joueur en danger) : basse martelée,
+ * caisse claire et accents de cuivres.
+ *
+ * window.LolMusic.start() / stop() / setVolume(0..1) / setEnabled(bool) / setIntensity(0..2) / enabled
  */
 (() => {
   const STORAGE = 'lolm.music';
-  const BAR = 4.2; // durée d'une mesure (s)
+  const BARS = [4.2, 3.5, 2.9]; // durée d'une mesure (s) selon l'intensité
   const BARS_PER_CHORD = 2;
   // accords : fondamentale (MIDI) et notes de l'accord
   const CHORDS = [
@@ -18,7 +22,15 @@
     { root: 53, notes: [60, 65, 69, 72] }, // Fa
     { root: 48, notes: [60, 64, 67, 72] }, // Do
   ];
+  // tension : Rém – Do – Si♭ – La (dominante, plus inquiétante)
+  const TENSE = [
+    { root: 50, notes: [62, 65, 69, 74] },
+    { root: 48, notes: [60, 64, 67, 72] },
+    { root: 46, notes: [58, 62, 65, 70] },
+    { root: 45, notes: [57, 61, 64, 69] },
+  ];
   const hz = (midi) => 440 * 2 ** ((midi - 69) / 12);
+  let intensity = 0;
 
   let ctx = null;
   let master = null;
@@ -65,7 +77,7 @@
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
     filter.frequency.setValueAtTime(500, t);
-    filter.frequency.linearRampToValueAtTime(1100, t + dur * 0.5);
+    filter.frequency.linearRampToValueAtTime(1100 + intensity * 500, t + dur * 0.5);
     filter.frequency.linearRampToValueAtTime(600, t + dur);
     const env = ctx.createGain();
     env.gain.setValueAtTime(0, t);
@@ -130,12 +142,86 @@
     osc.stop(t + 1);
   }
 
+  /** Caisse claire : bruit filtré, sec. */
+  function snare(t, gain = 0.07) {
+    const len = Math.floor(ctx.sampleRate * 0.25);
+    const buffer = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 3;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.value = 1200;
+    const env = ctx.createGain();
+    env.gain.value = gain;
+    src.connect(filter).connect(env);
+    out(env, 0.7);
+    src.start(t);
+  }
+
+  /** Accent de cuivres : accord court et brillant. */
+  function brass(chord, t, gain = 0.028) {
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(600, t);
+    filter.frequency.linearRampToValueAtTime(2600, t + 0.12);
+    filter.frequency.exponentialRampToValueAtTime(700, t + 0.7);
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(gain, t + 0.05);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+    filter.connect(env);
+    out(env, 0.6);
+    for (const n of chord.notes.slice(0, 3)) {
+      const osc = ctx.createOscillator();
+      osc.type = 'sawtooth';
+      osc.frequency.value = hz(n);
+      osc.connect(filter);
+      osc.start(t);
+      osc.stop(t + 1);
+    }
+  }
+
+  /** Basse martelée (croches) pour le climax. */
+  function ostinato(chord, t, bar) {
+    for (let k = 0; k < 8; k++) {
+      const osc = ctx.createOscillator();
+      osc.type = 'square';
+      osc.frequency.value = hz(chord.root - 12 + (k % 4 === 3 ? 7 : 0));
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 420;
+      const env = ctx.createGain();
+      const s0 = t + (k * bar) / 8;
+      env.gain.setValueAtTime(0, s0);
+      env.gain.linearRampToValueAtTime(0.045, s0 + 0.01);
+      env.gain.exponentialRampToValueAtTime(0.0001, s0 + bar / 8);
+      osc.connect(filter).connect(env);
+      out(env, 0.85);
+      osc.start(s0);
+      osc.stop(s0 + bar / 8 + 0.05);
+    }
+  }
+
   /** Programme une mesure : nappe et basse au début de chaque accord, harpe et tambour. */
   function scheduleBar(t) {
-    const chord = CHORDS[Math.floor(barIndex / BARS_PER_CHORD) % CHORDS.length];
+    const BAR = BARS[intensity];
+    const chords = intensity ? TENSE : CHORDS;
+    const chord = chords[Math.floor(barIndex / BARS_PER_CHORD) % chords.length];
     if (barIndex % BARS_PER_CHORD === 0) {
       pad(chord, t, BAR * BARS_PER_CHORD);
-      bass(chord, t, BAR * BARS_PER_CHORD);
+      if (intensity < 2) bass(chord, t, BAR * BARS_PER_CHORD);
+    }
+    if (intensity >= 1) {
+      // tension : tambours sur chaque temps, plus forts sur les temps forts
+      for (let k = 1; k < 4; k++) drum(t + (k * BAR) / 4, k === 2 ? 0.14 : 0.09);
+    }
+    if (intensity >= 2) {
+      ostinato(chord, t, BAR);
+      snare(t + BAR / 4);
+      snare(t + (3 * BAR) / 4);
+      if (barIndex % 2 === 0) brass(chord, t);
     }
     // harpe : quelques notes de l'accord, plus haut, en arpège un peu libre
     const steps = 8;
@@ -152,8 +238,9 @@
 
   function tick() {
     while (nextBar < ctx.currentTime + 1.5) {
+      const bar = BARS[intensity];
       scheduleBar(nextBar);
-      nextBar += BAR;
+      nextBar += bar;
     }
   }
 
@@ -193,6 +280,11 @@
       if (volume <= 0) this.stop();
       else fadeTo(volume * 0.6, 0.4);
     },
+    /** 0 calme, 1 tension, 2 climax (prend effet à la mesure suivante). */
+    setIntensity(level) {
+      intensity = Math.max(0, Math.min(2, Math.round(Number(level) || 0)));
+    },
+    get intensity() { return intensity; },
     setEnabled(on) {
       enabled = Boolean(on);
       try { localStorage.setItem(STORAGE, enabled ? 'on' : 'off'); } catch { /* rien */ }

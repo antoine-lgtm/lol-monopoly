@@ -116,6 +116,7 @@
 
 
     renderPawnPicker(el, player, lobby, me);
+    renderTeam(el, slot, lobby, me);
     renderSkins(el, player, lobby, me);
     renderSpells(el, player, lobby, me);
     const quest = $('.banner__quest', el);
@@ -211,6 +212,9 @@
     } else if (count < lobby.minPlayers) {
       button.disabled = true;
       hint.textContent = `Il faut au moins ${lobby.minPlayers} invocateurs pour lancer.`;
+    } else if (lobby.rules?.teams && count !== 4) {
+      button.disabled = true;
+      hint.textContent = 'Le mode 2 contre 2 se joue à 4 : invite un ami ou ajoute un bot.';
     } else {
       button.disabled = false;
       hint.textContent = `${count} invocateurs prêts.`;
@@ -476,6 +480,80 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Équipes (mode 2 contre 2) : chacun choisit Bleue ou Rouge ; le chef place les bots
+  // ---------------------------------------------------------------------------
+
+  const TEAM_LABELS = { blue: 'Équipe Bleue', red: 'Équipe Rouge' };
+  function renderTeam(el, slot, lobby, me) {
+    const box = $('.team-picker', el);
+    const on = Boolean(lobby.rules?.teams);
+    box.hidden = !on;
+    el.dataset.team = on ? slot.player.team || '' : '';
+    if (!on) return;
+    const editable = lobby.status === 'lobby' && (me || (slot.player.bot && isOwner()));
+    $$('.team-picker__btn', box).forEach((b) => {
+      b.dataset.slot = slot.index;
+      b.setAttribute('aria-pressed', String(slot.player.team === b.dataset.team));
+      b.disabled = !editable && slot.player.team !== b.dataset.team;
+      b.classList.toggle('is-locked', !editable);
+      b.title = TEAM_LABELS[b.dataset.team];
+    });
+  }
+  banners.addEventListener('click', (event) => {
+    const b = event.target.closest('.team-picker__btn');
+    if (!b || b.disabled || b.classList.contains('is-locked')) return;
+    socket.emit('lobby:setTeam', { team: b.dataset.team, slot: Number(b.dataset.slot) }, (res) => {
+      if (!res?.ok) App.toast(res?.error || 'Changement impossible.', 'error');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Historique : les 10 dernières parties, à revoir
+  // ---------------------------------------------------------------------------
+
+  App.openHistory = () => {
+    const list = $('#history-list');
+    list.replaceChildren();
+    $('#history-empty').hidden = true;
+    App.openModal('modal-history');
+    socket.emit('replay:list', {}, (res) => {
+      if (!res?.ok) return App.toast(res?.error || 'Historique indisponible.', 'error');
+      $('#history-empty').hidden = res.replays.length > 0;
+      list.replaceChildren(...res.replays.map((r) => {
+        const li = document.createElement('li');
+        li.className = 'history-item';
+        const info = document.createElement('div');
+        info.className = 'history-item__info';
+        const title = document.createElement('b');
+        title.textContent = r.winnerTeam ? `Victoire de l’équipe ${r.winnerTeam}` : r.winner ? `Victoire de ${r.winner}` : 'Partie terminée';
+        const who = document.createElement('span');
+        who.className = 'history-item__players';
+        for (const p of r.players) {
+          const chip = document.createElement('span');
+          chip.className = 'history-item__chip';
+          chip.style.setProperty('--c', p.color);
+          chip.textContent = `${p.place ? `${p.place}. ` : ''}${p.name}`;
+          who.append(chip);
+        }
+        const meta = document.createElement('small');
+        const date = new Date(r.date);
+        meta.textContent = `${date.toLocaleDateString('fr-FR')} à ${date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · ${r.rounds} tours · ${r.actions} actions`;
+        info.append(title, who, meta);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn--primary btn--sm';
+        btn.textContent = 'Revoir';
+        btn.addEventListener('click', () => {
+          App.closeModal('modal-history');
+          App.playReplay?.(r.id);
+        });
+        li.append(info, btn);
+        return li;
+      }));
+    });
+  };
+
+  // ---------------------------------------------------------------------------
   // Skins du pion : débloqués en jouant (parties jouées, victoires)
   // ---------------------------------------------------------------------------
 
@@ -634,6 +712,10 @@
       ...section('Quêtes de rôle', Object.entries(lobby.quests || {}).map(([role, q]) => [`${ROLE_LABELS[role]} — ${q.name}`, `${q.text}. Récompense : ${q.reward}.`])),
       ...section('Objets (3 au maximum, achetés à la Fontaine ou à la Boutique)', Object.values(lobby.items || {}).map((it) => [`${it.name} (${it.price} PO${it.tier === 'late' ? ', fin de partie' : ''})`, it.text])),
       ...(lobby.rules?.passives !== false ? section('Pouvoirs des pions', Object.entries(lobby.passives || {}).map(([id, pv]) => [`${PAWN_LABELS[id]} — ${pv.name}`, pv.text])) : []),
+      ...section('Modes', [
+        ['Équipes 2 contre 2', 'À 4 joueurs : pas de loyer entre partenaires, un groupe se complète avec les cases du partenaire pour construire, dons de PO possibles. L’équipe gagne quand les deux adversaires sont éliminés.'],
+        ['Victoire à l’objectif', 'Le premier (ou la première équipe) à tenir 3 groupes complets sans hypothèque détruit le Nexus et gagne aussitôt.'],
+      ]),
       ...(lobby.rules?.events !== false ? section('Événements de la Faille (un tous les 4 tours)', Object.values(lobby.events || {}).map((ev) => [ev.name, ev.text])) : []),
       ...section('Grands objectifs', [
         ['Âme du Dragon', 'Posséder les 4 Dragons : +30 % sur tous tes loyers pendant 5 tours.'],
@@ -658,6 +740,8 @@
       herald: el.herald.checked,
       passives: el.passives.checked,
       events: el.events.checked,
+      teams: el.teams.checked,
+      objective: el.objective.checked,
       fountainDouble: el.fountainDouble.checked,
       startGold: Number(el.startGold.value),
       maxRounds: Number(el.maxRounds.value),

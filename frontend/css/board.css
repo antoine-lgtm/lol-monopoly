@@ -2700,3 +2700,110 @@ body.reduce-motion .gv-pawn.is-current .gv-standee__body {
   .gv-quote { bottom: 190px; }
   .gv-eventfx { top: 12%; }
 }
+
+/* ---------- Équipes (2 contre 2), objectif ---------- */
+.gv-tag--team-blue { background: rgba(63, 167, 255, 0.18); color: #9fd0ff; border-color: rgba(63, 167, 255, 0.55); }
+.gv-tag--team-red { background: rgba(232, 64, 87, 0.18); color: #ffa3ad; border-color: rgba(232, 64, 87, 0.55); }
+.gv-tag--objective { background: rgba(240, 200, 96, 0.14); color: #f0d890; border-color: rgba(240, 200, 96, 0.5); }
+.gv-player[data-team="blue"] { box-shadow: inset 3px 0 0 #3fa7ff; }
+.gv-player[data-team="red"] { box-shadow: inset 3px 0 0 #e84057; }
+.gv-player__give {
+  margin-top: 6px;
+  padding: 3px 10px;
+  border: 1px solid rgba(200, 170, 110, 0.5);
+  border-radius: 3px;
+  background: rgba(1, 10, 19, 0.6);
+  color: #c8aa6e;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.gv-player__give:hover { border-color: #c8aa6e; color: #f0e6d2; }
+
+/* ---------- Statistiques : courbe de richesse ---------- */
+.gv-stats { padding: 12px 14px; overflow-y: auto; }
+.gv-stats[hidden] { display: none; }
+.gv-stats__title { margin: 0 0 8px; font-size: 12px; color: #a09b8c; }
+.gv-stats__now { display: grid; gap: 4px; margin-top: 10px; }
+.gv-stats__row { display: grid; grid-template-columns: 10px 1fr auto; align-items: center; gap: 8px; font-size: 13px; color: #f0e6d2; }
+.gv-stats__row i, .gv-chart__tiprow i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.gv-stats__row span { font-variant-numeric: tabular-nums; color: #c8aa6e; }
+
+.gv-chart { position: relative; margin: 0; }
+.gv-chart__svg { display: block; width: 100%; height: auto; overflow: visible; }
+.gv-chart__grid { stroke: rgba(240, 230, 210, 0.08); stroke-width: 1; }
+.gv-chart__axis { stroke: rgba(240, 230, 210, 0.3); stroke-width: 1; }
+.gv-chart__tick { fill: #7e7b72; font-size: 9px; font-variant-numeric: tabular-nums; }
+.gv-chart__line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.gv-chart__line.is-out { opacity: 0.45; }
+.gv-chart__dot { stroke: #0a1420; stroke-width: 2; }
+.gv-chart__label { fill: #d8d0bc; font-size: 10px; font-weight: 600; }
+.gv-chart__cross { stroke: rgba(240, 230, 210, 0.45); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
+.gv-chart__tip {
+  position: absolute;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  gap: 2px;
+  min-width: 150px;
+  padding: 6px 9px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: #f0e6d2;
+  background: rgba(1, 10, 19, 0.95);
+  border: 1px solid #785a28;
+  border-radius: 4px;
+  pointer-events: none;
+}
+.gv-chart__tip[hidden] { display: none; }
+.gv-chart__tiprow { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.gv-chart__legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 11px; color: #c8c0aa; }
+.gv-chart__key { display: inline-flex; align-items: center; gap: 5px; }
+.gv-over__chart { margin-top: 14px; padding: 10px 12px; background: rgba(1, 10, 19, 0.45); border: 1px solid rgba(200, 170, 110, 0.2); }
+.gv-over__buttons { display: flex; justify-content: center; gap: 10px; margin-top: 16px; }
+
+/* ---------- Lecteur de replay ---------- */
+.gv-replay {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  transform: translateX(-50%);
+  background: rgba(1, 10, 19, 0.94);
+  border: 1px solid #c8aa6e;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.7);
+}
+.gv-replay[hidden] { display: none; }
+.gv-replay__badge { padding: 2px 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #010a13; background: #e84057; border-radius: 3px; }
+.gv-replay__btn {
+  min-width: 34px;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid rgba(200, 170, 110, 0.45);
+  border-radius: 3px;
+  background: #0a1620;
+  color: #f0e6d2;
+  font-weight: 700;
+  cursor: pointer;
+}
+.gv-replay__btn:hover, .gv-replay__btn.is-active { border-color: #c8aa6e; background: rgba(200, 170, 110, 0.18); }
+.gv-replay__btn--quit { color: #ff8a98; }
+.gv-replay__speeds { display: inline-flex; gap: 4px; }
+.gv-replay__progress { display: grid; gap: 3px; min-width: 150px; font-size: 11px; color: #a09b8c; font-variant-numeric: tabular-nums; }
+.gv-replay__bar { height: 4px; background: rgba(240, 230, 210, 0.12); border-radius: 2px; overflow: hidden; }
+.gv-replay__bar span { display: block; height: 100%; width: 0; background: #c8aa6e; transition: width 0.2s; }
+/* en replay, pas d'actions de jeu */
+.board-view.is-replay .gv-actions,
+.board-view.is-replay #gv-forfeit,
+.board-view.is-replay #gv-emote,
+.board-view.is-replay #gv-ping,
+.board-view.is-replay .gv-timer,
+.board-view.is-replay #gv-timer { display: none !important; }
+
+@media (max-width: 760px) {
+  .gv-replay { bottom: 70px; flex-wrap: wrap; justify-content: center; width: calc(100% - 16px); }
+}

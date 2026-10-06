@@ -36,7 +36,8 @@
   let b3 = null; // plateau WebGL (board3d.js) ; null = plateau CSS de secours
 
   const fmt = (n) => new Intl.NumberFormat('fr-FR').format(n);
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  let animSpeed = 1; // replay : animations accélérées (×2, ×4)
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms / animSpeed));
   const myKey = () => (App.me?.name || '').toLowerCase();
   const me = () => state?.players.find((p) => p.key === myKey());
   const isMyTurn = () => state && state.current === myKey() && state.phase !== 'over';
@@ -954,6 +955,8 @@
       if (p.soul) tag('soul', `Âme ${p.soul}t`, `Âme du Dragon : +30 % sur ses loyers (${p.soul} tours)`);
       if (p.elderBuff) tag('elder', `Ancien ${p.elderBuff}t`, `Dragon Ancien : +30 % sur ses loyers (${p.elderBuff} tours)`);
       if (p.herald) tag('herald', 'Héraut', 'Peut détruire une construction adverse');
+      if (p.team) tag(`team-${p.team}`, p.team === 'blue' ? 'Bleue' : 'Rouge', `Équipe ${p.team === 'blue' ? 'Bleue' : 'Rouge'}`);
+      if (state.rules?.objective && !p.bankrupt && p.objective) tag('objective', `Nexus ${p.objective}/${state.objectiveGoal || 3}`, 'Groupes complets (sans hypothèque) : 3 = victoire');
       if (p.bot) tag('bot', 'Bot', `Joué par l’ordinateur (${{ easy: 'Facile', normal: 'Normal', hard: 'Difficile' }[p.bot] || p.bot})`);
       const pv = state.rules?.passives !== false ? catalog().passives?.[p.pawn || 'classic'] : null;
       if (pv && !p.bankrupt) {
@@ -998,6 +1001,19 @@
         }
         row.append(items);
       }
+      // 2 contre 2 : donner des PO à son partenaire
+      const mineNow = me();
+      if (!replay && mineNow && !mineNow.bankrupt && !p.bankrupt && p.key !== mineNow.key && p.team && p.team === mineNow.team && state.phase !== 'over') {
+        const give = el('button', 'gv-player__give', 'Donner des PO');
+        give.type = 'button';
+        give.addEventListener('click', () => {
+          const raw = window.prompt(`Combien de PO donner à ${p.name} ? (tu as ${fmt(mineNow.gold)} PO)`, '100');
+          const amount = Number(String(raw || '').replace(/\D/g, ''));
+          if (amount > 0) send('game:give', { to: p.key, amount });
+        });
+        row.append(give);
+      }
+      row.dataset.team = p.team || '';
       row.prepend(pawn, info, tags, owned);
       return row;
     }));
@@ -2134,7 +2150,8 @@
       return;
     }
     closeInspect();
-    const won = state.winner === myKey();
+    const mine = me();
+    const won = state.winnerTeam ? Boolean(mine && mine.team === state.winnerTeam) : state.winner === myKey();
     box.innerHTML = '';
     const panel = document.createElement('div');
     panel.className = `gv-over__panel ${won ? 'is-victory' : 'is-defeat'}`;
@@ -2144,7 +2161,11 @@
     const sub = document.createElement('p');
     sub.className = 'gv-over__sub';
     const winner = state.players.find((p) => p.key === state.winner);
-    sub.textContent = winner ? `${winner.name} domine la Faille en ${state.round} tours.` : 'Partie terminée.';
+    const teamName = { blue: 'Bleue', red: 'Rouge' }[state.winnerTeam];
+    sub.textContent = teamName
+      ? `L’équipe ${teamName} (${state.players.filter((p) => p.team === state.winnerTeam).map((p) => p.name).join(' et ')}) domine la Faille en ${state.round} tours.`
+      : winner ? `${winner.name} domine la Faille en ${state.round} tours.` : 'Partie terminée.';
+    if (replay) title.textContent = `${title.textContent} — REPLAY`;
     // classement : le vainqueur, puis les éliminés du dernier au premier ; statistiques de chacun
     const stats = state.stats || {};
     const ordered = [...state.players].sort((a, b) => {
@@ -2209,12 +2230,25 @@
       awards.append(li);
     }
     if (awards.children.length) ranking.append(awards);
+    if (state.history?.length > 1) {
+      const chart = wealthChart(state.history, state.players, { width: 620, height: 210 });
+      chart.classList.add('gv-over__chart');
+      ranking.append(chart);
+    }
     const back = document.createElement('button');
     back.type = 'button';
     back.className = 'gv-btn gv-btn--primary';
-    back.textContent = 'Retour au salon';
-    back.addEventListener('click', closeBoard);
-    panel.append(title, sub, ranking, back);
+    back.textContent = replay ? 'Quitter le replay' : 'Retour au salon';
+    back.addEventListener('click', () => (replay ? stopReplay() : closeBoard()));
+    const buttons = el('div', 'gv-over__buttons');
+    if (!replay && state.id) {
+      const again = el('button', 'gv-btn', 'Revoir la partie');
+      again.type = 'button';
+      again.addEventListener('click', () => App.playReplay(state.id));
+      buttons.append(again);
+    }
+    buttons.append(back);
+    panel.append(title, sub, ranking, buttons);
     box.append(panel);
     box.hidden = false;
   }
@@ -2240,7 +2274,171 @@
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Statistiques : courbe de la valeur de chaque joueur au fil des tours
+  // ---------------------------------------------------------------------------
+
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const svgEl = (tag, attrs = {}) => {
+    const node = document.createElementNS(SVG_NS, tag);
+    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+    return node;
+  };
+  // Les couleurs des joueurs sont aussi celles de leur pion : chaque courbe a en plus son style de
+  // trait et le nom du joueur au bout, pour ne jamais dépendre de la couleur seule.
+  const DASHES = ['', '7 4', '2 4', '10 4 2 4', '4 3'];
+  const compact = (n) => (Math.abs(n) >= 1000 ? `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1).replace('.', ',')} k` : String(Math.round(n)));
+
+  /** Courbe de richesse (valeur totale : PO + cases + constructions), un point par tour de table. */
+  function wealthChart(history, players, { width = 300, height = 190 } = {}) {
+    const wrap = el('figure', 'gv-chart');
+    const pad = { l: 40, r: 64, t: 12, b: 24 };
+    const w = width - pad.l - pad.r;
+    const h = height - pad.t - pad.b;
+    const rounds = history.map((pt) => pt.round);
+    const r0 = Math.min(...rounds);
+    const r1 = Math.max(r0 + 1, ...rounds);
+    const max = Math.max(1000, ...history.flatMap((pt) => Object.values(pt.worth))) * 1.08;
+    const x = (r) => pad.l + ((r - r0) / (r1 - r0)) * w;
+    const y = (v) => pad.t + h - (v / max) * h;
+    const svg = svgEl('svg', { viewBox: `0 0 ${width} ${height}`, class: 'gv-chart__svg', role: 'img' });
+    svg.setAttribute('aria-label', `Valeur de chaque joueur, tours ${r0} à ${r1}`);
+    // grille horizontale discrète + graduations
+    const steps = 4;
+    for (let k = 0; k <= steps; k++) {
+      const v = (max / steps) * k;
+      svg.append(svgEl('line', { x1: pad.l, x2: pad.l + w, y1: y(v), y2: y(v), class: k ? 'gv-chart__grid' : 'gv-chart__axis' }));
+      const t = svgEl('text', { x: pad.l - 6, y: y(v) + 3, class: 'gv-chart__tick', 'text-anchor': 'end' });
+      t.textContent = compact(v);
+      svg.append(t);
+    }
+    const tickEvery = Math.max(1, Math.ceil((r1 - r0) / 6));
+    for (let r = r0; r <= r1; r += tickEvery) {
+      const t = svgEl('text', { x: x(r), y: height - 6, class: 'gv-chart__tick', 'text-anchor': 'middle' });
+      t.textContent = `T${r}`;
+      svg.append(t);
+    }
+    // une ligne par joueur (2 px), étiquette au bout
+    const ends = [];
+    players.forEach((p, i) => {
+      const pts = history.filter((pt) => pt.worth[p.key] !== undefined).map((pt) => [x(pt.round), y(pt.worth[p.key])]);
+      if (!pts.length) return;
+      const line = svgEl('polyline', { points: pts.map(([a, b]) => `${a.toFixed(1)},${b.toFixed(1)}`).join(' '), class: 'gv-chart__line' });
+      line.style.stroke = p.color;
+      if (DASHES[i % DASHES.length]) line.setAttribute('stroke-dasharray', DASHES[i % DASHES.length]);
+      if (p.bankrupt) line.classList.add('is-out');
+      svg.append(line);
+      const [ex, ey] = pts[pts.length - 1];
+      ends.push({ p, ex, ey });
+    });
+    // étiquettes de fin de courbe, écartées pour ne pas se chevaucher
+    ends.sort((a, b) => a.ey - b.ey);
+    let lastY = -Infinity;
+    for (const e of ends) {
+      const ly = Math.max(e.ey, lastY + 12);
+      lastY = ly;
+      svg.append(svgEl('circle', { cx: e.ex, cy: e.ey, r: 3, class: 'gv-chart__dot', fill: e.p.color }));
+      const t = svgEl('text', { x: e.ex + 6, y: ly + 3, class: 'gv-chart__label' });
+      t.textContent = e.p.name.length > 9 ? `${e.p.name.slice(0, 8)}…` : e.p.name;
+      svg.append(t);
+    }
+    // survol : ligne verticale + infobulle du tour le plus proche
+    const cross = svgEl('line', { y1: pad.t, y2: pad.t + h, class: 'gv-chart__cross' });
+    cross.style.display = 'none';
+    const hit = svgEl('rect', { x: pad.l, y: pad.t, width: w, height: h, fill: 'transparent' });
+    svg.append(cross, hit);
+    const tip = el('div', 'gv-chart__tip');
+    tip.hidden = true;
+    hit.addEventListener('pointermove', (event) => {
+      const box = svg.getBoundingClientRect();
+      const px = ((event.clientX - box.left) / box.width) * width;
+      const r = Math.round(r0 + ((px - pad.l) / w) * (r1 - r0));
+      const pt = history.reduce((best, q) => (Math.abs(q.round - r) < Math.abs(best.round - r) ? q : best), history[0]);
+      cross.setAttribute('x1', x(pt.round));
+      cross.setAttribute('x2', x(pt.round));
+      cross.style.display = '';
+      tip.replaceChildren(el('b', '', `Tour ${pt.round}`), ...players
+        .filter((p) => pt.worth[p.key] !== undefined)
+        .sort((a, b) => pt.worth[b.key] - pt.worth[a.key])
+        .map((p) => {
+          const row = el('span', 'gv-chart__tiprow');
+          const sw = el('i');
+          sw.style.background = p.color;
+          row.append(sw, `${p.name} : ${fmt(pt.worth[p.key])} PO`);
+          return row;
+        }));
+      tip.hidden = false;
+      tip.style.left = `${(x(pt.round) / width) * 100}%`;
+    });
+    hit.addEventListener('pointerleave', () => {
+      cross.style.display = 'none';
+      tip.hidden = true;
+    });
+    // légende (toujours présente) + tableau pour les lecteurs d'écran
+    const legend = el('figcaption', 'gv-chart__legend');
+    players.forEach((p, i) => {
+      const item = el('span', 'gv-chart__key');
+      const sw = svgEl('svg', { viewBox: '0 0 22 6', width: 22, height: 6 });
+      const l = svgEl('line', { x1: 0, x2: 22, y1: 3, y2: 3, 'stroke-width': 2 });
+      l.style.stroke = p.color;
+      if (DASHES[i % DASHES.length]) l.setAttribute('stroke-dasharray', DASHES[i % DASHES.length]);
+      sw.append(l);
+      item.append(sw, p.name);
+      legend.append(item);
+    });
+    const table = el('table', 'visually-hidden');
+    const head = el('tr');
+    head.append(el('th', '', 'Tour'), ...players.map((p) => el('th', '', p.name)));
+    table.append(head, ...history.map((pt) => {
+      const tr = el('tr');
+      tr.append(el('td', '', String(pt.round)), ...players.map((p) => el('td', '', pt.worth[p.key] !== undefined ? `${pt.worth[p.key]} PO` : '–')));
+      return tr;
+    }));
+    wrap.append(svg, tip, legend, table);
+    return wrap;
+  }
+
+  function renderStats() {
+    const box = $('#gv-stats');
+    if (!box) return;
+    if (box.hidden && !isPhone()) {
+      box.dataset.dirty = '1';
+      return;
+    }
+    box.dataset.dirty = '';
+    const history = [...(state.history || [])];
+    // point « maintenant » pour suivre le tour en cours
+    const now = { round: state.round + (state.phase === 'over' ? 0 : 0.5), worth: Object.fromEntries(state.players.map((p) => [p.key, p.bankrupt ? 0 : p.worth])) };
+    if (!history.length || history[history.length - 1].round !== state.round || state.phase !== 'over') history.push(now);
+    const title = el('p', 'gv-stats__title', 'Valeur de chaque joueur (PO + cases + constructions)');
+    const table = el('div', 'gv-stats__now');
+    for (const p of [...state.players].sort((a, b) => b.worth - a.worth)) {
+      const row = el('span', 'gv-stats__row');
+      const sw = el('i');
+      sw.style.background = p.color;
+      row.append(sw, el('b', '', p.name), el('span', '', p.bankrupt ? 'Éliminé' : `${fmt(p.worth)} PO`));
+      table.append(row);
+    }
+    box.replaceChildren(title, wealthChart(history, state.players, { width: 300, height: 200 }), table);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Musique : plus intense quand le Baron ou l'Ancien sont en jeu, puis en fin de partie
+  // ---------------------------------------------------------------------------
+
+  function musicIntensity() {
+    if (!state || state.phase === 'over') return 0;
+    const alive = state.players.filter((p) => !p.bankrupt);
+    const danger = alive.some((p) => p.gold < 150 && p.worth < 700);
+    const nearGoal = state.rules?.objective && alive.some((p) => p.objective >= (state.objectiveGoal || 3) - 1);
+    const lastRounds = state.rules?.maxRounds && state.round >= state.rules.maxRounds - 3;
+    if (danger || nearGoal || lastRounds || (alive.length <= 2 && state.players.length > 2) || state.round >= 30) return 2;
+    if (state.baron?.active || state.elder?.active || state.event) return 1;
+    return 0;
+  }
+
   function renderAll() {
+    window.LolMusic?.setIntensity?.(musicIntensity());
     cueSounds();
     renderTop();
     renderPlayers();
@@ -2253,6 +2451,7 @@
     renderKit();
     renderShop();
     renderTrade();
+    renderStats();
     renderOver();
     if (inspected !== null && state.phase !== 'buy') openInspect(inspected);
     if (state.phase !== 'buy' && inspected === state.pendingIndex) closeInspect();
@@ -2280,9 +2479,16 @@
   let queue = Promise.resolve();
 
   function onGameState(next) {
+    if (replay) stopReplay({ silent: true }); // une vraie partie démarre : on quitte le replay
+    applyState(next);
+  }
+
+  function applyState(next) {
     // échéance du chrono, calculée à la réception (avant les animations)
     if (next.timer) next.timerDeadline = performance.now() + next.timer.left;
     queue = queue.then(async () => {
+      // état d'un replay qu'on vient de quitter : ignoré
+      if (next.replayOf && next.replayOf !== replay?.token) return;
       if (next.id !== gameId) {
         await realArtReady; // liste de tes images, pour que les cases les utilisent dès le départ
         gameId = next.id;
@@ -2306,6 +2512,138 @@
     }).catch((err) => console.error('[game]', err));
   }
   socket.on('game:state', onGameState);
+
+  // ---------------------------------------------------------------------------
+  // Replay : une partie terminée rejouée coup par coup sur le plateau
+  // ---------------------------------------------------------------------------
+
+  let replay = null; // { id, frames, total, index, state, static, playing, speed, loading }
+  const replayBar = $('#gv-replay');
+
+  /** Reconstitue un état complet à partir du précédent et des changements envoyés par le serveur. */
+  function decodeFrame(prev, delta, statics) {
+    const { fx, logAdd, playersDelta, ...rest } = delta;
+    const next = { ...(prev || {}), ...statics, ...rest };
+    next.fx = fx || [];
+    next.log = [...(prev?.log || []), ...(logAdd || [])].slice(-30);
+    const players = (prev?.players || []).map((p) => ({ ...p }));
+    for (const [i, diff] of playersDelta || []) players[i] = { ...(players[i] || {}), ...diff };
+    next.players = players;
+    return next;
+  }
+
+  async function loadReplayFrames() {
+    if (!replay || replay.loading || replay.frames.length >= replay.total) return;
+    replay.loading = true;
+    const from = replay.frames.length;
+    const res = await new Promise((resolve) => socket.emit('replay:frames', { id: replay.id, from }, resolve));
+    if (!replay) return;
+    replay.loading = false;
+    if (!res?.ok) {
+      App.toast(res?.error || 'Replay indisponible.', 'error');
+      stopReplay();
+      return;
+    }
+    if (res.static) replay.static = res.static;
+    replay.total = res.total;
+    replay.frames.push(...res.frames);
+  }
+
+  function renderReplayBar() {
+    if (!replay) return;
+    const shown = Math.max(0, replay.index);
+    $('#gv-replay-fill').style.width = `${(shown / Math.max(1, replay.total - 1)) * 100}%`;
+    $('#gv-replay-label').textContent = `Tour ${replay.state?.round ?? 1} · ${shown + 1}/${replay.total}`;
+    $('[data-replay="toggle"]', replayBar).textContent = replay.playing ? '⏸' : '▶';
+    $$('[data-speed]', replayBar).forEach((b) => b.classList.toggle('is-active', Number(b.dataset.speed) === replay.speed));
+  }
+
+  /** Avance d'un état ; `quiet` : sans animation (saut au tour suivant). */
+  async function replayStep(quiet = false) {
+    if (!replay) return false;
+    if (replay.index + 1 >= replay.frames.length) await loadReplayFrames();
+    if (!replay || replay.index + 1 >= replay.frames.length) return false;
+    replay.index += 1;
+    replay.state = decodeFrame(replay.state, replay.frames[replay.index], replay.static);
+    const shown = quiet ? { ...replay.state, fx: [] } : replay.state;
+    applyState({ ...structuredClone(shown), replayOf: replay.token });
+    await queue;
+    if (!replay) return false;
+    if (replay.frames.length - replay.index < 40) loadReplayFrames();
+    return true;
+  }
+
+  async function replayLoop() {
+    while (replay && replay.playing) {
+      const ok = await replayStep();
+      if (!replay) return;
+      renderReplayBar();
+      if (!ok) {
+        replay.playing = false;
+        renderReplayBar();
+        return;
+      }
+      const hasFx = replay.state.fx?.length;
+      await new Promise((r) => setTimeout(r, (hasFx ? 220 : 90) / replay.speed));
+    }
+  }
+
+  App.playReplay = async (id) => {
+    if (state && !state.replayOf && state.phase !== 'over' && !replay && state.players.some((p) => p.key === myKey() && !p.bankrupt)) {
+      App.toast('Termine d’abord ta partie en cours.', 'info');
+      return;
+    }
+    stopReplay({ silent: true });
+    replay = { id, token: Symbol('replay'), frames: [], total: 1, index: -1, state: null, static: null, playing: false, speed: 1, loading: false };
+    view.classList.add('is-replay');
+    replayBar.hidden = false;
+    gameId = null; // nouveau plateau
+    animSpeed = 1;
+    App.toast('Chargement du replay…', 'info', 1500);
+    await loadReplayFrames();
+    if (!replay) return;
+    await replayStep(true);
+    replay.playing = true;
+    renderReplayBar();
+    replayLoop();
+  };
+
+  function stopReplay({ silent = false } = {}) {
+    if (!replay) return;
+    replay = null;
+    animSpeed = 1;
+    view.classList.remove('is-replay');
+    replayBar.hidden = true;
+    gameId = null; // la prochaine partie reconstruit le plateau
+    if (!silent) closeBoard();
+  }
+
+  replayBar.addEventListener('click', async (event) => {
+    const b = event.target.closest('button');
+    if (!b || !replay) return;
+    if (b.dataset.speed) {
+      replay.speed = Number(b.dataset.speed);
+      animSpeed = replay.speed;
+    } else if (b.dataset.replay === 'toggle') {
+      replay.playing = !replay.playing;
+      if (replay.playing) replayLoop();
+    } else if (b.dataset.replay === 'next') {
+      // au tour de table suivant, sans animation
+      const wasPlaying = replay.playing;
+      replay.playing = false;
+      const round = replay.state?.round ?? 1;
+      while (replay && replay.state && replay.state.round === round && replay.state.phase !== 'over') {
+        if (!(await replayStep(true))) break;
+      }
+      if (replay && wasPlaying) {
+        replay.playing = true;
+        replayLoop();
+      }
+    } else if (b.dataset.replay === 'quit') {
+      stopReplay();
+    }
+    renderReplayBar();
+  });
   // Par sécurité : si l'état est arrivé avant la fin de la connexion, on le réaffiche
   document.addEventListener('app:login', () => { if (state) queue = queue.then(renderAll); });
 
@@ -2355,6 +2693,7 @@
   function showTab(name) {
     $$('.gv-side__tab').forEach((t) => t.classList.toggle('is-active', t.dataset.gvTab === name));
     $$('[data-gv-panel]').forEach((p) => { p.hidden = p.dataset.gvPanel !== name; });
+    if (name === 'stats' && state) renderStats();
     if (name === 'chat') {
       const list = $('#gv-chat-list');
       list.scrollTop = list.scrollHeight;

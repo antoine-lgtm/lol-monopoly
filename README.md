@@ -55,6 +55,16 @@ TEST_3D=1 npm run test:browser    # + chargement du plateau 3D (plus lent)
   (3 victoires), Infernal (10 parties). À choisir sous le pion, dans le salon.
 - **Emotes et pings** : bouton ☺ en haut du plateau ; ping sur une case avec le bouton ! ou
   **Alt + clic**.
+- **Équipes 2 contre 2** (règle maison, 4 joueurs, bots compris) : chacun choisit Bleue ou Rouge
+  dans le salon ; pas de loyer entre partenaires, groupe complété avec les cases du partenaire,
+  dons de PO ; l'équipe gagne quand les deux adversaires sont éliminés.
+- **Victoire à l'objectif** (règle maison) : 3 groupes complets sans hypothèque détruisent le Nexus.
+- **Replays** : les 10 dernières parties de chacun sont gardées. « Revoir la partie » en fin de
+  partie, ou le bouton Historique du salon : lecture, pause, ×1/×2/×4, tour suivant.
+- **Statistiques** : onglet « Stats » (courbe de la valeur de chaque joueur, tour par tour),
+  reprise dans le récapitulatif de fin.
+- **Musique dynamique** : plus intense quand le Baron ou l'Ancien sont en jeu, puis en fin de
+  partie (joueur en danger, objectif presque atteint, derniers tours).
 - **Répliques des champions** : une bulle quand on achète une case ou qu'on paye un loyer.
   Pour les entendre, déposer des sons dans `frontend/assets/voices/` (voir `LISEZMOI.txt`).
 
