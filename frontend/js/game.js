@@ -341,7 +341,7 @@
   }
 
   function priceLabel(sq) {
-    return sq.price ? `${fmt(sq.price)} Or` : sq.amount ? `${sq.amount} Or` : '';
+    return sq.price ? `${fmt(sq.price)} PO` : sq.amount ? `${sq.amount} PO` : '';
   }
 
   function buildSquare(sq, i) {
@@ -373,7 +373,7 @@
     if (sq.type === 'go') {
       const sub = document.createElement('span');
       sub.className = 'gv-sq__price';
-      sub.textContent = '+200 Or';
+      sub.textContent = '+200 PO';
       inner.append(sub);
     } else if (sq.type === 'jail') {
       const sub = document.createElement('span');
@@ -383,7 +383,7 @@
     } else if (priceLabel(sq)) {
       const price = document.createElement('span');
       price.className = 'gv-sq__price';
-      price.textContent = sq.kind === 'sbires' ? '10 % ou 200 Or' : priceLabel(sq);
+      price.textContent = sq.kind === 'sbires' ? '10 % ou 200 PO' : priceLabel(sq);
       inner.append(price);
     }
     const owner = document.createElement('span');
@@ -936,7 +936,7 @@
       name.textContent = p.name;
       const gold = document.createElement('span');
       gold.className = 'gv-player__gold';
-      gold.textContent = p.bankrupt ? 'Éliminé' : `${fmt(p.gold)} Or`;
+      gold.textContent = p.bankrupt ? 'Éliminé' : `${fmt(p.gold)} PO`;
       info.append(name, gold);
 
       const tags = document.createElement('div');
@@ -948,7 +948,7 @@
         t.title = title;
         tags.append(t);
       };
-      if (p.baron) tag('baron', 'Main du Baron', 'Loyers +50 % et +300 Or au prochain passage à la Fontaine');
+      if (p.baron) tag('baron', 'Main du Baron', 'Loyers +50 % et +300 PO au prochain passage à la Fontaine');
       if (p.inJail) tag('jail', 'Prison', 'En prison');
       if (p.jailCards) tag('zhonya', `Zhonya ×${p.jailCards}`, 'Carte de sortie de prison');
       if (p.soul) tag('soul', `Âme ${p.soul}t`, `Âme du Dragon : +30 % sur ses loyers (${p.soul} tours)`);
@@ -1393,7 +1393,7 @@
           status.textContent = 'Tu es en Prison : tente un double ou paye.';
           box.append(
             button('Tenter un double', 'game:roll', { primary: true }),
-            button('Payer 50 Or', 'game:payJail', { disabled: mine.gold < 50 }),
+            button('Payer 50 PO', 'game:payJail', { disabled: mine.gold < 50 }),
           );
           if (mine.jailCards) box.append(button('Utiliser Zhonya', 'game:useCard'));
         } else {
@@ -1402,9 +1402,9 @@
         }
         break;
       case 'buy':
-        status.textContent = `${sq.name} est libre — ${fmt(sq.price)} Or`;
+        status.textContent = `${sq.name} est libre — ${fmt(sq.price)} PO`;
         box.append(
-          button(`Acheter (${fmt(sq.price)})`, 'game:buy', { primary: true, disabled: mine.gold < sq.price, hint: mine.gold < sq.price ? 'Pas assez d’Or' : '' }),
+          button(`Acheter (${fmt(sq.price)})`, 'game:buy', { primary: true, disabled: mine.gold < sq.price, hint: mine.gold < sq.price ? 'Pas assez de PO' : '' }),
           button('Passer', 'game:skip'),
         );
         openInspect(state.pendingIndex);
@@ -1414,11 +1414,11 @@
         status.textContent = 'Les Sbires réclament leur part : choisis ton impôt.';
         box.append(
           button(`10 % de ta fortune (${fmt(state.taxPercent)})`, 'game:tax', { primary: state.taxPercent <= 200, payload: { choice: 'percent' } }),
-          button('200 Or', 'game:tax', { primary: state.taxPercent > 200, payload: { choice: 'flat' } }),
+          button('200 PO', 'game:tax', { primary: state.taxPercent > 200, payload: { choice: 'flat' } }),
         );
         break;
       case 'debt':
-        status.textContent = `Dette de ${fmt(-mine.gold)} Or : vends des tours ou hypothèque des cases (onglet « Mes cases »).`;
+        status.textContent = `Dette de ${fmt(-mine.gold)} PO : vends des tours ou hypothèque des cases (onglet « Mes cases »).`;
         box.append(button('Déclarer faillite', 'game:forfeit'));
         showTab('mine');
         break;
@@ -1594,7 +1594,7 @@
           onClick: (b) => {
             const choices = [];
             if (bootsReady) choices.push({ label: 'Lacer les Bottes (+1 case)', primary: true, onPick: () => send('game:boots') });
-            if (canSell) choices.push({ label: `Revendre (+${Math.floor(def.price / 2)} Or)`, onPick: () => send('game:sellItem', { item: it.id }) });
+            if (canSell) choices.push({ label: `Revendre (+${Math.floor(def.price / 2)} PO)`, onPick: () => send('game:sellItem', { item: it.id }) });
             openKitPop(b, `${def.name} — ${def.text}`, choices);
           },
         }));
@@ -1622,7 +1622,7 @@
     }
     if (mine.perks?.freeRecall) {
       extras.append(kitButton({
-        icon: itemIcon('potion'), title: 'Retour gratuit à la Fontaine, +100 Or (quête Mid)', badge: 'Q',
+        icon: itemIcon('potion'), title: 'Retour gratuit à la Fontaine, +100 PO (quête Mid)', badge: 'Q',
         usable: myTurn && state.phase === 'roll' && !mine.inJail, cls: 'gv-kit__btn--perk',
         onClick: () => send('game:perk', { perk: 'freeRecall' }),
       }));
@@ -1659,7 +1659,7 @@
     const card = el('div', 'gv-trade__card gv-shop__card');
     card.setAttribute('role', 'dialog');
     card.append(el('h3', 'gv-trade__title', 'Boutique'));
-    card.append(el('p', 'gv-trade__note', `${fmt(mine.gold)} Or · ${mine.items.length}/${cat.maxItems} objets · revente à moitié prix`));
+    card.append(el('p', 'gv-trade__note', `${fmt(mine.gold)} PO · ${mine.items.length}/${cat.maxItems} objets · revente à moitié prix`));
     for (const [tier, title] of [['early', 'Début de partie'], ['late', 'Fin de partie']]) {
       card.append(el('h4', 'gv-trade__subtitle', title));
       const grid = el('div', 'gv-shop__grid');
@@ -1672,10 +1672,10 @@
         img.alt = '';
         const info = el('div', 'gv-shop__info');
         info.append(el('b', '', it.name), el('small', '', it.text));
-        const buy = el('button', 'gv-btn gv-btn--primary', owned ? 'Possédé' : `${it.price} Or`);
+        const buy = el('button', 'gv-btn gv-btn--primary', owned ? 'Possédé' : `${it.price} PO`);
         buy.type = 'button';
         buy.disabled = owned || full || mine.gold < it.price;
-        buy.title = owned ? '' : full ? '3 objets au maximum : revends-en un' : mine.gold < it.price ? 'Pas assez d’Or' : 'Acheter';
+        buy.title = owned ? '' : full ? '3 objets au maximum : revends-en un' : mine.gold < it.price ? 'Pas assez de PO' : 'Acheter';
         buy.addEventListener('click', () => send('game:buyItem', { item: id }));
         item.append(img, info, buy);
         grid.append(item);
@@ -1791,7 +1791,7 @@
         list.append(label);
       }
       const gold = el('label', 'gv-trade__gold');
-      gold.append(el('span', '', 'Or'));
+      gold.append(el('span', '', 'PO'));
       const input = el('input');
       input.type = 'number';
       input.min = '0';
@@ -1850,7 +1850,7 @@
       col.append(el('h4', 'gv-trade__subtitle', title));
       const list = el('div', 'gv-trade__list');
       for (const i of part.props) list.append(propChip(i));
-      if (part.gold) list.append(el('span', 'gv-trade__chip gv-trade__chip--gold', `${fmt(part.gold)} Or`));
+      if (part.gold) list.append(el('span', 'gv-trade__chip gv-trade__chip--gold', `${fmt(part.gold)} PO`));
       if (!part.props.length && !part.gold) list.append(el('p', 'gv-trade__empty', 'Rien'));
       col.append(list);
       return col;
@@ -1935,7 +1935,7 @@
       name.textContent = sq.name;
       const lvl = document.createElement('span');
       lvl.className = 'gv-mine__level';
-      lvl.textContent = st.mortgaged ? 'Hypothéquée' : st.level === 5 ? 'Inhibiteur' : st.level ? `T${st.level}` : `${fmt(state.rents[i])} Or`;
+      lvl.textContent = st.mortgaged ? 'Hypothéquée' : st.level === 5 ? 'Inhibiteur' : st.level ? `T${st.level}` : `${fmt(state.rents[i])} PO`;
       if (sq.type === 'property') row.append(champImage('gv-mine__art', portraitUrl(sq)));
       else if (specialArt(sq)) row.append(artImage('gv-mine__art', specialArt(sq)));
       row.append(name, lvl);
@@ -2003,23 +2003,23 @@
     if (sq.type === 'property') {
       const level = st?.level ?? -1;
       const labels = ['Loyer', 'Avec 1 tour', 'Avec 2 tours', 'Avec 3 tours', 'Avec 4 tours', 'Avec Inhibiteur'];
-      sq.rent.forEach((r, l) => line(labels[l], `${fmt(r)} Or`, l === level));
-      line('Groupe complet (sans tour)', `${fmt(sq.rent[0] * 2)} Or`);
-      line('Prix d’une tour', `${fmt(groups[sq.group].house)} Or`);
+      sq.rent.forEach((r, l) => line(labels[l], `${fmt(r)} PO`, l === level));
+      line('Groupe complet (sans tour)', `${fmt(sq.rent[0] * 2)} PO`);
+      line('Prix d’une tour', `${fmt(groups[sq.group].house)} PO`);
     } else if (sq.type === 'dragon') {
-      [25, 50, 100, 200].forEach((r, n) => line(`${n + 1} Dragon${n ? 's' : ''}`, `${r} Or`));
+      [25, 50, 100, 200].forEach((r, n) => line(`${n + 1} Dragon${n ? 's' : ''}`, `${r} PO`));
     } else if (sq.type === 'potion') {
       line('1 Potion', '4 × les dés');
       line('2 Potions', '10 × les dés');
     } else {
       const texts = {
-        go: 'Chaque passage rapporte 200 Or. Avec la Main du Baron : +300 Or de plus, puis le buff disparaît.',
-        jail: 'Simple visite… sauf si Blitzcrank t’a attrapé. Pour sortir : un double, 50 Or ou une carte Zhonya.',
-        baron: 'Le Baron Nashor apparaît au 3ᵉ tour. Le premier qui tombe ici gagne la Main du Baron : loyers +50 % et +300 Or au prochain passage à la Fontaine.',
+        go: 'Chaque passage rapporte 200 PO. Avec la Main du Baron : +300 PO de plus, puis le buff disparaît.',
+        jail: 'Simple visite… sauf si Blitzcrank t’a attrapé. Pour sortir : un double, 50 PO ou une carte Zhonya.',
+        baron: 'Le Baron Nashor apparaît au 3ᵉ tour. Le premier qui tombe ici gagne la Main du Baron : loyers +50 % et +300 PO au prochain passage à la Fontaine.',
         gotojail: 'Le grab de Blitzcrank t’envoie directement en Prison, sans passer par la Fontaine.',
         chance: 'Pioche une carte Ping SS.',
         chest: 'Ouvre un Coffre Hextech.',
-        tax: sq.kind === 'sbires' ? 'Paye 10 % de ta fortune ou 200 Or, au choix.' : 'Paye 75 Or à la Boutique.',
+        tax: sq.kind === 'sbires' ? 'Paye 10 % de ta fortune ou 200 PO, au choix.' : 'Paye 75 PO à la Boutique.',
       };
       const p = document.createElement('p');
       p.className = 'gv-inspect__text';
@@ -2027,8 +2027,8 @@
       body.append(p);
     }
     if (sq.price) {
-      line('Prix', `${fmt(sq.price)} Or`);
-      line('Hypothèque', `${fmt(sq.price / 2)} Or`);
+      line('Prix', `${fmt(sq.price)} PO`);
+      line('Hypothèque', `${fmt(sq.price / 2)} PO`);
     }
     card.append(body);
 
@@ -2172,11 +2172,11 @@
       const cells = [
         k + 1,
         p.name,
-        p.bankrupt ? `Éliminé${st.eliminatedRound ? ` (tour ${st.eliminatedRound})` : ''}` : `${fmt(p.worth)} Or`,
+        p.bankrupt ? `Éliminé${st.eliminatedRound ? ` (tour ${st.eliminatedRound})` : ''}` : `${fmt(p.worth)} PO`,
         st.bought ?? '–',
         st.built ?? '–',
-        st.rentEarned !== undefined ? `${fmt(st.rentEarned)} Or` : '–',
-        st.rentPaid !== undefined ? `${fmt(st.rentPaid)} Or` : '–',
+        st.rentEarned !== undefined ? `${fmt(st.rentEarned)} PO` : '–',
+        st.rentPaid !== undefined ? `${fmt(st.rentPaid)} PO` : '–',
         st.trades ?? '–',
       ];
       cells.forEach((v, c) => {

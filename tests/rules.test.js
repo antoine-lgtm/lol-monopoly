@@ -86,7 +86,7 @@ test('faillite : les cases retournent à la banque et le créancier ne garde que
   assert.equal(debtor.bankrupt, true);
   assert.equal(g.props[a], undefined, 'les cases sont libres');
   assert.equal(g.supply.towers, 32, 'les tours retournent dans la réserve');
-  // il avait 40 Or + la revente de ses tours et l'hypothèque de ses cases
+  // il avait 40 PO + la revente de ses tours et l'hypothèque de ses cases
   assert.ok(creditor.gold - START_GOLD < 300, 'le créancier ne touche pas la dette entière');
   assert.ok(creditor.gold - START_GOLD >= 40);
 });

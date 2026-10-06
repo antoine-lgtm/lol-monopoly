@@ -109,7 +109,7 @@ function unmortgageAction(game, p, lv) {
 const tradeMemo = new WeakMap(); // game -> { turnId, sentAt }
 const TRADE_WAIT_MS = 20_000;
 
-/** Propose un échange qui complète un groupe du bot (contre une case utile à l'autre, ou de l'Or). */
+/** Propose un échange qui complète un groupe du bot (contre une case utile à l'autre, ou des PO). */
 function tradeAction(game, p, lv) {
   if (lv === LEVELS.easy || game.trade) return null;
   const memo = tradeMemo.get(game);

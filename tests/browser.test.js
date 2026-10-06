@@ -138,7 +138,7 @@ test.describe('dans le navigateur', { skip }, () => {
     noErrors(a, b);
   });
 
-  test('sorts d’invocateur : Soin depuis le kit (+100 Or, puis recharge)', async () => {
+  test('sorts d’invocateur : Soin depuis le kit (+100 PO, puis recharge)', async () => {
     const { a, b } = await startGame(PORT, ['Karma', 'Lux']);
     await a.waitForSelector('#gv-kit .gv-kit__btn--spell.is-ready');
     await a.click('#gv-kit .gv-kit__btn--spell:nth-child(2)'); // Flash, Soin par défaut

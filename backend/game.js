@@ -7,7 +7,7 @@
  * construire…) et reçoit l'état complet après chaque action. Toutes les méthodes
  * publiques renvoient { ok: true } ou { ok: false, error }.
  *
- * Vocabulaire : Or = argent, Tours T1–T4 = maisons, Inhibiteur = hôtel,
+ * Vocabulaire : PO (pièces d'or) = argent, Tours T1–T4 = maisons, Inhibiteur = hôtel,
  * Dragons = gares, Potions = compagnies, Fontaine = Départ.
  */
 
@@ -104,31 +104,31 @@ const groupMembers = (group) => BOARD.map((s, i) => (s.group === group ? i : -1)
 const CHANCE_CARDS = [
   { text: 'Téléportation ! Va sur le Dragon le plus proche.', act: (g, p) => g.moveTo(p, g.nextIndexOf(p.pos, DRAGON_INDEXES)) },
   { text: 'Ekko remonte le temps : recule de 3 cases.', act: (g, p) => g.moveBy(p, -3, { direct: true }) },
-  { text: 'Flash vers la Fontaine ! Reçois 200 Or.', act: (g, p) => g.moveTo(p, 0) },
+  { text: 'Flash vers la Fontaine ! Reçois 200 PO.', act: (g, p) => g.moveTo(p, 0) },
   { text: 'Tu pars farmer chez Yasuo.', act: (g, p) => g.moveTo(p, 39) },
-  { text: 'Roaming bot : va sur Sion. Si tu passes par la Fontaine, reçois 200 Or.', act: (g, p) => g.moveTo(p, 21) },
+  { text: 'Roaming bot : va sur Sion. Si tu passes par la Fontaine, reçois 200 PO.', act: (g, p) => g.moveTo(p, 21) },
   { text: 'Gank réussi chez Shen : avance jusqu’à lui.', act: (g, p) => g.moveTo(p, 11) },
   { bad: true, text: 'Blitzcrank t’attrape ! Va directement en Prison.', act: (g, p) => g.sendToJail(p) },
-  { text: 'First Blood ! Reçois 150 Or.', act: (g, p) => g.gain(p, 150) },
-  { text: 'Tu voles le buff bleu adverse : reçois 50 Or.', act: (g, p) => g.gain(p, 50) },
-  { bad: true, text: 'Gank raté, tu offres un kill : paye 15 Or.', act: (g, p) => g.charge(p, 15, null) },
-  { bad: true, text: 'Élu shotcaller de l’équipe : paye 50 Or à chaque joueur.', act: (g, p) => g.payEachPlayer(p, 50) },
-  { bad: true, text: 'Réparation des structures : 25 Or par tour, 100 Or par inhibiteur.', act: (g, p) => g.repairs(p, 25, 100) },
+  { text: 'First Blood ! Reçois 150 PO.', act: (g, p) => g.gain(p, 150) },
+  { text: 'Tu voles le buff bleu adverse : reçois 50 PO.', act: (g, p) => g.gain(p, 50) },
+  { bad: true, text: 'Gank raté, tu offres un kill : paye 15 PO.', act: (g, p) => g.charge(p, 15, null) },
+  { bad: true, text: 'Élu shotcaller de l’équipe : paye 50 PO à chaque joueur.', act: (g, p) => g.payEachPlayer(p, 50) },
+  { bad: true, text: 'Réparation des structures : 25 PO par tour, 100 PO par inhibiteur.', act: (g, p) => g.repairs(p, 25, 100) },
   { text: 'Zhonya ! Garde cette carte pour sortir de Prison.', act: (g, p) => { p.jailCards += 1; } },
 ];
 
 /** Coffre Hextech (Caisse de communauté) */
 const CHEST_CARDS = [
-  { text: 'Tu vends un skin Prestige : reçois 200 Or.', act: (g, p) => g.gain(p, 200) },
-  { text: 'Erreur de la banque de Piltover en ta faveur : reçois 200 Or.', act: (g, p) => g.gain(p, 200) },
-  { text: 'Retour à la Fontaine : reçois 200 Or.', act: (g, p) => g.moveTo(p, 0) },
-  { text: 'C’est ton anniversaire dans la Faille : chaque joueur te donne 10 Or.', act: (g, p) => g.collectFromEachPlayer(p, 10) },
-  { text: 'Soins de Soraka : reçois 100 Or.', act: (g, p) => g.gain(p, 100) },
-  { text: 'Tu hérites des économies de Gangplank : reçois 100 Or.', act: (g, p) => g.gain(p, 100) },
-  { text: 'Honorable mention de ton équipe : reçois 25 Or.', act: (g, p) => g.gain(p, 25) },
-  { bad: true, text: 'Frais de l’hôpital de Zaun : paye 100 Or.', act: (g, p) => g.charge(p, 100, null) },
-  { bad: true, text: 'Tu achètes une Zhonya trop tôt : paye 50 Or.', act: (g, p) => g.charge(p, 50, null) },
-  { bad: true, text: 'Taxe du Conseil de Piltover : 40 Or par tour, 115 Or par inhibiteur.', act: (g, p) => g.repairs(p, 40, 115) },
+  { text: 'Tu vends un skin Prestige : reçois 200 PO.', act: (g, p) => g.gain(p, 200) },
+  { text: 'Erreur de la banque de Piltover en ta faveur : reçois 200 PO.', act: (g, p) => g.gain(p, 200) },
+  { text: 'Retour à la Fontaine : reçois 200 PO.', act: (g, p) => g.moveTo(p, 0) },
+  { text: 'C’est ton anniversaire dans la Faille : chaque joueur te donne 10 PO.', act: (g, p) => g.collectFromEachPlayer(p, 10) },
+  { text: 'Soins de Soraka : reçois 100 PO.', act: (g, p) => g.gain(p, 100) },
+  { text: 'Tu hérites des économies de Gangplank : reçois 100 PO.', act: (g, p) => g.gain(p, 100) },
+  { text: 'Honorable mention de ton équipe : reçois 25 PO.', act: (g, p) => g.gain(p, 25) },
+  { bad: true, text: 'Frais de l’hôpital de Zaun : paye 100 PO.', act: (g, p) => g.charge(p, 100, null) },
+  { bad: true, text: 'Tu achètes une Zhonya trop tôt : paye 50 PO.', act: (g, p) => g.charge(p, 50, null) },
+  { bad: true, text: 'Taxe du Conseil de Piltover : 40 PO par tour, 115 PO par inhibiteur.', act: (g, p) => g.repairs(p, 40, 115) },
   { bad: true, text: 'Report de ta partie classée : va directement en Prison.', act: (g, p) => g.sendToJail(p) },
   { text: 'Zhonya ! Garde cette carte pour sortir de Prison.', act: (g, p) => { p.jailCards += 1; } },
 ];
@@ -348,7 +348,7 @@ class Game {
       p.armed.barrier = false;
       notes.push(`Barrière −${saved}`);
     }
-    this.say(`${p.name} paye ${rent} Or de loyer à ${owner.name} (${sq.name})${notes.length ? ` — ${notes.join(', ')}` : ''}.`);
+    this.say(`${p.name} paye ${rent} PO de loyer à ${owner.name} (${sq.name})${notes.length ? ` — ${notes.join(', ')}` : ''}.`);
     this.effect({ type: 'rent', key: p.key, owner: owner.key, index, amount: rent });
     this.stats[p.key].rentPaid += rent;
     this.stats[owner.key].rentEarned += rent;
@@ -457,7 +457,7 @@ class Game {
       total += level === MAX_LEVEL ? perInhib : level * perTower;
     }
     if (total) {
-      this.say(`${p.name} paye ${total} Or de réparations.`);
+      this.say(`${p.name} paye ${total} PO de réparations.`);
       this.charge(p, total, null);
     } else {
       this.say(`${p.name} n’a aucune structure à réparer.`);
@@ -510,10 +510,10 @@ class Game {
 
   passGo(p) {
     this.gain(p, GO_BONUS);
-    this.say(`${p.name} passe par la Fontaine : +${GO_BONUS} Or.`);
+    this.say(`${p.name} passe par la Fontaine : +${GO_BONUS} PO.`);
     if (this.eventIs('rush')) {
       this.gain(p, GO_BONUS);
-      this.say(`Ruée des sbires : ${p.name} reçoit ${GO_BONUS} Or de plus.`);
+      this.say(`Ruée des sbires : ${p.name} reçoit ${GO_BONUS} PO de plus.`);
     }
     if (this.hasPassive(p, 'poro')) this.gain(p, PASSIVES.poro.gold);
     if (this.rules.items) p.canShop = true; // on peut acheter des objets en passant à la base
@@ -526,7 +526,7 @@ class Game {
       p.baron = false;
       this.baron.holder = null;
       this.gain(p, BARON_GO_BONUS);
-      this.say(`La Main du Baron rapporte ${BARON_GO_BONUS} Or à ${p.name}, puis se dissipe.`);
+      this.say(`La Main du Baron rapporte ${BARON_GO_BONUS} PO à ${p.name}, puis se dissipe.`);
     }
   }
 
@@ -537,10 +537,10 @@ class Game {
     if (steps > 0 && from + steps >= 40) this.passGo(p);
     if (steps > 0 && to === 0 && this.rules.fountainDouble) {
       this.gain(p, GO_BONUS);
-      this.say(`${p.name} s’arrête pile sur la Fontaine : +${GO_BONUS} Or de plus !`);
+      this.say(`${p.name} s’arrête pile sur la Fontaine : +${GO_BONUS} PO de plus !`);
     }
     if (steps > 0 && p.perks.jungle) {
-      // quête Jungle : de l'Or par case Dragon traversée (ou atteinte)
+      // quête Jungle : des PO par case Dragon traversée (ou atteinte)
       let crossed = 0;
       for (let k = 1; k <= steps; k++) if (DRAGON_INDEXES.includes((from + k) % 40)) crossed += 1;
       if (crossed) this.gain(p, JUNGLE_GOLD * crossed);
@@ -599,7 +599,7 @@ class Game {
     switch (sq.type) {
       case 'tax':
         if (sq.kind === 'boutique') {
-          this.say(`${p.name} passe à la Boutique : -${sq.amount} Or.`);
+          this.say(`${p.name} passe à la Boutique : -${sq.amount} PO.`);
           if (this.rules.items) p.canShop = true;
           this.charge(p, sq.amount, null);
         } else {
@@ -628,7 +628,7 @@ class Game {
           this.baron.holder = p.key;
           p.baron = true;
           this.effect({ type: 'baron', key: p.key });
-          this.say(`${p.name} tue le Baron Nashor ! Main du Baron : loyers +50 % et +${BARON_GO_BONUS} Or au prochain passage à la Fontaine.`);
+          this.say(`${p.name} tue le Baron Nashor ! Main du Baron : loyers +50 % et +${BARON_GO_BONUS} PO au prochain passage à la Fontaine.`);
         } else if (!this.baron.taken) {
           this.say(`Le Baron Nashor n’est pas encore apparu (tour ${BARON_ROUND}).`);
         }
@@ -730,7 +730,7 @@ class Game {
       } else {
         p.jailTurns += 1;
         if (p.jailTurns >= 3) {
-          this.say(`${p.name} paye ${JAIL_FINE} Or et sort de Prison.`);
+          this.say(`${p.name} paye ${JAIL_FINE} PO et sort de Prison.`);
           p.inJail = false;
           p.jailTurns = 0;
           this.rollAgain = false;
@@ -781,12 +781,12 @@ class Game {
     if (error) return { ok: false, error };
     const p = this.currentPlayer;
     const sq = BOARD[this.pendingIndex];
-    if (p.gold < sq.price) return { ok: false, error: 'Pas assez d’Or.' };
+    if (p.gold < sq.price) return { ok: false, error: 'Pas assez de PO.' };
     p.gold -= sq.price;
     this.effect({ type: 'gold', key, amount: -sq.price });
     this.props[this.pendingIndex] = { owner: key, level: 0, mortgaged: false };
     this.effect({ type: 'buy', key, index: this.pendingIndex });
-    this.say(`${p.name} achète ${sq.name} pour ${sq.price} Or.`);
+    this.say(`${p.name} achète ${sq.name} pour ${sq.price} PO.`);
     this.stats[key].bought += 1;
     this.checkQuest(p);
     this.checkSoul(p);
@@ -812,7 +812,7 @@ class Game {
     const p = this.currentPlayer;
     let amount = choice === 'percent' ? Math.round(this.netWorth(p) * 0.1) : 200;
     if (this.hasPassive(p, 'minion')) amount = Math.round(amount * PASSIVES.minion.share);
-    this.say(`${p.name} paye ${amount} Or aux Sbires.`);
+    this.say(`${p.name} paye ${amount} PO aux Sbires.`);
     this.phase = 'end';
     this.charge(p, amount, null);
     this.settle();
@@ -824,12 +824,12 @@ class Game {
     if (error) return { ok: false, error };
     const p = this.currentPlayer;
     if (!p.inJail) return { ok: false, error: 'Tu n’es pas en Prison.' };
-    if (p.gold < JAIL_FINE) return { ok: false, error: 'Pas assez d’Or.' };
+    if (p.gold < JAIL_FINE) return { ok: false, error: 'Pas assez de PO.' };
     p.inJail = false;
     p.jailTurns = 0;
     p.gold -= JAIL_FINE;
     this.effect({ type: 'gold', key, amount: -JAIL_FINE });
-    this.say(`${p.name} paye ${JAIL_FINE} Or et sort de Prison.`);
+    this.say(`${p.name} paye ${JAIL_FINE} PO et sort de Prison.`);
     return { ok: true };
   }
 
@@ -1021,7 +1021,7 @@ class Game {
       this.effect({ type: 'move', key: p.key, from, to: 0, steps: 0, direct: true });
       this.gain(p, RECALL_GOLD);
       if (this.rules.items) p.canShop = true;
-      this.say(`${p.name} rentre à la Fontaine (quête Mid) : +${RECALL_GOLD} Or.`);
+      this.say(`${p.name} rentre à la Fontaine (quête Mid) : +${RECALL_GOLD} PO.`);
       this.phase = 'end';
       return { ok: true };
     }
@@ -1039,12 +1039,12 @@ class Game {
     if (p.items.length >= MAX_ITEMS) return { ok: false, error: `${MAX_ITEMS} objets au maximum : revends-en un.` };
     if (this.hasItem(p, id)) return { ok: false, error: 'Tu as déjà cet objet.' };
     const price = this.itemPrice(id);
-    if (p.gold < price) return { ok: false, error: 'Pas assez d’Or.' };
+    if (p.gold < price) return { ok: false, error: 'Pas assez de PO.' };
     p.gold -= price;
     p.items.push({ id, cd: 0 });
     this.effect({ type: 'gold', key, amount: -price });
     this.effect({ type: 'item', key, item: id });
-    this.say(`${p.name} achète ${item.name} (${price} Or).`);
+    this.say(`${p.name} achète ${item.name} (${price} PO).`);
     return { ok: true };
   }
 
@@ -1058,7 +1058,7 @@ class Game {
     p.items.splice(k, 1);
     const refund = Math.floor(ITEMS[id].price / 2);
     this.gain(p, refund);
-    this.say(`${p.name} revend ${ITEMS[id].name} (+${refund} Or).`);
+    this.say(`${p.name} revend ${ITEMS[id].name} (+${refund} PO).`);
     this.checkDebt();
     return { ok: true };
   }
@@ -1126,7 +1126,7 @@ class Game {
     const minLevel = Math.min(...members.map((i) => this.props[i].level));
     if (st.level > minLevel) return { ok: false, error: 'Construis d’abord sur les autres cases du groupe.' };
     const cost = this.buildCost(p, sq.group);
-    if (p.gold < cost) return { ok: false, error: 'Pas assez d’Or.' };
+    if (p.gold < cost) return { ok: false, error: 'Pas assez de PO.' };
     const inhib = st.level + 1 === MAX_LEVEL;
     if (inhib && this.supply.inhibs <= 0) return { ok: false, error: 'La banque n’a plus d’Inhibiteur en réserve.' };
     if (!inhib && this.supply.towers <= 0) return { ok: false, error: 'La banque n’a plus de tour en réserve.' };
@@ -1166,7 +1166,7 @@ class Game {
     p.gold += refund;
     this.effect({ type: 'gold', key: p.key, amount: refund });
     this.effect({ type: 'build', key: p.key, index, level: st.level });
-    this.say(`${p.name} vend une structure sur ${sq.name} (+${refund} Or).`);
+    this.say(`${p.name} vend une structure sur ${sq.name} (+${refund} PO).`);
   }
 
   sell(key, index) {
@@ -1188,7 +1188,7 @@ class Game {
     const value = sq.price / 2;
     p.gold += value;
     this.effect({ type: 'gold', key: p.key, amount: value });
-    this.say(`${p.name} hypothèque ${sq.name} (+${value} Or).`);
+    this.say(`${p.name} hypothèque ${sq.name} (+${value} PO).`);
   }
 
   mortgage(key, index) {
@@ -1213,11 +1213,11 @@ class Game {
     const st = this.props[index];
     if (!st.mortgaged) return { ok: false, error: 'Cette case n’est pas hypothéquée.' };
     const cost = Math.ceil((sq.price / 2) * 1.1);
-    if (p.gold < cost) return { ok: false, error: 'Pas assez d’Or.' };
+    if (p.gold < cost) return { ok: false, error: 'Pas assez de PO.' };
     p.gold -= cost;
     st.mortgaged = false;
     this.effect({ type: 'gold', key, amount: -cost });
-    this.say(`${p.name} lève l’hypothèque de ${sq.name} (-${cost} Or).`);
+    this.say(`${p.name} lève l’hypothèque de ${sq.name} (-${cost} PO).`);
     return { ok: true };
   }
 
@@ -1254,13 +1254,13 @@ class Game {
     const to = this.player(t.to);
     if (!from || !to || from.bankrupt || to.bankrupt || from === to) return 'Joueur invalide.';
     for (const g of [t.give.gold, t.get.gold]) if (!Number.isInteger(g) || g < 0) return 'Montant invalide.';
-    if (t.give.gold > Math.max(0, from.gold)) return 'Tu n’as pas assez d’Or pour cet échange.';
-    if (t.get.gold > Math.max(0, to.gold)) return `${to.name} n’a pas assez d’Or pour cet échange.`;
+    if (t.give.gold > Math.max(0, from.gold)) return 'Tu n’as pas assez de PO pour cet échange.';
+    if (t.get.gold > Math.max(0, to.gold)) return `${to.name} n’a pas assez de PO pour cet échange.`;
     if (!t.give.gold && !t.get.gold && !t.give.props.length && !t.get.props.length) return 'L’échange est vide.';
     return this.tradableProps(from.key, t.give.props) || this.tradableProps(to.key, t.get.props);
   }
 
-  /** Le joueur dont c'est le tour propose un échange (cases et/ou Or) à un autre joueur. */
+  /** Le joueur dont c'est le tour propose un échange (cases et/ou PO) à un autre joueur. */
   proposeTrade(key, { to, giveGold = 0, giveProps = [], getGold = 0, getProps = [] } = {}) {
     const error = this.guard(key, ['roll', 'end', 'debt']);
     if (error) return { ok: false, error };
@@ -1313,7 +1313,7 @@ class Game {
       this.checkSoul(q);
     }
     this.effect({ type: 'trade-done', accepted: true, from: t.from, to: t.to, give: t.give, get: t.get });
-    const part = ({ gold, props }) => [...props.map((i) => BOARD[i].name), ...(gold ? [`${gold} Or`] : [])].join(', ') || 'rien';
+    const part = ({ gold, props }) => [...props.map((i) => BOARD[i].name), ...(gold ? [`${gold} PO`] : [])].join(', ') || 'rien';
     this.say(`Échange conclu : ${from.name} donne ${part(t.give)} à ${to.name} contre ${part(t.get)}.`);
     this.checkDebt();
     return { ok: true };
@@ -1339,7 +1339,7 @@ class Game {
       if (creditor && !creditor.bankrupt) {
         creditor.gold -= back;
         this.effect({ type: 'gold', key: creditor.key, amount: -back });
-        this.say(`${creditor.name} ne touche que ${debt.amount - back} Or sur les ${debt.amount} dus.`);
+        this.say(`${creditor.name} ne touche que ${debt.amount - back} PO sur les ${debt.amount} dus.`);
       }
     }
     p.owes = [];
@@ -1349,12 +1349,12 @@ class Game {
     if (p.bankrupt) return;
     const angel = this.rules.items ? p.items.findIndex((it) => it.id === 'angel') : -1;
     if (angel >= 0 && !this.voluntaryForfeit) {
-      // l'Ange gardien sauve le joueur : la dette impayée est effacée, il repart avec 0 Or
+      // l'Ange gardien sauve le joueur : la dette impayée est effacée, il repart avec 0 PO
       p.items.splice(angel, 1);
       this.clawBack(p);
       p.gold = 0;
       this.effect({ type: 'angel', key: p.key });
-      this.say(`L’Ange gardien ressuscite ${p.name} ! Il repart avec 0 Or.`);
+      this.say(`L’Ange gardien ressuscite ${p.name} ! Il repart avec 0 PO.`);
       if (p === this.currentPlayer) this.checkDebt();
       return;
     }
@@ -1364,7 +1364,7 @@ class Game {
       this.clawBack(p);
       p.gold = PASSIVES.egg.gold;
       this.effect({ type: 'passive', key: p.key, pawn: 'egg' });
-      this.say(`Renaissance ! ${p.name} renaît de son œuf avec ${PASSIVES.egg.gold} Or.`);
+      this.say(`Renaissance ! ${p.name} renaît de son œuf avec ${PASSIVES.egg.gold} PO.`);
       if (p === this.currentPlayer) this.checkDebt();
       return;
     }

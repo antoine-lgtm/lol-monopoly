@@ -9,8 +9,8 @@
 const SPELLS = {
   flash: { name: 'Flash', cd: 5, text: 'Ton prochain déplacement fait 1 case de plus ou de moins (à choisir avant de lancer).' },
   teleport: { name: 'Téléportation', cd: 8, text: 'Au lieu de lancer les dés, va directement sur une de tes cases.' },
-  heal: { name: 'Soin', cd: 6, text: '+100 Or.' },
-  barrier: { name: 'Barrière', cd: 7, text: 'Le prochain loyer que tu dois payer est réduit de 300 Or.' },
+  heal: { name: 'Soin', cd: 6, text: '+100 PO.' },
+  barrier: { name: 'Barrière', cd: 7, text: 'Le prochain loyer que tu dois payer est réduit de 300 PO.' },
   ignite: { name: 'Embrasement', cd: 7, text: 'Le prochain loyer que tu reçois est multiplié par 1,5.' },
   ghost: { name: 'Fantôme', cd: 6, text: 'À ton prochain lancer, tu peux relancer un des deux dés.' },
   cleanse: { name: 'Purge', cd: 5, text: 'Sors de Prison immédiatement, puis lance les dés.' },
@@ -19,13 +19,13 @@ const DEFAULT_SPELLS = ['flash', 'heal'];
 
 /** early : objets abordables tôt ; late : objets chers pour la fin de partie. */
 const ITEMS = {
-  doran: { name: 'Anneau de Doran', price: 200, tier: 'early', text: '+10 Or au début de chacun de tes tours.' },
-  potion: { name: 'Potion réutilisable', price: 250, tier: 'early', text: '+30 Or à chaque passage par la Fontaine.' },
+  doran: { name: 'Anneau de Doran', price: 200, tier: 'early', text: '+10 PO au début de chacun de tes tours.' },
+  potion: { name: 'Potion réutilisable', price: 250, tier: 'early', text: '+30 PO à chaque passage par la Fontaine.' },
   boots: { name: 'Bottes', price: 300, tier: 'early', cd: 3, text: '+1 case à ton prochain lancer (une fois tous les 3 tours).' },
   banshee: { name: 'Voile de la banshee', price: 550, tier: 'late', cd: 4, text: 'Annule la prochaine carte négative (puis 4 tours de recharge).' },
   nashor: { name: 'Dent de Nashor', price: 700, tier: 'late', text: '+12 % sur les loyers que tu reçois.' },
   frozen: { name: 'Cœur gelé', price: 800, tier: 'late', text: '−12 % sur les loyers que tu paies.' },
-  angel: { name: 'Ange gardien', price: 1000, tier: 'late', text: 'Te sauve d’une faillite, une fois : tu repars avec 0 Or et tu gardes tes cases.' },
+  angel: { name: 'Ange gardien', price: 1000, tier: 'late', text: 'Te sauve d’une faillite, une fois : tu repars avec 0 PO et tu gardes tes cases.' },
 };
 const MAX_ITEMS = 3;
 
@@ -34,7 +34,7 @@ const QUEST_VALUES = {
   TOP: { goal: 4 }, // passages par la Fontaine
   JGL: { goal: 2, alt: 5, types: ['dragon', 'potion'] }, // camps possédés, ou arrêts sur un camp
   MID: { goal: 6 }, // cases possédées (contrôle de la voie)
-  ADC: { goal: 350 }, // Or de loyers touchés
+  ADC: { goal: 350 }, // PO de loyers touchées
   SUPP: { goal: 3, alt: 7 }, // échanges conclus, ou loyers payés
 };
 const RECALL_GOLD = 200;
@@ -44,10 +44,10 @@ const TOP_GOLD = 100; // récompense Top (avec la téléportation gratuite)
 const ADC_BONUS = 0.05; // récompense ADC : bonus sur les loyers reçus
 const SUPPORT_CUT = 0.04; // récompense Support : réduction des loyers payés // récompense Jungle, par case Dragon traversée
 const QUESTS = {
-  TOP: { name: 'Le duel', goal: QUEST_VALUES.TOP.goal, text: `Passer ${QUEST_VALUES.TOP.goal} fois par la Fontaine`, reward: `Une téléportation gratuite vers une de tes cases + ${TOP_GOLD} Or` },
-  JGL: { name: 'Le chasseur', ...QUEST_VALUES.JGL, text: `Posséder ${QUEST_VALUES.JGL.goal} camps (Dragons ou Potions) ou s’arrêter ${QUEST_VALUES.JGL.alt} fois sur un camp`, reward: `+${JUNGLE_GOLD} Or chaque fois que tu passes sur une case Dragon` },
-  MID: { name: 'Maître de la voie', goal: QUEST_VALUES.MID.goal, text: `Posséder ${QUEST_VALUES.MID.goal} cases`, reward: `Un retour gratuit à la Fontaine (+${RECALL_GOLD} Or) et tes constructions coûtent ${Math.round(MID_BUILD_DISCOUNT * 100)} % de moins` },
-  ADC: { name: 'La ferme', goal: QUEST_VALUES.ADC.goal, text: `Toucher ${QUEST_VALUES.ADC.goal} Or de loyers`, reward: `+${Math.round(ADC_BONUS * 100)} % sur tes loyers` },
+  TOP: { name: 'Le duel', goal: QUEST_VALUES.TOP.goal, text: `Passer ${QUEST_VALUES.TOP.goal} fois par la Fontaine`, reward: `Une téléportation gratuite vers une de tes cases + ${TOP_GOLD} PO` },
+  JGL: { name: 'Le chasseur', ...QUEST_VALUES.JGL, text: `Posséder ${QUEST_VALUES.JGL.goal} camps (Dragons ou Potions) ou s’arrêter ${QUEST_VALUES.JGL.alt} fois sur un camp`, reward: `+${JUNGLE_GOLD} PO chaque fois que tu passes sur une case Dragon` },
+  MID: { name: 'Maître de la voie', goal: QUEST_VALUES.MID.goal, text: `Posséder ${QUEST_VALUES.MID.goal} cases`, reward: `Un retour gratuit à la Fontaine (+${RECALL_GOLD} PO) et tes constructions coûtent ${Math.round(MID_BUILD_DISCOUNT * 100)} % de moins` },
+  ADC: { name: 'La ferme', goal: QUEST_VALUES.ADC.goal, text: `Toucher ${QUEST_VALUES.ADC.goal} PO de loyers`, reward: `+${Math.round(ADC_BONUS * 100)} % sur tes loyers` },
   SUPP: { name: 'Le gardien', ...QUEST_VALUES.SUPP, text: `Conclure ${QUEST_VALUES.SUPP.goal} échanges ou payer ${QUEST_VALUES.SUPP.alt} loyers`, reward: `−${Math.round(SUPPORT_CUT * 100)} % sur les loyers payés, et ta prochaine carte négative est annulée` },
 };
 
@@ -72,15 +72,15 @@ const PASSIVE_VALUES = {
 const pct = (x) => `${Math.round(x * 100)} %`;
 const V = PASSIVE_VALUES;
 const PASSIVES = {
-  poro: { name: 'Snax', ...V.poro, text: `+${V.poro.gold} Or à chaque passage par la Fontaine.` },
-  teemo: { name: 'Champignon toxique', ...V.teemo, text: `+${V.teemo.gold} Or sur chaque loyer que tu reçois.` },
-  ward: { name: 'Contrôle de vision', ...V.ward, text: `+${V.ward.gold} Or chaque fois que tu tires une carte (Ping SS ou Coffre).` },
+  poro: { name: 'Snax', ...V.poro, text: `+${V.poro.gold} PO à chaque passage par la Fontaine.` },
+  teemo: { name: 'Champignon toxique', ...V.teemo, text: `+${V.teemo.gold} PO sur chaque loyer que tu reçois.` },
+  ward: { name: 'Contrôle de vision', ...V.ward, text: `+${V.ward.gold} PO chaque fois que tu tires une carte (Ping SS ou Coffre).` },
   minion: { name: 'Vague de sbires', ...V.minion, text: V.minion.share === 0.5 ? 'Tu ne payes que la moitié aux Sbires.' : `Tu ne payes que ${pct(V.minion.share)} aux Sbires.` },
   zhonya: { name: 'Stase', ...V.zhonya, text: `Annule un loyer à payer (puis ${V.zhonya.cd} tours de recharge).` },
   blade: { name: 'Coup critique', ...V.blade, text: `${pct(V.blade.chance)} de chances qu’un loyer reçu soit multiplié par ${String(V.blade.mult).replace('.', ',')}.` },
   tibbers: { name: 'Tibbers', ...V.tibbers, text: `Tes constructions coûtent ${pct(V.tibbers.discount)} de moins.` },
-  egg: { name: 'Renaissance', ...V.egg, text: `+${V.egg.start} Or au départ ; une fois par partie, survit à la faillite et repart avec ${V.egg.gold} Or.` },
-  classic: { name: 'Classique', ...V.classic, text: `+${V.classic.start} Or au début de la partie.` },
+  egg: { name: 'Renaissance', ...V.egg, text: `+${V.egg.start} PO au départ ; une fois par partie, survit à la faillite et repart avec ${V.egg.gold} PO.` },
+  classic: { name: 'Classique', ...V.classic, text: `+${V.classic.start} PO au début de la partie.` },
 };
 
 /** Événements de la Faille : un tous les 4 tours de table, pendant 1 tour. */
@@ -89,8 +89,8 @@ const EVENTS = {
   patch: { name: 'Nouveau patch', text: 'Tous les loyers +25 % ce tour-ci.' },
   fog: { name: 'Brouillard de guerre', text: 'Tous les loyers −25 % ce tour-ci.' },
   sale: { name: 'Soldes de la Boutique', text: 'Objets et constructions −25 % ce tour-ci.' },
-  snowdown: { name: 'Snowdown', text: 'Cadeau de saison : chaque joueur reçoit 75 Or.' },
-  bounty: { name: 'Prime de guerre', text: 'Le joueur le plus riche donne 40 Or à chacun des autres.' },
+  snowdown: { name: 'Snowdown', text: 'Cadeau de saison : chaque joueur reçoit 75 PO.' },
+  bounty: { name: 'Prime de guerre', text: 'Le joueur le plus riche donne 40 PO à chacun des autres.' },
 };
 const EVENT_EVERY = 4;
 

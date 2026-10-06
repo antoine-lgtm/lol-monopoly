@@ -470,7 +470,7 @@
       const note = document.createElement('li');
       note.className = 'social__empty';
       note.style.gridColumn = '1 / -1';
-      note.textContent = 'La boutique ouvrira avec le plateau (étape 4) : l’or gagné en partie servira à acheter pions, icônes et bannières.';
+      note.textContent = 'La boutique ouvrira avec le plateau (étape 4) : les PO gagnées en partie serviront à acheter pions, icônes et bannières.';
       grid.append(note);
     }
     App.openModal('modal-shop');

@@ -24,13 +24,13 @@ const firstOf = (group) => BOARD.findIndex((sq) => sq.group === group);
 
 test('chaque pion a un pouvoir, et la règle peut les couper', () => {
   for (const pawn of ['poro', 'teemo', 'ward', 'minion', 'zhonya', 'blade', 'tibbers', 'egg', 'classic']) assert.ok(PASSIVES[pawn]?.text);
-  assert.equal(newGame({ pawns: ['classic', 'poro'] }).players[0].gold, 1500 + PASSIVES.classic.start, 'pion classique : Or en plus');
+  assert.equal(newGame({ pawns: ['classic', 'poro'] }).players[0].gold, 1500 + PASSIVES.classic.start, 'pion classique : PO en plus');
   assert.equal(newGame({ pawns: ['classic', 'poro'], rules: { passives: false } }).players[0].gold, 1500);
   assert.equal(sanitizeRules({ turnTimer: 45 }).turnTimer, 60, 'durée de chrono invalide ignorée');
   assert.equal(sanitizeRules({ turnTimer: 0 }).turnTimer, 0);
 });
 
-test('Poro : de l’Or en plus en passant par la Fontaine', () => {
+test('Poro : des PO en plus en passant par la Fontaine', () => {
   const g = newGame({ pawns: ['poro', 'teemo'] });
   const p = g.players[0];
   p.pos = 38;
@@ -38,7 +38,7 @@ test('Poro : de l’Or en plus en passant par la Fontaine', () => {
   assert.equal(p.gold, 1500 + 200 + PASSIVES.poro.gold);
 });
 
-test('Champignon de Teemo : de l’Or en plus sur les loyers reçus ; Stase de Zhonya : un loyer annulé', () => {
+test('Champignon de Teemo : des PO en plus sur les loyers reçus ; Stase de Zhonya : un loyer annulé', () => {
   const g = newGame({ pawns: ['teemo', 'zhonya'] });
   const [teemo, zhonya] = g.players;
   const i = firstOf('marron');
@@ -53,7 +53,7 @@ test('Champignon de Teemo : de l’Or en plus sur les loyers reçus ; Stase de Z
   zhonya.pos = i - 1;
   g.moveBy(zhonya, 1);
   const rent = BOARD[i].rent[0] + PASSIVES.teemo.gold;
-  assert.equal(zhonya.gold, 1500 - rent, 'loyer + Or du champignon');
+  assert.equal(zhonya.gold, 1500 - rent, 'loyer + PO du champignon');
   assert.equal(teemo.gold, 1500 + rent);
 });
 

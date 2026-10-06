@@ -375,8 +375,8 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
 
     const img = images.get(i);
     const name = sq.type === 'go' ? 'FONTAINE' : sq.type === 'jail' ? 'PRISON' : sq.name.toUpperCase();
-    const sub = sq.type === 'go' ? '+200 Or' : sq.type === 'jail' ? 'Simple visite'
-      : sq.kind === 'sbires' ? '10 % ou 200 Or' : priceLabel(sq);
+    const sub = sq.type === 'go' ? '+200 PO' : sq.type === 'jail' ? 'Simple visite'
+      : sq.kind === 'sbires' ? '10 % ou 200 PO' : priceLabel(sq);
 
     if (sq.type === 'property') {
       const color = groups[sq.group].color;

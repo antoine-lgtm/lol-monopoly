@@ -632,14 +632,14 @@
     help.replaceChildren(
       ...section('Sorts d’invocateur (2 par joueur)', (lobby.spellList || []).map((sp) => [`${sp.name} (${sp.cd} tours)`, sp.text])),
       ...section('Quêtes de rôle', Object.entries(lobby.quests || {}).map(([role, q]) => [`${ROLE_LABELS[role]} — ${q.name}`, `${q.text}. Récompense : ${q.reward}.`])),
-      ...section('Objets (3 au maximum, achetés à la Fontaine ou à la Boutique)', Object.values(lobby.items || {}).map((it) => [`${it.name} (${it.price} Or${it.tier === 'late' ? ', fin de partie' : ''})`, it.text])),
+      ...section('Objets (3 au maximum, achetés à la Fontaine ou à la Boutique)', Object.values(lobby.items || {}).map((it) => [`${it.name} (${it.price} PO${it.tier === 'late' ? ', fin de partie' : ''})`, it.text])),
       ...(lobby.rules?.passives !== false ? section('Pouvoirs des pions', Object.entries(lobby.passives || {}).map(([id, pv]) => [`${PAWN_LABELS[id]} — ${pv.name}`, pv.text])) : []),
       ...(lobby.rules?.events !== false ? section('Événements de la Faille (un tous les 4 tours)', Object.values(lobby.events || {}).map((ev) => [ev.name, ev.text])) : []),
       ...section('Grands objectifs', [
         ['Âme du Dragon', 'Posséder les 4 Dragons : +30 % sur tous tes loyers pendant 5 tours.'],
         ['Dragon Ancien (tour 15)', 'Le premier à tomber sur une case Dragon : +30 % sur tous ses loyers pendant 5 tours (cumulable avec l’Âme).'],
         ['Héraut de la Faille (tour 8)', 'Apparaît dans la fosse du Baron : le joueur qui le récupère détruit une construction adverse.'],
-        ['Baron Nashor (tour 3)', 'Loyers +50 % et +300 Or au prochain passage par la Fontaine.'],
+        ['Baron Nashor (tour 3)', 'Loyers +50 % et +300 PO au prochain passage par la Fontaine.'],
       ]),
     );
   }

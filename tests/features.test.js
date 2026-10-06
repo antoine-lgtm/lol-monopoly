@@ -38,7 +38,7 @@ test('sorts par défaut : Flash et Soin ; deux sorts différents au choix', () =
   assert.deepEqual(g.players[1].spells.map((sp) => sp.id), ['flash', 'heal']);
 });
 
-test('Soin : +100 Or puis recharge', () => {
+test('Soin : +100 PO puis recharge', () => {
   const g = newGame();
   const p = g.players[0];
   assert.equal(g.useSpell('p0', 'heal').ok, true);
@@ -182,7 +182,7 @@ test('quêtes : chaque rôle a la sienne, récompense quand elle est finie', () 
   g.checkQuest(mid);
   assert.equal(mid.quest.done, true);
   assert.equal(g.buildCost(mid, 'bleu'), Math.round(200 * 0.9));
-  // ADC : Or de loyers
+  // ADC : PO de loyers
   const adc = g.players[3];
   const i = firstProperty('bleu');
   g.props[i] = { owner: adc.key, level: 4, mortgaged: false };
