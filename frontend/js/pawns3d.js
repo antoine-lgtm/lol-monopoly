@@ -17,7 +17,7 @@ import { mergeGeometries } from '/vendor/three-addons/utils/BufferGeometryUtils.
 // Ils remplacent le pion dessiné en formes simples ; sinon on garde ce dernier.
 // ---------------------------------------------------------------------------
 
-const MODEL_HEIGHT = 0.56; // hauteur visée (comme les pions dessinés)
+const MODEL_SIZE = 0.5; // plus grande dimension visée (comme les pions dessinés)
 const loadedModels = new Map(); // kind -> { scene, animations }
 
 /** Charge les modèles présents sur le serveur (liste dans /pawn-models.json). À attendre avant buildPawn. */
@@ -58,7 +58,7 @@ async function cloneModel(kind) {
   // mise à l'échelle et centrage : pieds sur le socle, centré, hauteur fixe
   const box = new THREE.Box3().setFromObject(scene);
   const size = box.getSize(new THREE.Vector3());
-  const k = MODEL_HEIGHT / Math.max(size.y, size.x * 0.8, size.z * 0.8, 1e-6);
+  const k = MODEL_SIZE / Math.max(size.y, size.x, size.z, 1e-6);
   scene.scale.multiplyScalar(k);
   box.setFromObject(scene);
   const center = box.getCenter(new THREE.Vector3());

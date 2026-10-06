@@ -1,0 +1,8 @@
+Crédits des modèles 3D des pions
+================================
+
+poro.glb
+  « League of Legends Poro » par hotwire12 (Printables / Thingiverse),
+  licence Creative Commons Attribution 4.0 (CC BY 4.0).
+  Modèle extrait de League of Legends (Riot Games). Converti du STL en GLB,
+  peint (fourrure, cornes, pattes) et doté d'yeux pour le jeu.

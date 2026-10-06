@@ -74,6 +74,12 @@ s'affiche, avec un bandeau qui explique pourquoi. `?3d=1` force la 3D, `?3d=0` l
 Déposer ses images dans `frontend/assets/board/real/` (dragons, potions, coffre, ping, coins…) :
 la liste des noms est dans `LISEZMOI.txt`. Elles remplacent les dessins par défaut.
 
+## Crédits
+
+- Modèle 3D du Poro : « League of Legends Poro » par hotwire12 (Printables), licence CC BY 4.0 —
+  voir `frontend/assets/pawns/models/CREDITS.txt`.
+- League of Legends et ses éléments appartiennent à Riot Games.
+
 ## Organisation
 
 | Dossier | Contenu |
