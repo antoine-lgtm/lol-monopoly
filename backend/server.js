@@ -16,7 +16,10 @@ const crypto = require('crypto');
 const express = require('express');
 const { Server } = require('socket.io');
 const { Game } = require('./game');
-const { SPELLS, ITEMS, QUESTS, DEFAULT_SPELLS, DEFAULT_RULES, sanitizeRules, sanitizeSpells } = require('./features');
+const { LEVELS: BOT_LEVELS, botStep, botAnswerTrade } = require('./bot');
+const {
+  SPELLS, ITEMS, QUESTS, PASSIVES, EVENTS, SKINS, skinUnlocked, DEFAULT_SPELLS, DEFAULT_RULES, sanitizeRules, sanitizeSpells,
+} = require('./features');
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -35,6 +38,13 @@ const CHAT_RATE_LIMIT = { max: 5, windowMs: 3000 };
 const RECONNECT_GRACE_MS = 30_000; // rafraîchir la page ne fait pas quitter le lobby
 const INVITE_TTL_MS = 60_000;
 const AUTOPLAY_DELAY_MS = 15_000; // un joueur déconnecté joue automatiquement après ce délai
+const TIMEOUT_STEP_MS = 900; // chrono écoulé : le jeu joue une action toutes les 0,9 s
+const BOT_STEP_MS = Number(process.env.BOT_STEP_MS) || 1100; // rythme des bots
+const BOT_NAMES = ['Garen', 'Annie', 'Ashe', 'Malphite', 'Ryze', 'Sona', 'Nunu', 'Lux', 'Darius', 'Jinx', 'Thresh', 'Ezreal'];
+// Emotes et pings envoyés pendant la partie
+const EMOTES = ['gg', 'wp', 'lol', 'question', 'angry', 'cry', 'thumb', 'heart', 'mastery', 'poro'];
+const PINGS = ['ping', 'danger', 'omw', 'question'];
+const EMOTE_COOLDOWN_MS = 1_200;
 
 const NAME_PATTERN = /^[\p{L}\p{N} _.-]{3,16}$/u;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -57,6 +67,15 @@ app.get('/board-art.json', (_req, res) => {
   let files = [];
   try {
     files = fs.readdirSync(REAL_ART_DIR).filter((f) => /\.(png|webp|jpe?g|svg)$/i.test(f));
+  } catch { /* dossier absent */ }
+  res.set('Cache-Control', 'no-cache').json(files);
+});
+// Répliques des champions déposées dans frontend/assets/voices/ (yasuo.mp3, yasuo-2.ogg…)
+const VOICES_DIR = path.join(__dirname, '..', 'frontend', 'assets', 'voices');
+app.get('/voices.json', (_req, res) => {
+  let files = [];
+  try {
+    files = fs.readdirSync(VOICES_DIR).filter((f) => /\.(mp3|ogg|wav|m4a|webm)$/i.test(f));
   } catch { /* dossier absent */ }
   res.set('Cache-Control', 'no-cache').json(files);
 });
@@ -131,6 +150,8 @@ function notify(key, level, message) {
   io.to(userRoom(key)).emit('notify', { level, message });
 }
 
+const isBot = (key) => Boolean(users.get(key)?.bot);
+
 function presenceOf(user) {
   if (!user.socketId) return { status: 'offline', label: 'Hors ligne' };
   const lobby = user.lobbyId && lobbies.get(user.lobbyId);
@@ -196,6 +217,10 @@ function serializeLobby(lobby) {
     spellList: Object.entries(SPELLS).map(([id, sp]) => ({ id, name: sp.name, cd: sp.cd, text: sp.text })),
     quests: QUESTS,
     items: ITEMS,
+    passives: PASSIVES,
+    events: EVENTS,
+    skins: SKINS,
+    botLevels: Object.fromEntries(Object.entries(BOT_LEVELS).map(([id, lv]) => [id, lv.name])),
     slots: lobby.slots.map((slot, index) => {
       if (!slot) return { index, player: null, pendingInvite: pendingBySlot.get(index) ?? null };
       const user = users.get(slot.key);
@@ -207,8 +232,11 @@ function serializeLobby(lobby) {
           role: slot.role,
           pawn: slot.pawn,
           spells: slot.spells || [...DEFAULT_SPELLS],
+          skin: slot.skin || 'base',
+          bot: user.bot || null,
+          stats: user.stats || { games: 0, wins: 0 },
           isOwner: slot.key === lobby.ownerKey,
-          connected: Boolean(user.socketId),
+          connected: Boolean(user.socketId) || Boolean(user.bot),
         },
         pendingInvite: null,
       };
@@ -264,7 +292,7 @@ function addToLobby(user, lobby, preferredSlot = null) {
   if (index === -1) return false;
 
   const taken = new Set(lobby.slots.filter(Boolean).map((s) => s.pawn));
-  lobby.slots[index] = { key: user.key, role: null, pawn: PAWNS.find((p) => !taken.has(p)), spells: [...DEFAULT_SPELLS] };
+  lobby.slots[index] = { key: user.key, role: null, pawn: PAWNS.find((p) => !taken.has(p)), spells: [...DEFAULT_SPELLS], skin: 'base' };
   lobby.invites.delete(user.key);
   user.lobbyId = lobby.id;
 
@@ -294,9 +322,12 @@ function removeFromLobby(user, reason = 'left') {
   const socket = user.socketId && io.sockets.sockets.get(user.socketId);
   if (socket) socket.leave(lobbyRoom(lobby.id));
 
+  if (user.bot) users.delete(user.key); // un bot retiré disparaît
   const remaining = lobby.slots.filter(Boolean);
-  if (remaining.length === 0) {
+  if (!remaining.some((s) => !isBot(s.key))) {
+    // plus aucun humain : on ferme le salon et ses bots
     clearTimeout(lobby.autoplayTimer);
+    for (const s of remaining) users.delete(s.key);
     deleteLobby(lobby);
     return;
   }
@@ -305,7 +336,7 @@ function removeFromLobby(user, reason = 'left') {
   systemMessage(lobby, `${user.name} ${verb}.`);
 
   if (lobby.ownerKey === user.key) {
-    lobby.ownerKey = remaining[0].key;
+    lobby.ownerKey = remaining.find((s) => !isBot(s.key)).key;
     systemMessage(lobby, `${users.get(lobby.ownerKey).name} est maintenant le chef du salon.`);
   }
   broadcastLobby(lobby);
@@ -330,36 +361,97 @@ function currentLobby(user) {
 // Partie
 // ---------------------------------------------------------------------------
 
+/** Chrono du tour : une nouvelle échéance à chaque nouveau tour de jeu. */
+function updateDeadline(lobby) {
+  const game = lobby.game;
+  const seconds = game.rules.turnTimer;
+  const current = game.currentPlayer;
+  if (!seconds || game.phase === 'over' || isBot(current.key)) {
+    lobby.deadline = null;
+    lobby.turnSig = null;
+    return;
+  }
+  const sig = `${game.id}:${game.turnId}`;
+  if (lobby.turnSig !== sig) {
+    lobby.turnSig = sig;
+    lobby.deadline = Date.now() + seconds * 1000;
+  }
+}
+
+/** État envoyé aux joueurs, avec le temps restant du tour (en ms, pour éviter les écarts d'horloge). */
+function gameState(lobby, { keepFx = true } = {}) {
+  const state = lobby.game.serialize();
+  if (!keepFx) state.fx = [];
+  state.timer = lobby.deadline ? { left: Math.max(0, lobby.deadline - Date.now()), total: lobby.game.rules.turnTimer * 1000 } : null;
+  return state;
+}
+
 function broadcastGame(lobby) {
   const game = lobby.game;
   if (!game) return;
-  io.to(lobbyRoom(lobby.id)).emit('game:state', game.serialize());
+  updateDeadline(lobby);
+  io.to(lobbyRoom(lobby.id)).emit('game:state', gameState(lobby));
 
   // Fin de partie : le salon redevient disponible pour une revanche
   if (game.phase === 'over' && lobby.status === 'in-game') {
     lobby.status = 'lobby';
     const winner = game.player(game.winner);
     systemMessage(lobby, winner ? `${winner.name} remporte la partie !` : 'Partie terminée.');
+    // profil : parties jouées et victoires (débloquent les skins)
+    for (const p of game.players) {
+      const u = users.get(p.key);
+      if (!u || u.bot) continue;
+      u.stats ||= { games: 0, wins: 0 };
+      u.stats.games += 1;
+      if (p.key === game.winner) u.stats.wins += 1;
+    }
     broadcastLobby(lobby);
     broadcastLobbyPresence(lobby);
   }
   scheduleAutoplay(lobby);
 }
 
-/** Si le joueur dont c'est le tour est déconnecté, on joue pour lui après un délai. */
+/**
+ * Qui joue la prochaine action ? Un bot (à son rythme), le jeu à la place d'un joueur
+ * dont le chrono est écoulé, ou d'un joueur déconnecté depuis un moment.
+ */
 function scheduleAutoplay(lobby) {
   clearTimeout(lobby.autoplayTimer);
   lobby.autoplayTimer = null;
   const game = lobby.game;
   if (!game || game.phase === 'over') return;
-  const user = users.get(game.currentPlayer.key);
-  if (user && user.socketId) return;
-  lobby.autoplayTimer = setTimeout(() => {
-    lobby.autoplayTimer = null;
-    if (lobby.game !== game || game.phase === 'over') return;
+  const run = (delay, fn) => {
+    lobby.autoplayTimer = setTimeout(() => {
+      lobby.autoplayTimer = null;
+      if (lobby.game !== game || game.phase === 'over') return;
+      try {
+        fn();
+      } catch (err) {
+        console.error('[autoplay]', err);
+        game.autoStep();
+      }
+      broadcastGame(lobby);
+    }, Math.max(0, delay));
+  };
+  // un bot à qui l'on propose un échange répond d'abord
+  if (game.trade && isBot(game.trade.to)) return run(BOT_STEP_MS * 1.5, () => botAnswerTrade(game, game.trade.to));
+  const key = game.currentPlayer.key;
+  const user = users.get(key);
+  if (user?.bot) {
+    return run(BOT_STEP_MS, () => {
+      const res = botStep(game, key);
+      if (!res.ok) game.autoStep(); // filet de sécurité : jamais bloqué
+    });
+  }
+  const delays = [];
+  if (lobby.deadline) delays.push(lobby.deadline - Date.now());
+  if (!user || !user.socketId) delays.push(AUTOPLAY_DELAY_MS);
+  if (!delays.length) return;
+  const delay = Math.min(...delays);
+  run(delay <= 0 ? TIMEOUT_STEP_MS : delay, () => {
+    if (game.trade && game.trade.from === key) game.cancelTrade(key);
     game.autoStep();
-    broadcastGame(lobby);
-  }, AUTOPLAY_DELAY_MS);
+  });
 }
 
 // Purge périodique des invitations expirées
@@ -451,7 +543,8 @@ io.on('connection', (socket) => {
 
     // Partie en cours : l'état part après la confirmation, pour que le client sache déjà qui il est
     if (lobby && lobby.game && lobby.status === 'in-game') {
-      socket.emit('game:state', { ...lobby.game.serialize(), fx: [] });
+      updateDeadline(lobby);
+      socket.emit('game:state', gameState(lobby, { keepFx: false }));
       scheduleAutoplay(lobby);
     }
   });
@@ -643,6 +736,60 @@ io.on('connection', (socket) => {
     reply(ack, { ok: true });
   }));
 
+  socket.on('lobby:setSkin', authed(({ skin }, ack) => {
+    const lobby = currentLobby(me);
+    if (!lobby) return fail(ack, 'Aucun salon.');
+    if (lobby.status !== 'lobby') return fail(ack, 'La partie est déjà lancée.');
+    if (!SKINS[skin]) return fail(ack, 'Skin inconnu.');
+    if (!skinUnlocked(skin, me.stats)) return fail(ack, 'Ce skin n’est pas encore débloqué.');
+    lobby.slots.find((s) => s && s.key === me.key).skin = skin;
+    broadcastLobby(lobby);
+    reply(ack, { ok: true });
+  }));
+
+  socket.on('lobby:addBot', authed(({ slot, level }, ack) => {
+    const lobby = currentLobby(me);
+    if (!lobby || lobby.ownerKey !== me.key) return fail(ack, 'Seul le chef du salon ajoute des bots.');
+    if (lobby.status !== 'lobby') return fail(ack, 'La partie est déjà lancée.');
+    if (!BOT_LEVELS[level]) return fail(ack, 'Niveau inconnu.');
+    const index = Number.isInteger(slot) && lobby.slots[slot] === null ? slot : lobby.slots.indexOf(null);
+    if (index === -1) return fail(ack, 'Le salon est complet.');
+    const usedNames = new Set(lobby.slots.filter(Boolean).map((s) => users.get(s.key)?.name));
+    const name = BOT_NAMES.find((n) => !usedNames.has(`${n} (bot)`)) || 'Bot';
+    const bot = {
+      key: `bot:${crypto.randomUUID().slice(0, 8)}`,
+      name: `${name} (bot)`,
+      icon: crypto.randomInt(ICON_COUNT),
+      bot: level,
+      socketId: null,
+      lobbyId: null,
+      friends: new Set(),
+      incomingRequests: new Set(),
+      disconnectTimer: null,
+      chatTimestamps: [],
+    };
+    users.set(bot.key, bot);
+    addToLobby(bot, lobby, index);
+    const s = lobby.slots[index];
+    const roles = new Set(lobby.slots.filter(Boolean).map((x) => x.role));
+    s.role = ROLES.find((r) => !roles.has(r)) || null;
+    s.spells = level === 'easy' ? [...DEFAULT_SPELLS] : ['heal', 'barrier'];
+    systemMessage(lobby, `${bot.name} (${BOT_LEVELS[level].name}) rejoint le salon.`);
+    broadcastLobby(lobby);
+    reply(ack, { ok: true });
+  }));
+
+  socket.on('lobby:removeBot', authed(({ slot }, ack) => {
+    const lobby = currentLobby(me);
+    if (!lobby || lobby.ownerKey !== me.key) return fail(ack, 'Seul le chef du salon retire les bots.');
+    if (lobby.status !== 'lobby') return fail(ack, 'La partie est déjà lancée.');
+    const s = lobby.slots[slot];
+    const bot = s && users.get(s.key);
+    if (!bot || !bot.bot) return fail(ack, 'Aucun bot à cette place.');
+    removeFromLobby(bot, 'kicked');
+    reply(ack, { ok: true });
+  }));
+
   socket.on('lobby:kick', authed(({ name }, ack) => {
     const lobby = currentLobby(me);
     if (!lobby || lobby.ownerKey !== me.key) return fail(ack, 'Seul le chef du salon peut exclure.');
@@ -670,7 +817,7 @@ io.on('connection', (socket) => {
     const order = [...players].sort((a, b) => (a.key === lobby.ownerKey ? -1 : b.key === lobby.ownerKey ? 1 : 0));
     lobby.game = new Game(order.map((s) => {
       const u = users.get(s.key);
-      return { key: u.key, name: u.name, icon: u.icon, pawn: s.pawn, role: s.role, spells: s.spells };
+      return { key: u.key, name: u.name, icon: u.icon, pawn: s.pawn, role: s.role, spells: s.spells, skin: s.skin, bot: u.bot || null };
     }), { rules: lobby.rules });
     systemMessage(lobby, 'Partie trouvée ! Chargement de la Faille…');
     broadcastLobby(lobby);
@@ -723,7 +870,35 @@ io.on('connection', (socket) => {
   socket.on('game:sync', authed((_payload, ack) => {
     const lobby = currentLobby(me);
     if (!lobby || !lobby.game) return fail(ack, 'Aucune partie.');
-    socket.emit('game:state', { ...lobby.game.serialize(), fx: [] });
+    socket.emit('game:state', gameState(lobby, { keepFx: false }));
+    reply(ack, { ok: true });
+  }));
+
+  // --- Emotes et pings sur le plateau ------------------------------------------
+
+  let lastEmote = 0;
+  const inGame = () => {
+    const lobby = currentLobby(me);
+    return lobby && lobby.game && lobby.status === 'in-game' && lobby.game.player(me.key) ? lobby : null;
+  };
+  socket.on('game:emote', authed(({ emote }, ack) => {
+    const lobby = inGame();
+    if (!lobby) return fail(ack, 'Aucune partie en cours.');
+    if (!EMOTES.includes(emote)) return fail(ack, 'Emote inconnue.');
+    if (Date.now() - lastEmote < EMOTE_COOLDOWN_MS) return fail(ack, 'Doucement !');
+    lastEmote = Date.now();
+    io.to(lobbyRoom(lobby.id)).emit('game:emote', { key: me.key, name: me.name, emote });
+    reply(ack, { ok: true });
+  }));
+  socket.on('game:ping', authed(({ index, kind }, ack) => {
+    const lobby = inGame();
+    if (!lobby) return fail(ack, 'Aucune partie en cours.');
+    const i = Number(index);
+    if (!Number.isInteger(i) || i < 0 || i >= 40) return fail(ack, 'Case invalide.');
+    if (Date.now() - lastEmote < EMOTE_COOLDOWN_MS) return fail(ack, 'Doucement !');
+    lastEmote = Date.now();
+    const color = lobby.game.player(me.key).color;
+    io.to(lobbyRoom(lobby.id)).emit('game:ping', { key: me.key, name: me.name, index: i, kind: PINGS.includes(kind) ? kind : 'ping', color });
     reply(ack, { ok: true });
   }));
 
@@ -785,6 +960,8 @@ function snapshot() {
       key: u.key,
       name: u.name,
       icon: u.icon,
+      bot: u.bot || null,
+      stats: u.stats || { games: 0, wins: 0 },
       lobbyId: u.lobbyId,
       friends: [...u.friends],
       incomingRequests: [...u.incomingRequests],
@@ -838,6 +1015,8 @@ function loadSave() {
         key: u.key,
         name: u.name,
         icon: u.icon,
+        bot: u.bot || null,
+        stats: u.stats || { games: 0, wins: 0 },
         socketId: null,
         lobbyId: u.lobbyId && lobbies.has(u.lobbyId) ? u.lobbyId : null,
         friends: new Set(u.friends),
@@ -846,6 +1025,7 @@ function loadSave() {
         chatTimestamps: [],
       };
       users.set(user.key, user);
+      if (user.bot) continue;
       // comme après une déconnexion : on garde sa place un moment, le temps qu'il revienne
       user.disconnectTimer = setTimeout(() => {
         user.disconnectTimer = null;

@@ -44,25 +44,64 @@ const BUFF_ROUNDS = 5; // pendant 5 tours de table
 const HERALD_ROUND = 8;
 const ELDER_ROUND = 15;
 
+/** Passif de chaque pion (règle « passives »). */
+const PASSIVES = {
+  poro: { name: 'Snax', text: '+20 Or à chaque passage par la Fontaine.' },
+  teemo: { name: 'Champignon toxique', text: '+10 Or sur chaque loyer que tu reçois.' },
+  ward: { name: 'Contrôle de vision', text: '+10 Or chaque fois que tu tires une carte (Ping SS ou Coffre).' },
+  minion: { name: 'Vague de sbires', text: 'Tu ne payes que la moitié aux Sbires.' },
+  zhonya: { name: 'Stase', text: 'Annule un loyer à payer (puis 10 tours de recharge).', cd: 10 },
+  blade: { name: 'Coup critique', text: '10 % de chances qu’un loyer reçu soit multiplié par 1,5.' },
+  tibbers: { name: 'Tibbers', text: 'Tes constructions coûtent 10 % de moins.' },
+  egg: { name: 'Renaissance', text: 'Une fois par partie, survit à la faillite : tu repars avec 0 Or.' },
+  classic: { name: 'Classique', text: '+100 Or au début de la partie.' },
+};
+
+/** Événements de la Faille : un tous les 4 tours de table, pendant 1 tour. */
+const EVENTS = {
+  rush: { name: 'Ruée des sbires', text: 'Passer par la Fontaine rapporte le double ce tour-ci.' },
+  patch: { name: 'Nouveau patch', text: 'Tous les loyers +25 % ce tour-ci.' },
+  fog: { name: 'Brouillard de guerre', text: 'Tous les loyers −25 % ce tour-ci.' },
+  sale: { name: 'Soldes de la Boutique', text: 'Objets et constructions −25 % ce tour-ci.' },
+  snowdown: { name: 'Snowdown', text: 'Cadeau de saison : chaque joueur reçoit 75 Or.' },
+  bounty: { name: 'Prime de guerre', text: 'Le joueur le plus riche donne 40 Or à chacun des autres.' },
+};
+const EVENT_EVERY = 4;
+
+/** Skins de pions, débloqués en jouant (parties jouées / victoires). */
+const SKINS = {
+  base: { name: 'Classique', games: 0, wins: 0 },
+  hextech: { name: 'Hextech', games: 1, wins: 0 },
+  shadow: { name: 'Obscur', games: 3, wins: 0 },
+  gold: { name: 'Prestige', games: 0, wins: 1 },
+  crystal: { name: 'Cristal', games: 0, wins: 3 },
+  infernal: { name: 'Infernal', games: 10, wins: 0 },
+};
+const skinUnlocked = (id, stats = {}) => Boolean(SKINS[id]) && (stats.games || 0) >= SKINS[id].games && (stats.wins || 0) >= SKINS[id].wins;
+
 const DEFAULT_RULES = {
   spells: true,
   quests: true,
   items: true,
   dragons: true, // Âme du Dragon et Dragon Ancien
   herald: true,
+  passives: true, // pouvoir de chaque pion
+  events: true, // événements de la Faille
   startGold: 1500,
   maxRounds: 0, // 0 = partie normale ; 20 = partie rapide (le plus riche gagne)
+  turnTimer: 60, // secondes par tour (0 = pas de chrono)
   fountainDouble: false, // double gain en s'arrêtant pile sur la Fontaine
 };
 
 /** Règles maison reçues du salon : on ne garde que des valeurs valides. */
 function sanitizeRules(raw = {}) {
   const rules = { ...DEFAULT_RULES };
-  for (const key of ['spells', 'quests', 'items', 'dragons', 'herald', 'fountainDouble']) {
+  for (const key of ['spells', 'quests', 'items', 'dragons', 'herald', 'passives', 'events', 'fountainDouble']) {
     if (typeof raw[key] === 'boolean') rules[key] = raw[key];
   }
   if ([1000, 1500, 2000].includes(raw.startGold)) rules.startGold = raw.startGold;
   if ([0, 20].includes(raw.maxRounds)) rules.maxRounds = raw.maxRounds;
+  if ([0, 30, 60, 90].includes(raw.turnTimer)) rules.turnTimer = raw.turnTimer;
   return rules;
 }
 
@@ -73,7 +112,7 @@ function sanitizeSpells(list) {
 }
 
 module.exports = {
-  SPELLS, DEFAULT_SPELLS, ITEMS, MAX_ITEMS, QUESTS,
+  SPELLS, DEFAULT_SPELLS, ITEMS, MAX_ITEMS, QUESTS, PASSIVES, EVENTS, EVENT_EVERY, SKINS, skinUnlocked,
   SOUL_BONUS, ELDER_BONUS, BUFF_ROUNDS, HERALD_ROUND, ELDER_ROUND,
   DEFAULT_RULES, sanitizeRules, sanitizeSpells,
 };

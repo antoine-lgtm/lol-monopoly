@@ -12,7 +12,8 @@
  */
 
 const {
-  SPELLS, ITEMS, MAX_ITEMS, QUESTS, SOUL_BONUS, ELDER_BONUS, BUFF_ROUNDS, HERALD_ROUND, ELDER_ROUND,
+  SPELLS, ITEMS, MAX_ITEMS, QUESTS, PASSIVES, EVENTS, EVENT_EVERY, SKINS,
+  SOUL_BONUS, ELDER_BONUS, BUFF_ROUNDS, HERALD_ROUND, ELDER_ROUND,
   sanitizeRules, sanitizeSpells,
 } = require('./features');
 
@@ -159,9 +160,13 @@ class Game {
       name: p.name,
       icon: p.icon,
       pawn: p.pawn || 'classic',
+      skin: SKINS[p.skin] ? p.skin : 'base',
+      bot: p.bot || null, // niveau du bot (easy | normal | hard), null pour un humain
       color: PLAYER_COLORS[i % PLAYER_COLORS.length],
       pos: 0,
-      gold: this.rules.startGold,
+      gold: this.rules.startGold + (this.rules.passives && p.pawn === 'classic' ? 100 : 0),
+      passiveCd: 0, // recharge du passif (Zhonya)
+      reborn: false, // Renaissance (Œuf d'Anivia) déjà utilisée
       role: QUESTS[p.role] ? p.role : null,
       spells: this.rules.spells ? sanitizeSpells(p.spells).map((id) => ({ id, cd: 0 })) : [],
       items: [], // { id, cd }
@@ -192,6 +197,10 @@ class Game {
     this.elder = { active: false, taken: false };
     this.soulTaken = null;
     this.ghostDice = null;
+    /** Événement de la Faille en cours : { id, until } (jusqu'au tour de table `until`, exclu). */
+    this.event = null;
+    /** Change à chaque nouveau tour de jeu (ou relance après un double) : sert au chrono. */
+    this.turnId = 0;
     this.supply = { towers: TOWER_SUPPLY, inhibs: INHIB_SUPPLY };
     /** Statistiques de fin de partie, par joueur. */
     this.stats = Object.fromEntries(this.players.map((p) => [p.key, {
@@ -263,6 +272,8 @@ class Game {
     }
     if (owner?.baron) rent *= BARON_RENT_MULT;
     if (owner) rent *= 1 + this.rentBonus(owner);
+    if (this.eventIs('patch')) rent *= 1.25;
+    if (this.eventIs('fog')) rent *= 0.75;
     return Math.round(rent);
   }
 
@@ -280,6 +291,27 @@ class Game {
     return p.items.some((it) => it.id === id);
   }
 
+  /** Le pion du joueur a-t-il ce passif (règle « passives » active) ? */
+  hasPassive(p, pawn) {
+    return this.rules.passives && p.pawn === pawn;
+  }
+
+  eventIs(id) {
+    return this.event?.id === id;
+  }
+
+  /** Prix d'une construction : Tibbers −10 %, Soldes −25 %. */
+  buildCost(p, group) {
+    let cost = GROUPS[group].house;
+    if (this.hasPassive(p, 'tibbers')) cost *= 0.9;
+    if (this.eventIs('sale')) cost *= 0.75;
+    return Math.round(cost);
+  }
+
+  itemPrice(id) {
+    return Math.round(ITEMS[id].price * (this.eventIs('sale') ? 0.75 : 1));
+  }
+
   /** Le joueur paye le loyer d'une case : réductions, Embrasement et Barrière compris. */
   payRent(p, owner, index) {
     const sq = BOARD[index];
@@ -289,6 +321,20 @@ class Game {
     if (this.hasItem(p, 'frozen')) cut += 0.12;
     rent *= 1 - cut;
     const notes = [];
+    if (this.hasPassive(p, 'zhonya') && !p.passiveCd && rent > 0) {
+      p.passiveCd = PASSIVES.zhonya.cd;
+      this.effect({ type: 'passive', key: p.key, pawn: 'zhonya' });
+      this.say(`Stase de Zhonya : ${p.name} ne paye pas le loyer de ${sq.name} !`);
+      return;
+    }
+    if (this.hasPassive(owner, 'blade') && this.random() < 0.1) {
+      rent *= 1.5;
+      notes.push('Coup critique ×1,5');
+    }
+    if (this.hasPassive(owner, 'teemo')) {
+      rent += 10;
+      notes.push('Champignon +10');
+    }
     if (owner.armed.ignite) {
       rent *= 1.5;
       owner.armed.ignite = false;
@@ -302,6 +348,7 @@ class Game {
       notes.push(`Barrière −${saved}`);
     }
     this.say(`${p.name} paye ${rent} Or de loyer à ${owner.name} (${sq.name})${notes.length ? ` — ${notes.join(', ')}` : ''}.`);
+    this.effect({ type: 'rent', key: p.key, owner: owner.key, index, amount: rent });
     this.stats[p.key].rentPaid += rent;
     this.stats[owner.key].rentEarned += rent;
     if (p.quest && p.quest.id === 'SUPP') p.quest.paid += 1;
@@ -460,6 +507,11 @@ class Game {
   passGo(p) {
     this.gain(p, GO_BONUS);
     this.say(`${p.name} passe par la Fontaine : +${GO_BONUS} Or.`);
+    if (this.eventIs('rush')) {
+      this.gain(p, GO_BONUS);
+      this.say(`Ruée des sbires : ${p.name} reçoit ${GO_BONUS} Or de plus.`);
+    }
+    if (this.hasPassive(p, 'poro')) this.gain(p, 20);
     if (this.rules.items) p.canShop = true; // on peut acheter des objets en passant à la base
     if (this.hasItem(p, 'potion')) this.gain(p, 30);
     if (p.quest && p.quest.id === 'TOP' && !p.quest.done) {
@@ -585,6 +637,7 @@ class Game {
     const title = deckName === 'chance' ? 'Ping SS' : 'Coffre Hextech';
     this.effect({ type: 'card', key: p.key, deck: deckName, title, text: card.text });
     this.say(`${p.name} — ${title} : ${card.text}`);
+    if (this.hasPassive(p, 'ward')) this.gain(p, 10);
     if (card.bad) {
       const veil = p.items.find((it) => it.id === 'banshee' && !it.cd);
       if (veil || p.perks.cardShield) {
@@ -620,6 +673,7 @@ class Game {
     if (this.phase === 'over' || this.phase === 'debt') return;
     if (this.phase === 'buy' || this.phase === 'tax') return;
     this.phase = this.rollAgain && !this.currentPlayer.inJail ? 'roll' : 'end';
+    if (this.phase === 'roll') this.turnId += 1;
   }
 
   roll(key) {
@@ -748,7 +802,8 @@ class Game {
     const error = this.guard(key, ['tax']);
     if (error) return { ok: false, error };
     const p = this.currentPlayer;
-    const amount = choice === 'percent' ? Math.round(this.netWorth(p) * 0.1) : 200;
+    let amount = choice === 'percent' ? Math.round(this.netWorth(p) * 0.1) : 200;
+    if (this.hasPassive(p, 'minion')) amount = Math.round(amount / 2);
     this.say(`${p.name} paye ${amount} Or aux Sbires.`);
     this.phase = 'end';
     this.charge(p, amount, null);
@@ -818,8 +873,10 @@ class Game {
         this.effect({ type: 'elder-spawn' });
         this.say('Le Dragon Ancien s’éveille : le premier à tomber sur une case Dragon le terrasse !');
       }
+      this.rollEvent();
     }
     this.current = next;
+    this.turnId += 1;
     this.startTurn(this.currentPlayer);
     this.phase = 'roll';
     this.doubles = 0;
@@ -833,8 +890,27 @@ class Game {
   startTurn(p) {
     for (const sp of p.spells) if (sp.cd > 0) sp.cd -= 1;
     for (const it of p.items) if (it.cd > 0) it.cd -= 1;
+    if (p.passiveCd > 0) p.passiveCd -= 1;
     p.canShop = false;
     if (this.hasItem(p, 'doran')) this.gain(p, 10);
+  }
+
+  /** Nouveau tour de table : fin de l'événement en cours, et un nouveau tous les 4 tours. */
+  rollEvent() {
+    if (this.event && this.round >= this.event.until) this.event = null;
+    if (!this.rules.events || this.round % EVENT_EVERY !== 0) return;
+    const ids = Object.keys(EVENTS);
+    const id = ids[Math.floor(this.random() * ids.length)];
+    this.event = { id, until: this.round + 1 };
+    this.effect({ type: 'event', event: id });
+    this.say(`Événement de la Faille — ${EVENTS[id].name} : ${EVENTS[id].text}`);
+    const alive = this.alivePlayers();
+    if (id === 'snowdown') for (const p of alive) this.gain(p, 75);
+    if (id === 'bounty') {
+      const rich = [...alive].sort((a, b) => this.netWorth(b) - this.netWorth(a))[0];
+      // la prime ne fait jamais tomber en dette : on donne ce qu'on a
+      if (rich) for (const other of alive) if (other !== rich) this.charge(rich, Math.min(40, Math.max(0, rich.gold)), other);
+    }
   }
 
   /** Partie rapide : à la fin du dernier tour, le plus riche gagne. */
@@ -954,12 +1030,13 @@ class Game {
     if (!p.canShop) return { ok: false, error: 'Passe par la Fontaine ou la Boutique pour acheter.' };
     if (p.items.length >= MAX_ITEMS) return { ok: false, error: `${MAX_ITEMS} objets au maximum : revends-en un.` };
     if (this.hasItem(p, id)) return { ok: false, error: 'Tu as déjà cet objet.' };
-    if (p.gold < item.price) return { ok: false, error: 'Pas assez d’Or.' };
-    p.gold -= item.price;
+    const price = this.itemPrice(id);
+    if (p.gold < price) return { ok: false, error: 'Pas assez d’Or.' };
+    p.gold -= price;
     p.items.push({ id, cd: 0 });
-    this.effect({ type: 'gold', key, amount: -item.price });
+    this.effect({ type: 'gold', key, amount: -price });
     this.effect({ type: 'item', key, item: id });
-    this.say(`${p.name} achète ${item.name} (${item.price} Or).`);
+    this.say(`${p.name} achète ${item.name} (${price} Or).`);
     return { ok: true };
   }
 
@@ -1040,7 +1117,7 @@ class Game {
     if (st.level >= MAX_LEVEL) return { ok: false, error: 'Inhibiteur déjà construit.' };
     const minLevel = Math.min(...members.map((i) => this.props[i].level));
     if (st.level > minLevel) return { ok: false, error: 'Construis d’abord sur les autres cases du groupe.' };
-    const cost = GROUPS[sq.group].house;
+    const cost = this.buildCost(p, sq.group);
     if (p.gold < cost) return { ok: false, error: 'Pas assez d’Or.' };
     const inhib = st.level + 1 === MAX_LEVEL;
     if (inhib && this.supply.inhibs <= 0) return { ok: false, error: 'La banque n’a plus d’Inhibiteur en réserve.' };
@@ -1273,6 +1350,16 @@ class Game {
       if (p === this.currentPlayer) this.checkDebt();
       return;
     }
+    if (this.hasPassive(p, 'egg') && !p.reborn && !this.voluntaryForfeit) {
+      // Renaissance de l'Œuf d'Anivia : une fois par partie
+      p.reborn = true;
+      this.clawBack(p);
+      p.gold = 0;
+      this.effect({ type: 'passive', key: p.key, pawn: 'egg' });
+      this.say(`Renaissance ! ${p.name} renaît de son œuf avec 0 Or.`);
+      if (p === this.currentPlayer) this.checkDebt();
+      return;
+    }
     this.clawBack(p);
     p.bankrupt = true;
     this.eliminated += 1;
@@ -1360,7 +1447,13 @@ class Game {
     game.elder ||= { active: false, taken: false };
     game.soulTaken ??= null;
     game.ghostDice ??= null;
+    game.event ??= null;
+    game.turnId ??= 0;
     for (const p of game.players) {
+      p.skin ||= 'base';
+      p.bot ??= null;
+      p.passiveCd ??= 0;
+      p.reborn ??= false;
       p.role ??= null;
       p.spells ||= [];
       p.items ||= [];
@@ -1393,8 +1486,11 @@ class Game {
       herald: { ...this.herald },
       elder: { ...this.elder },
       ghostDice: this.ghostDice,
+      turnId: this.turnId,
+      event: this.event ? { id: this.event.id, ...EVENTS[this.event.id] } : null,
       rules: this.rules,
-      catalog: { spells: SPELLS, items: ITEMS, quests: QUESTS, maxItems: MAX_ITEMS },
+      catalog: { spells: SPELLS, items: ITEMS, quests: QUESTS, maxItems: MAX_ITEMS, passives: PASSIVES, events: EVENTS },
+      prices: { sale: this.eventIs('sale') },
       winner: this.winner,
       supply: { ...this.supply },
       stats: this.stats,
@@ -1404,6 +1500,10 @@ class Game {
         name: p.name,
         icon: p.icon,
         pawn: p.pawn,
+        skin: p.skin,
+        bot: p.bot,
+        passiveCd: p.passiveCd,
+        reborn: p.reborn,
         color: p.color,
         pos: p.pos,
         gold: p.gold,
