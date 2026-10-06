@@ -138,6 +138,15 @@ test.describe('dans le navigateur', { skip }, () => {
     noErrors(a, b);
   });
 
+  test('sorts d’invocateur : Soin depuis le kit (+100 Or, puis recharge)', async () => {
+    const { a, b } = await startGame(PORT, ['Karma', 'Lux']);
+    await a.waitForSelector('#gv-kit .gv-kit__btn--spell.is-ready');
+    await a.click('#gv-kit .gv-kit__btn--spell:nth-child(2)'); // Flash, Soin par défaut
+    await a.waitForFunction(() => document.querySelector('.gv-player.is-me .gv-player__gold').textContent.replace(/\D/g, '') === '1600');
+    await a.waitForSelector('#gv-kit .gv-kit__btn--spell.is-cooldown');
+    noErrors(a, b);
+  });
+
   test('échange : proposer de l’or, l’autre joueur accepte', async () => {
     const { a, b } = await startGame(PORT, ['Ezreal', 'Fiora']);
     await a.waitForSelector('.gv-btn--trade');

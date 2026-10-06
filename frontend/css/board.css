@@ -2356,3 +2356,133 @@ body.reduce-motion .gv-pawn.is-current .gv-standee__body {
   body.in-game .notifications { bottom: 120px; left: 8px; right: 8px; width: auto; }
   .gv-3dnotice { top: 112px; }
 }
+
+/* =====================================================================
+   Kit du joueur : sorts, objets, quête, Héraut ; boutique ; quêtes des joueurs
+   ===================================================================== */
+.gv-kit {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  pointer-events: auto;
+}
+.gv-kit:empty { display: none; }
+.gv-kit__group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 7px;
+  border: 1px solid rgba(200, 155, 60, 0.35);
+  border-radius: 10px;
+  background: rgba(1, 10, 19, 0.82);
+}
+.gv-kit__btn {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 2px solid #463714;
+  border-radius: 8px;
+  background: #0a1620;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s, filter 0.15s;
+}
+.gv-kit__btn img { display: block; width: 100%; height: 100%; border-radius: 6px; }
+.gv-kit__btn:not(.is-ready) { filter: saturate(0.55) brightness(0.8); }
+.gv-kit__btn.is-ready { border-color: #c89b3c; }
+.gv-kit__btn.is-ready:hover { transform: translateY(-2px); border-color: #f0e6d2; }
+.gv-kit__btn.is-armed { border-color: #0ac8b9; filter: none; box-shadow: 0 0 0 2px rgba(10, 200, 185, 0.4), 0 0 14px rgba(10, 200, 185, 0.6); }
+.gv-kit__btn.is-cooldown img { filter: grayscale(1) brightness(0.45); }
+.gv-kit__btn--item:not(.is-ready) { filter: none; cursor: pointer; }
+.gv-kit__cd {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 800 18px/1 Barlow, Arial, sans-serif;
+  color: #f0e6d2;
+  text-shadow: 0 1px 3px #000;
+}
+.gv-kit__badge {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  min-width: 16px;
+  padding: 1px 4px;
+  border-radius: 8px;
+  background: #c89b3c;
+  color: #0a0e13;
+  font: 800 10px/1.3 Barlow, Arial, sans-serif;
+}
+.gv-kit__slot {
+  width: 44px;
+  height: 44px;
+  border: 2px dashed rgba(120, 90, 40, 0.5);
+  border-radius: 8px;
+}
+.gv-btn--shop { border-color: #f0c860; color: #f0d890; animation: shop-pulse 1.6s ease-in-out infinite; }
+@keyframes shop-pulse { 50% { box-shadow: 0 0 14px rgba(240, 200, 96, 0.55); } }
+.gv-kit__pop {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  z-index: 20;
+  width: max-content;
+  max-width: 300px;
+  padding: 10px;
+  transform: translateX(-50%);
+  border: 1px solid #785a28;
+  border-radius: 10px;
+  background: rgba(1, 10, 19, 0.97);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+.gv-kit__pop-title { margin: 0 0 8px; font-size: 12px; color: #cdbe91; line-height: 1.35; }
+.gv-kit__pop-list { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow: auto; }
+.gv-kit__pop-list .gv-btn { padding: 8px 12px; font-size: 12px; }
+.gv-kit__pop-empty { margin: 0; font-size: 12px; color: #7a8590; }
+
+/* boutique */
+.gv-shop__card { width: min(680px, 100%); }
+.gv-shop__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 8px; margin-bottom: 8px; }
+.gv-shop__item {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid rgba(120, 90, 40, 0.5);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.gv-shop__item.is-owned { border-color: #0ac8b9; }
+.gv-shop__item img { width: 44px; height: 44px; border-radius: 6px; }
+.gv-shop__info { display: flex; flex-direction: column; gap: 2px; }
+.gv-shop__info b { font-size: 13px; }
+.gv-shop__info small { font-size: 11.5px; line-height: 1.3; color: #a09b8c; }
+.gv-shop__item .gv-btn { padding: 8px 10px; font-size: 12px; white-space: nowrap; }
+
+/* liste des joueurs : quête et objets */
+.gv-player__quest {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  color: #7fe9f0;
+}
+.gv-player__quest > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gv-player__quest.is-done { color: #f0d890; }
+.gv-player__bar { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+.gv-player__bar span { display: block; height: 100%; background: linear-gradient(90deg, #0ac8b9, #7fe9f0); }
+.gv-player__quest.is-done .gv-player__bar span { background: linear-gradient(90deg, #c89b3c, #f0d890); }
+.gv-player__items { grid-column: 1 / -1; display: flex; gap: 4px; }
+.gv-player__items img { width: 20px; height: 20px; border-radius: 4px; border: 1px solid #463714; }
+.gv-tag--soul { background: rgba(255, 140, 60, 0.2); color: #ffc890; border-color: rgba(255, 140, 60, 0.5); }
+.gv-tag--elder { background: rgba(120, 220, 255, 0.18); color: #b8f0ff; border-color: rgba(120, 220, 255, 0.5); }
+.gv-tag--herald { background: rgba(178, 124, 255, 0.2); color: #e0c8ff; border-color: rgba(178, 124, 255, 0.5); }
+.gv-pill--event { border-color: rgba(120, 220, 255, 0.5); color: #b8f0ff; }
+@media (max-width: 760px) {
+  .gv-kit { gap: 6px; flex-wrap: wrap; justify-content: center; }
+  .gv-kit__btn, .gv-kit__slot { width: 36px; height: 36px; }
+  .gv-player__quest > span:first-child { font-size: 10px; }
+}

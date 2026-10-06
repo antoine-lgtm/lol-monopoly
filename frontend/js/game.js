@@ -184,6 +184,13 @@
           tone(55, 0.1, 1.4, 0.1, 'sawtooth');
           break;
         }
+        case 'spell': // sort lancé : souffle et éclat
+          noise(0, 0.25, 0.25, 1800, 'bandpass', 0.8).frequency.exponentialRampToValueAtTime(5000, now + 0.22);
+          bell(1175, 0.05, 0.4, 0.045);
+          break;
+        case 'quest': // fanfare courte
+          [659, 784, 988, 1319].forEach((f, k) => bell(f, k * 0.09, 0.6, 0.05));
+          break;
         case 'turn': // « à toi de jouer » : deux notes claires
           bell(784, 0, 0.5, 0.05);
           bell(1175, 0.12, 0.7, 0.05);
@@ -770,6 +777,41 @@
         case 'bankrupt':
           sfx('eliminated');
           break;
+        case 'spell':
+          sfx('spell');
+          break;
+        case 'item':
+          sfx('gain');
+          break;
+        case 'quest': {
+          sfx('quest');
+          const who = state.players.find((p) => p.key === fx.key);
+          App.toast(`${fx.key === myKey() ? 'Quête accomplie' : `${who?.name} accomplit sa quête`} : ${catalog().quests[fx.role]?.name || ''}`, 'success', 4500);
+          break;
+        }
+        case 'soul':
+        case 'elder':
+          sfx('baron');
+          App.toast(`${state.players.find((p) => p.key === fx.key)?.name} obtient ${fx.type === 'soul' ? 'l’Âme du Dragon' : 'le Dragon Ancien'} : +30 % sur ses loyers pendant 5 tours !`, 'info', 5000);
+          break;
+        case 'elder-spawn':
+          sfx('baron');
+          App.toast('Le Dragon Ancien s’éveille : le premier sur une case Dragon le terrasse !', 'info', 5000);
+          break;
+        case 'herald-spawn':
+          App.toast('Le Héraut de la Faille apparaît dans la fosse du Baron !', 'info', 5000);
+          break;
+        case 'herald':
+        case 'herald-charge':
+          sfx('build');
+          break;
+        case 'angel':
+          sfx('victory');
+          App.toast(`L’Ange gardien sauve ${state.players.find((p) => p.key === fx.key)?.name} !`, 'info', 4500);
+          break;
+        case 'card-blocked':
+          sfx('spell');
+          break;
         case 'trade-offer':
           if (fx.to === myKey()) sfx('card');
           break;
@@ -806,6 +848,7 @@
         mortgaged: st.mortgaged,
       })));
       b3.setPending(state.pendingIndex);
+      b3.setObjectives?.({ herald: state.herald?.active, elder: state.elder?.active });
     }
   }
 
@@ -846,6 +889,9 @@
       if (p.baron) tag('baron', 'Main du Baron', 'Loyers +50 % et +300 Or au prochain passage à la Fontaine');
       if (p.inJail) tag('jail', 'Prison', 'En prison');
       if (p.jailCards) tag('zhonya', `Zhonya ×${p.jailCards}`, 'Carte de sortie de prison');
+      if (p.soul) tag('soul', `Âme ${p.soul}t`, `Âme du Dragon : +30 % sur ses loyers (${p.soul} tours)`);
+      if (p.elderBuff) tag('elder', `Ancien ${p.elderBuff}t`, `Dragon Ancien : +30 % sur ses loyers (${p.elderBuff} tours)`);
+      if (p.herald) tag('herald', 'Héraut', 'Peut détruire une construction adverse');
 
       // Petites pastilles des groupes possédés
       const owned = document.createElement('div');
@@ -859,7 +905,32 @@
         dot.title = sq.name;
         owned.append(dot);
       }
-      row.append(pawn, info, tags, owned);
+      // quête du rôle : barre de progression
+      if (p.quest && !p.bankrupt) {
+        const def = catalog().quests[p.quest.id] || {};
+        const q = el('div', `gv-player__quest${p.quest.done ? ' is-done' : ''}`);
+        q.title = `${def.name} — ${def.text}. Récompense : ${def.reward}.`;
+        const label = el('span', '', p.quest.done ? `✓ Quête ${ROLE_NAMES[p.quest.id]}` : `Quête ${ROLE_NAMES[p.quest.id]} · ${def.text}`);
+        const bar = el('span', 'gv-player__bar');
+        const fill = el('span');
+        const goal = p.quest.id === 'SUPP' ? 2 : def.goal || 1;
+        fill.style.width = `${Math.min(100, (p.quest.progress / goal) * 100)}%`;
+        bar.append(fill);
+        q.append(label, bar);
+        row.append(q);
+      }
+      if (p.items?.length) {
+        const items = el('div', 'gv-player__items');
+        for (const it of p.items) {
+          const img = el('img');
+          img.src = itemIcon(it.id);
+          img.alt = catalog().items[it.id]?.name || '';
+          img.title = img.alt;
+          items.append(img);
+        }
+        row.append(items);
+      }
+      row.prepend(pawn, info, tags, owned);
       return row;
     }));
   }
@@ -874,6 +945,13 @@
       : holder ? `Main du Baron : ${holder.name}`
         : state.baron.taken ? 'Baron vaincu' : 'Baron au 3ᵉ tour';
     $('#gv-forfeit').hidden = !me() || me().bankrupt || state.phase === 'over';
+    const event = $('#gv-event');
+    const events = [];
+    if (state.herald?.active) events.push('Héraut dans la fosse');
+    if (state.elder?.active) events.push('Dragon Ancien éveillé');
+    if (state.rules?.maxRounds) events.push(`Partie rapide : ${state.round}/${state.rules.maxRounds}`);
+    event.hidden = !events.length;
+    event.textContent = events.join(' · ');
   }
 
   function button(label, action, { primary = false, payload = {}, disabled = false, hint = '' } = {}) {
@@ -964,6 +1042,16 @@
         box.append(button('Déclarer faillite', 'game:forfeit'));
         showTab('mine');
         break;
+      case 'ghost': {
+        const [a, b] = state.ghostDice || [0, 0];
+        status.textContent = `Fantôme : tu as fait ${a} + ${b}. Garde-les ou relance un dé.`;
+        box.append(
+          button(`Garder (${a + b})`, 'game:ghost', { primary: true, payload: { die: -1 } }),
+          button(`Relancer le ${a}`, 'game:ghost', { payload: { die: 0 } }),
+          button(`Relancer le ${b}`, 'game:ghost', { payload: { die: 1 } }),
+        );
+        break;
+      }
       case 'end':
         status.textContent = 'Construis, hypothèque, échange… ou termine ton tour.';
         box.append(button('Fin du tour', 'game:end', { primary: true }));
@@ -981,6 +1069,248 @@
       box.append(trade);
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Kit du joueur : sorts d'invocateur, objets, récompenses de quête, Héraut, boutique
+  // ---------------------------------------------------------------------------
+
+  const spellIcon = (id) => `assets/spells/${id}.svg`;
+  const itemIcon = (id) => `assets/items/${id}.svg`;
+  const catalog = () => state.catalog || { spells: {}, items: {}, quests: {}, maxItems: 3 };
+  const ROLE_NAMES = { TOP: 'Top', JGL: 'Jungle', MID: 'Mid', ADC: 'ADC', SUPP: 'Support' };
+
+  let kitPop = null; // petite bulle de choix au-dessus du kit
+  function closeKitPop() {
+    kitPop?.remove();
+    kitPop = null;
+  }
+  document.addEventListener('pointerdown', (e) => {
+    if (kitPop && !e.target.closest('.gv-kit__pop, .gv-kit__btn')) closeKitPop();
+  });
+
+  /** Ouvre une bulle de choix au-dessus d'un bouton du kit. */
+  function openKitPop(anchor, title, choices) {
+    closeKitPop();
+    const pop = el('div', 'gv-kit__pop');
+    pop.append(el('p', 'gv-kit__pop-title', title));
+    const list = el('div', 'gv-kit__pop-list');
+    if (!choices.length) list.append(el('p', 'gv-kit__pop-empty', 'Aucun choix possible.'));
+    for (const { label, onPick, primary = false } of choices) {
+      const b = el('button', `gv-btn${primary ? ' gv-btn--primary' : ''}`, label);
+      b.type = 'button';
+      b.addEventListener('click', () => { closeKitPop(); onPick(); });
+      list.append(b);
+    }
+    pop.append(list);
+    $('#gv-kit').append(pop);
+    const r = anchor.getBoundingClientRect();
+    const kr = $('#gv-kit').getBoundingClientRect();
+    pop.style.left = `${r.left + r.width / 2 - kr.left}px`;
+    kitPop = pop;
+  }
+
+  /** Cases du joueur où se téléporter (sauf celle où il est). */
+  const myTargets = (mine) => Object.entries(state.props)
+    .filter(([i, st]) => st.owner === mine.key && Number(i) !== mine.pos)
+    .map(([i]) => Number(i)).sort((a, b) => a - b);
+
+  function spellUsable(id, mine) {
+    const before = state.phase === 'roll';
+    switch (id) {
+      case 'flash': case 'ghost': return before && !mine.inJail && !mine.armed[id];
+      case 'teleport': return before && !mine.inJail && myTargets(mine).length > 0;
+      case 'cleanse': return before && mine.inJail;
+      case 'heal': return ['roll', 'end', 'debt'].includes(state.phase);
+      case 'barrier': case 'ignite': return ['roll', 'end', 'debt'].includes(state.phase) && !mine.armed[id];
+      default: return false;
+    }
+  }
+
+  function kitButton({ icon, title, cd = 0, armed = false, usable = false, onClick, cls = '', badge = '' }) {
+    const b = el('button', `gv-kit__btn ${cls}`);
+    b.type = 'button';
+    b.title = title;
+    b.setAttribute('aria-label', title.split(' — ')[0]);
+    b.classList.toggle('is-armed', armed);
+    b.classList.toggle('is-ready', usable);
+    b.classList.toggle('is-cooldown', cd > 0);
+    if (icon) {
+      const img = el('img');
+      img.src = icon;
+      img.alt = '';
+      b.append(img);
+    }
+    if (cd > 0) b.append(el('span', 'gv-kit__cd', String(cd)));
+    if (badge) b.append(el('span', 'gv-kit__badge', badge));
+    b.addEventListener('click', (e) => { e.stopPropagation(); onClick?.(b); });
+    return b;
+  }
+
+  function useSpell(id, anchor) {
+    const mine = me();
+    const name = catalog().spells[id]?.name || id;
+    if (id === 'flash') {
+      openKitPop(anchor, `${name} : au prochain lancer…`, [
+        { label: '+1 case', primary: true, onPick: () => send('game:spell', { spell: 'flash', arg: 1 }) },
+        { label: '−1 case', onPick: () => send('game:spell', { spell: 'flash', arg: -1 }) },
+      ]);
+    } else if (id === 'teleport') {
+      openKitPop(anchor, `${name} : aller sur…`, myTargets(mine).map((i) => ({
+        label: board[i].name, onPick: () => send('game:spell', { spell: 'teleport', arg: i }),
+      })));
+    } else {
+      send('game:spell', { spell: id });
+    }
+  }
+
+  function renderKit() {
+    const box = $('#gv-kit');
+    closeKitPop();
+    box.replaceChildren();
+    const mine = me();
+    if (!mine || mine.bankrupt || state.phase === 'over') return;
+    const myTurn = isMyTurn() && !state.trade;
+    const cat = catalog();
+
+    // sorts d'invocateur
+    if (mine.spells?.length) {
+      const group = el('div', 'gv-kit__group');
+      for (const sp of mine.spells) {
+        const def = cat.spells[sp.id] || {};
+        const armed = sp.id === 'flash' ? Boolean(mine.armed?.flash) : Boolean(mine.armed?.[sp.id]);
+        const usable = myTurn && !sp.cd && spellUsable(sp.id, mine);
+        group.append(kitButton({
+          icon: spellIcon(sp.id),
+          title: `${def.name} — ${def.text}${sp.cd ? ` (encore ${sp.cd} tour${sp.cd > 1 ? 's' : ''})` : ''}${armed ? ' (prêt)' : ''}`,
+          cd: sp.cd,
+          armed,
+          usable,
+          cls: 'gv-kit__btn--spell',
+          onClick: (b) => { if (usable) useSpell(sp.id, b); },
+        }));
+      }
+      box.append(group);
+    }
+
+    // objets (3 emplacements)
+    if (state.rules?.items) {
+      const group = el('div', 'gv-kit__group');
+      for (let k = 0; k < (cat.maxItems || 3); k++) {
+        const it = mine.items?.[k];
+        if (!it) {
+          group.append(el('span', 'gv-kit__slot'));
+          continue;
+        }
+        const def = cat.items[it.id] || {};
+        const canSell = myTurn && ['roll', 'end', 'debt'].includes(state.phase);
+        const bootsReady = it.id === 'boots' && myTurn && state.phase === 'roll' && !mine.inJail && !it.cd && !mine.armed?.boots;
+        group.append(kitButton({
+          icon: itemIcon(it.id),
+          title: `${def.name} — ${def.text}`,
+          cd: it.cd,
+          armed: it.id === 'boots' && Boolean(mine.armed?.boots),
+          usable: bootsReady,
+          cls: 'gv-kit__btn--item',
+          onClick: (b) => {
+            const choices = [];
+            if (bootsReady) choices.push({ label: 'Lacer les Bottes (+1 case)', primary: true, onPick: () => send('game:boots') });
+            if (canSell) choices.push({ label: `Revendre (+${Math.floor(def.price / 2)} Or)`, onPick: () => send('game:sellItem', { item: it.id }) });
+            openKitPop(b, `${def.name} — ${def.text}`, choices);
+          },
+        }));
+      }
+      // boutique ouverte après un passage par la Fontaine ou la Boutique
+      if (myTurn && mine.canShop) {
+        const shop = el('button', 'gv-btn gv-btn--shop', 'Boutique');
+        shop.type = 'button';
+        shop.addEventListener('click', openShop);
+        group.append(shop);
+      }
+      box.append(group);
+    }
+
+    // récompenses de quête et Héraut
+    const extras = el('div', 'gv-kit__group');
+    if (mine.perks?.freeTp) {
+      extras.append(kitButton({
+        icon: spellIcon('teleport'), title: 'Téléportation gratuite (quête Top)', badge: 'Q',
+        usable: myTurn && state.phase === 'roll' && !mine.inJail, cls: 'gv-kit__btn--perk',
+        onClick: (b) => openKitPop(b, 'Téléportation gratuite : aller sur…', myTargets(mine).map((i) => ({
+          label: board[i].name, onPick: () => send('game:perk', { perk: 'freeTp', arg: i }),
+        }))),
+      }));
+    }
+    if (mine.perks?.freeRecall) {
+      extras.append(kitButton({
+        icon: itemIcon('potion'), title: 'Retour gratuit à la Fontaine, +100 Or (quête Mid)', badge: 'Q',
+        usable: myTurn && state.phase === 'roll' && !mine.inJail, cls: 'gv-kit__btn--perk',
+        onClick: () => send('game:perk', { perk: 'freeRecall' }),
+      }));
+    }
+    if (mine.herald) {
+      const targets = Object.entries(state.props).filter(([, st]) => st.owner !== mine.key && st.level > 0).map(([i]) => Number(i));
+      extras.append(kitButton({
+        icon: itemIcon('herald'), title: 'Héraut de la Faille — détruit une construction adverse', badge: '×' + mine.herald,
+        usable: myTurn && ['roll', 'end'].includes(state.phase) && targets.length > 0, cls: 'gv-kit__btn--herald',
+        onClick: (b) => openKitPop(b, 'Le Héraut charge…', targets.map((i) => {
+          const owner = state.players.find((p) => p.key === state.props[i].owner);
+          return { label: `${board[i].name} (${owner?.name})`, onPick: () => send('game:herald', { index: i }) };
+        })),
+      }));
+    }
+    if (extras.children.length) box.append(extras);
+  }
+
+  // --- Boutique ------------------------------------------------------------------
+  const shopBox = document.createElement('div');
+  shopBox.className = 'gv-trade gv-shop';
+  shopBox.hidden = true;
+  view.append(shopBox);
+  function closeShop() { shopBox.hidden = true; }
+  function openShop() {
+    shopBox.hidden = false;
+    renderShop();
+  }
+  function renderShop() {
+    if (shopBox.hidden) return;
+    const mine = me();
+    if (!mine || !isMyTurn() || !mine.canShop) return closeShop();
+    const cat = catalog();
+    const card = el('div', 'gv-trade__card gv-shop__card');
+    card.setAttribute('role', 'dialog');
+    card.append(el('h3', 'gv-trade__title', 'Boutique'));
+    card.append(el('p', 'gv-trade__note', `${fmt(mine.gold)} Or · ${mine.items.length}/${cat.maxItems} objets · revente à moitié prix`));
+    for (const [tier, title] of [['early', 'Début de partie'], ['late', 'Fin de partie']]) {
+      card.append(el('h4', 'gv-trade__subtitle', title));
+      const grid = el('div', 'gv-shop__grid');
+      for (const [id, it] of Object.entries(cat.items).filter(([, x]) => x.tier === tier)) {
+        const owned = mine.items.some((x) => x.id === id);
+        const full = mine.items.length >= cat.maxItems;
+        const item = el('div', `gv-shop__item${owned ? ' is-owned' : ''}`);
+        const img = el('img');
+        img.src = itemIcon(id);
+        img.alt = '';
+        const info = el('div', 'gv-shop__info');
+        info.append(el('b', '', it.name), el('small', '', it.text));
+        const buy = el('button', 'gv-btn gv-btn--primary', owned ? 'Possédé' : `${it.price} Or`);
+        buy.type = 'button';
+        buy.disabled = owned || full || mine.gold < it.price;
+        buy.title = owned ? '' : full ? '3 objets au maximum : revends-en un' : mine.gold < it.price ? 'Pas assez d’Or' : 'Acheter';
+        buy.addEventListener('click', () => send('game:buyItem', { item: id }));
+        item.append(img, info, buy);
+        grid.append(item);
+      }
+      card.append(grid);
+    }
+    const foot = el('div', 'gv-trade__foot');
+    const close = el('button', 'gv-btn', 'Fermer');
+    close.type = 'button';
+    close.addEventListener('click', closeShop);
+    foot.append(close);
+    card.append(foot);
+    shopBox.replaceChildren(card);
+  }
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeShop(); });
 
   // ---------------------------------------------------------------------------
   // Échanges entre joueurs
@@ -1539,6 +1869,8 @@
     renderActions();
     renderLog();
     renderMine();
+    renderKit();
+    renderShop();
     renderTrade();
     renderOver();
     if (inspected !== null && state.phase !== 'buy') openInspect(inspected);

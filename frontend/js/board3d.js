@@ -1426,6 +1426,53 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   baronModel.scale.setScalar(0.9);
   scene.add(baronModel);
   const baronState = { risen: 0, target: 0 };
+
+  // Héraut de la Faille : petite créature violette à l'œil lumineux, dans la fosse du Baron
+  const herald = new THREE.Group();
+  {
+    const shellMat = new THREE.MeshPhysicalMaterial({ color: 0x7a3ac8, roughness: 0.35, clearcoat: 0.8 });
+    const shell = new THREE.Mesh(new THREE.SphereGeometry(0.2, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), shellMat);
+    shell.scale.set(1, 0.8, 1.1);
+    shell.position.y = 0.08;
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.06, 14, 10), new THREE.MeshStandardMaterial({ color: 0xbff8ff, emissive: 0x2ad8f0, emissiveIntensity: 2 }));
+    eye.position.set(0, 0.16, 0.17);
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x3a1a6a, roughness: 0.5 });
+    for (let k = 0; k < 6; k++) {
+      const side = k < 3 ? -1 : 1;
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.02, 0.16, 5), legMat);
+      leg.position.set(side * 0.2, 0.05, ((k % 3) - 1) * 0.11);
+      leg.rotation.z = side * 0.9;
+      herald.add(leg);
+    }
+    herald.add(shell, eye);
+    herald.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    herald.userData.eye = eye;
+    herald.visible = false;
+    scene.add(herald);
+  }
+  // Dragon Ancien éveillé : anneaux bleutés qui pulsent sur les 4 cases Dragon
+  const elderRings = board.map((sq, i) => (sq.type === 'dragon' ? i : -1)).filter((i) => i >= 0).map((i) => {
+    const { x0, y0, w, h } = squareRect(i);
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.2, 0.3, 40),
+      new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.copy(toWorld(x0 + w / 2, y0 + h / 2, TOP + 0.03));
+    ring.visible = false;
+    scene.add(ring);
+    return ring;
+  });
+  /** Héraut dans la fosse, Dragon Ancien éveillé. */
+  function setObjectives({ herald: heraldActive = false, elder = false } = {}) {
+    herald.visible = Boolean(heraldActive);
+    if (heraldActive) {
+      const c = cornerAt(20, 0.25);
+      herald.position.set(c.x, c.y, c.z);
+      herald.rotation.y = Math.atan2(-c.x, -c.z);
+    }
+    for (const r of elderRings) r.visible = Boolean(elder);
+  }
   const baronLight = new THREE.PointLight(0xb27cff, 0, 3, 2);
   scene.add(baronLight);
 
@@ -1954,6 +2001,16 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
         pos.needsUpdate = true;
       }
     }
+    if (herald.visible) {
+      herald.position.y = TOP + 0.05 + Math.abs(Math.sin(t * 3)) * 0.03;
+      herald.userData.eye.material.emissiveIntensity = 1.6 + Math.sin(t * 4) * 0.6;
+    }
+    for (const r of elderRings) {
+      if (!r.visible) continue;
+      const k = (t * 0.8) % 1;
+      r.scale.setScalar(0.8 + k * 0.9);
+      r.material.opacity = 0.7 * (1 - k);
+    }
     if (baronModel.visible) {
       baronState.risen += (baronState.target - baronState.risen) * 0.03;
       baronModel.userData.animate(t, baronState.risen);
@@ -2004,6 +2061,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   const api = {
     /** Ouvre le coffre hextech du centre (carte Coffre Hextech tirée). */
     openChest() { chest?.userData.open(); },
+    setObjectives,
     /** 'auto' | 'high' | 'medium' | 'low' */
     setQuality(q) {
       autoQuality = q === 'auto' && !FORCE_HQ;
