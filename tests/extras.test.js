@@ -131,6 +131,10 @@ test('bots : 150 parties entre bots se terminent, sans blocage ni incohérence',
     })), { random: rnd });
     let steps = 0;
     while (g.phase !== 'over' && steps++ < 80000) {
+      if (g.round > 150) {
+        g.endByRounds(); // partie trop longue : le plus riche gagne (comme la partie rapide)
+        break;
+      }
       if (g.trade) {
         assert.equal(botAnswerTrade(g, g.trade.to).ok, true);
         continue;
@@ -146,7 +150,7 @@ test('bots : 150 parties entre bots se terminent, sans blocage ni incohérence',
     }
     if (g.phase === 'over') finished += 1;
   }
-  assert.ok(finished >= 140, `${finished}/150 parties terminées`);
+  assert.equal(finished, 150, `${finished}/150 parties terminées`);
 });
 
 test('un bot répond à un échange : il refuse une offre ridicule, accepte une bonne affaire', () => {

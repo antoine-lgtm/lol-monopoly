@@ -15,7 +15,7 @@ const http = require('http');
 const crypto = require('crypto');
 const express = require('express');
 const { Server } = require('socket.io');
-const { Game } = require('./game');
+const { Game, TEAM_NAMES } = require('./game');
 const { LEVELS: BOT_LEVELS, botStep, botAnswerTrade } = require('./bot');
 const {
   SPELLS, ITEMS, QUESTS, PASSIVES, EVENTS, SKINS, skinUnlocked, DEFAULT_SPELLS, DEFAULT_RULES, sanitizeRules, sanitizeSpells,
@@ -45,6 +45,9 @@ const BOT_NAMES = ['Garen', 'Annie', 'Ashe', 'Malphite', 'Ryze', 'Sona', 'Nunu',
 const EMOTES = ['gg', 'wp', 'lol', 'question', 'angry', 'cry', 'thumb', 'heart', 'mastery', 'poro'];
 const PINGS = ['ping', 'danger', 'omw', 'question'];
 const EMOTE_COOLDOWN_MS = 1_200;
+const REPLAYS_PER_USER = 10; // parties gardées pour « Revoir »
+const REPLAY_CHUNK = 120; // états envoyés par paquet au lecteur
+const REPLAY_CACHE_MS = 10 * 60_000;
 
 const NAME_PATTERN = /^[\p{L}\p{N} _.-]{3,16}$/u;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -130,6 +133,10 @@ const users = new Map();
 const lobbies = new Map();
 /** @type {Map<string, string>} code -> lobbyId */
 const lobbyCodes = new Map();
+/** Parties terminées, rejouables : id -> { id, date, players, winner, winnerTeam, rounds, record } */
+const replays = new Map();
+/** États rejoués, gardés un moment en mémoire : id -> { frames, at } */
+const replayCache = new Map();
 
 // ---------------------------------------------------------------------------
 // Utilitaires
@@ -242,6 +249,7 @@ function serializeLobby(lobby) {
           pawn: slot.pawn,
           spells: slot.spells || [...DEFAULT_SPELLS],
           skin: slot.skin || 'base',
+          team: slot.team || null,
           bot: user.bot || null,
           stats: user.stats || { games: 0, wins: 0 },
           isOwner: slot.key === lobby.ownerKey,
@@ -301,7 +309,8 @@ function addToLobby(user, lobby, preferredSlot = null) {
   if (index === -1) return false;
 
   const taken = new Set(lobby.slots.filter(Boolean).map((s) => s.pawn));
-  lobby.slots[index] = { key: user.key, role: null, pawn: PAWNS.find((p) => !taken.has(p)), spells: [...DEFAULT_SPELLS], skin: 'base' };
+  const team = lobby.rules?.teams ? smallerTeam(lobby) : null; // avant d'occuper la place
+  lobby.slots[index] = { key: user.key, role: null, pawn: PAWNS.find((p) => !taken.has(p)), spells: [...DEFAULT_SPELLS], skin: 'base', team };
   lobby.invites.delete(user.key);
   user.lobbyId = lobby.id;
 
@@ -311,6 +320,26 @@ function addToLobby(user, lobby, preferredSlot = null) {
     socket.emit('chat:history', lobby.chat);
   }
   return true;
+}
+
+/** Équipe qui a le moins de joueurs (bleue en cas d'égalité). */
+function smallerTeam(lobby) {
+  const count = (t) => lobby.slots.filter((s) => s && s.team === t).length;
+  return count('red') < count('blue') ? 'red' : 'blue';
+}
+
+/** 2 contre 2 : chacun dans une équipe, 2 par équipe si possible. */
+function balanceTeams(lobby) {
+  for (const s of lobby.slots) if (s && s.team !== 'blue' && s.team !== 'red') s.team = null;
+  for (const s of lobby.slots) if (s && !s.team) s.team = smallerTeam(lobby);
+  const players = lobby.slots.filter(Boolean);
+  for (const [from, to] of [['blue', 'red'], ['red', 'blue']]) {
+    while (players.filter((s) => s.team === from).length > players.filter((s) => s.team === to).length + 1) {
+      // on déplace d'abord un bot, sinon le dernier arrivé
+      const mover = [...players].reverse().find((s) => s.team === from && isBot(s.key)) || [...players].reverse().find((s) => s.team === from);
+      mover.team = to;
+    }
+  }
 }
 
 /** Retire un joueur de son lobby courant. Transfère la couronne ou supprime le lobby si besoin. */
@@ -370,6 +399,92 @@ function currentLobby(user) {
 // Partie
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Replays : chaque partie terminée est gardée (10 dernières par joueur) et peut être revue
+// ---------------------------------------------------------------------------
+
+function saveReplay(game) {
+  if (!game.record || replays.has(game.id)) return;
+  const winner = game.player(game.winner);
+  replays.set(game.id, {
+    id: game.id,
+    date: Date.now(),
+    rounds: game.round,
+    players: game.players.map((p) => ({ name: p.name, color: p.color, pawn: p.pawn, team: p.team, bot: Boolean(p.bot), place: game.stats[p.key]?.place ?? null })),
+    winner: winner?.name ?? null,
+    winnerTeam: game.winnerTeam ? TEAM_NAMES[game.winnerTeam] : null,
+    record: game.record,
+  });
+  for (const p of game.players) {
+    const u = users.get(p.key);
+    if (!u || u.bot) continue;
+    u.replays = [game.id, ...(u.replays || []).filter((id) => id !== game.id)].slice(0, REPLAYS_PER_USER);
+  }
+  pruneReplays();
+}
+
+/** On oublie les parties que plus personne ne garde. */
+function pruneReplays() {
+  const kept = new Set();
+  for (const u of users.values()) for (const id of u.replays || []) kept.add(id);
+  for (const id of replays.keys()) if (!kept.has(id)) replays.delete(id);
+}
+
+/** États de la partie rejouée (calculés une fois, gardés 10 minutes). */
+function replayFrames(id) {
+  const cached = replayCache.get(id);
+  if (cached) {
+    cached.at = Date.now();
+    return cached.frames;
+  }
+  const replay = replays.get(id);
+  if (!replay) return null;
+  // Chaque état n'envoie que ce qui a changé depuis le précédent (≈ 1 Mo pour une longue partie
+  // au lieu de 15) : nouvelles lignes du journal, champs modifiés de chaque joueur, autres clés.
+  const frames = [];
+  const prev = {};
+  const prevPlayers = [];
+  let lastLog = 0;
+  Game.replay(replay.record, (state) => {
+    const { board, groups, catalog, fx, log, players, ...rest } = state;
+    if (!frames.static) frames.static = { board, groups, catalog };
+    const delta = {};
+    if (fx.length) delta.fx = JSON.parse(JSON.stringify(fx));
+    const added = log.filter((line) => line.id > lastLog);
+    if (added.length) {
+      delta.logAdd = JSON.parse(JSON.stringify(added));
+      lastLog = added[added.length - 1].id;
+    }
+    const changed = [];
+    players.forEach((p, i) => {
+      const before = prevPlayers[i] || (prevPlayers[i] = {});
+      const diff = {};
+      for (const [field, value] of Object.entries(p)) {
+        const json = JSON.stringify(value);
+        if (before[field] !== json) {
+          diff[field] = json === undefined ? value : JSON.parse(json); // copie : la partie continue de changer
+          before[field] = json;
+        }
+      }
+      if (Object.keys(diff).length) changed.push([i, diff]);
+    });
+    if (changed.length) delta.playersDelta = changed;
+    for (const [key, value] of Object.entries(rest)) {
+      const json = JSON.stringify(value ?? null);
+      if (prev[key] !== json) {
+        delta[key] = JSON.parse(json); // copie (props, historique… sont modifiés par la suite)
+        prev[key] = json;
+      }
+    }
+    frames.push(delta);
+  });
+  replayCache.set(id, { frames, at: Date.now() });
+  return frames;
+}
+setInterval(() => {
+  for (const [id, c] of replayCache) if (Date.now() - c.at > REPLAY_CACHE_MS) replayCache.delete(id);
+}, 60_000).unref();
+
 /** Chrono du tour : une nouvelle échéance à chaque nouveau tour de jeu. */
 function updateDeadline(lobby) {
   const game = lobby.game;
@@ -406,13 +521,14 @@ function broadcastGame(lobby) {
     lobby.status = 'lobby';
     const winner = game.player(game.winner);
     systemMessage(lobby, winner ? `${winner.name} remporte la partie !` : 'Partie terminée.');
+    saveReplay(game);
     // profil : parties jouées et victoires (débloquent les skins)
     for (const p of game.players) {
       const u = users.get(p.key);
       if (!u || u.bot) continue;
       u.stats ||= { games: 0, wins: 0 };
       u.stats.games += 1;
-      if (p.key === game.winner) u.stats.wins += 1;
+      if (p.key === game.winner || (game.winnerTeam && p.team === game.winnerTeam)) u.stats.wins += 1;
     }
     broadcastLobby(lobby);
     broadcastLobbyPresence(lobby);
@@ -741,6 +857,22 @@ io.on('connection', (socket) => {
     if (lobby.ownerKey !== me.key) return fail(ack, 'Seul le chef du salon règle la partie.');
     if (lobby.status !== 'lobby') return fail(ack, 'La partie est déjà lancée.');
     lobby.rules = sanitizeRules({ ...lobby.rules, ...(rules || {}) });
+    if (lobby.rules.teams) balanceTeams(lobby);
+    broadcastLobby(lobby);
+    reply(ack, { ok: true });
+  }));
+
+  socket.on('lobby:setTeam', authed(({ team, slot }, ack) => {
+    const lobby = currentLobby(me);
+    if (!lobby) return fail(ack, 'Aucun salon.');
+    if (lobby.status !== 'lobby') return fail(ack, 'La partie est déjà lancée.');
+    if (!lobby.rules.teams) return fail(ack, 'Le mode 2 contre 2 n’est pas activé.');
+    if (team !== 'blue' && team !== 'red') return fail(ack, 'Équipe inconnue.');
+    // chacun choisit son équipe ; le chef peut aussi placer les bots
+    const target = Number.isInteger(slot) ? lobby.slots[slot] : lobby.slots.find((s) => s && s.key === me.key);
+    if (!target) return fail(ack, 'Place vide.');
+    if (target.key !== me.key && !(lobby.ownerKey === me.key && isBot(target.key))) return fail(ack, 'Tu ne peux changer que ton équipe.');
+    target.team = team;
     broadcastLobby(lobby);
     reply(ack, { ok: true });
   }));
@@ -819,15 +951,24 @@ io.on('connection', (socket) => {
     if (players.length < MIN_PLAYERS_TO_START) {
       return fail(ack, `Il faut au moins ${MIN_PLAYERS_TO_START} invocateurs pour lancer.`);
     }
+    if (lobby.rules.teams && players.length !== 4) return fail(ack, 'Le mode 2 contre 2 se joue à 4 (ajoute des bots si besoin).');
 
     lobby.status = 'in-game';
     lobby.invites.clear();
     // Ordre de jeu : l'ordre visuel des colonnes (slots), le chef en premier
-    const order = [...players].sort((a, b) => (a.key === lobby.ownerKey ? -1 : b.key === lobby.ownerKey ? 1 : 0));
+    let order = [...players].sort((a, b) => (a.key === lobby.ownerKey ? -1 : b.key === lobby.ownerKey ? 1 : 0));
+    if (lobby.rules.teams) {
+      // 2 contre 2 : équipes équilibrées, et on alterne les équipes à chaque tour
+      balanceTeams(lobby);
+      const first = order[0].team;
+      const mine = order.filter((s) => s.team === first);
+      const theirs = order.filter((s) => s.team !== first);
+      order = [mine[0], theirs[0], mine[1], theirs[1]];
+    }
     lobby.game = new Game(order.map((s) => {
       const u = users.get(s.key);
-      return { key: u.key, name: u.name, icon: u.icon, pawn: s.pawn, role: s.role, spells: s.spells, skin: s.skin, bot: u.bot || null };
-    }), { rules: lobby.rules });
+      return { key: u.key, name: u.name, icon: u.icon, pawn: s.pawn, role: s.role, spells: s.spells, skin: s.skin, bot: u.bot || null, team: s.team };
+    }), { rules: lobby.rules, seed: crypto.randomInt(2 ** 31 - 1) });
     systemMessage(lobby, 'Partie trouvée ! Chargement de la Faille…');
     broadcastLobby(lobby);
     broadcastLobbyPresence(lobby);
@@ -864,6 +1005,7 @@ io.on('connection', (socket) => {
     'game:boots': (g) => g.useBoots(me.key),
     'game:ghost': (g, { die } = {}) => g.ghostChoice(me.key, Number(die)),
     'game:herald': (g, { index } = {}) => g.useHerald(me.key, Number(index)),
+    'game:give': (g, { to, amount } = {}) => g.giveGold(me.key, String(to || ''), Number(amount)),
   };
   for (const [event, action] of Object.entries(GAME_ACTIONS)) {
     socket.on(event, authed((payload, ack) => {
@@ -875,6 +1017,32 @@ io.on('connection', (socket) => {
       reply(ack, result);
     }));
   }
+
+  socket.on('replay:list', authed((_payload, ack) => {
+    const list = (me.replays || []).map((id) => replays.get(id)).filter(Boolean)
+      .map(({ record, ...meta }) => ({ ...meta, actions: record.actions.length }));
+    reply(ack, { ok: true, replays: list });
+  }));
+
+  socket.on('replay:frames', authed(({ id, from = 0 }, ack) => {
+    if (!(me.replays || []).includes(id)) return fail(ack, 'Partie introuvable.');
+    let frames;
+    try {
+      frames = replayFrames(id);
+    } catch (err) {
+      console.error('[replay]', err);
+      return fail(ack, 'Impossible de rejouer cette partie.');
+    }
+    if (!frames) return fail(ack, 'Partie introuvable.');
+    const start = Math.max(0, Number(from) || 0);
+    reply(ack, {
+      ok: true,
+      total: frames.length,
+      from: start,
+      static: start === 0 ? frames.static : undefined,
+      frames: frames.slice(start, start + REPLAY_CHUNK),
+    });
+  }));
 
   socket.on('game:sync', authed((_payload, ack) => {
     const lobby = currentLobby(me);
@@ -971,10 +1139,12 @@ function snapshot() {
       icon: u.icon,
       bot: u.bot || null,
       stats: u.stats || { games: 0, wins: 0 },
+      replays: u.replays || [],
       lobbyId: u.lobbyId,
       friends: [...u.friends],
       incomingRequests: [...u.incomingRequests],
     })),
+    replays: [...replays.values()],
     lobbies: [...lobbies.values()].map((l) => ({
       id: l.id,
       code: l.code,
@@ -1019,6 +1189,7 @@ function loadSave() {
       lobbies.set(lobby.id, lobby);
       lobbyCodes.set(lobby.code, lobby.id);
     }
+    for (const r of data.replays || []) replays.set(r.id, r);
     for (const u of data.users || []) {
       const user = {
         key: u.key,
@@ -1026,6 +1197,7 @@ function loadSave() {
         icon: u.icon,
         bot: u.bot || null,
         stats: u.stats || { games: 0, wins: 0 },
+        replays: u.replays || [],
         socketId: null,
         lobbyId: u.lobbyId && lobbies.has(u.lobbyId) ? u.lobbyId : null,
         friends: new Set(u.friends),

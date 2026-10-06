@@ -30,6 +30,8 @@ const MAX_LEVEL = 5; // 1–4 = tours, 5 = inhibiteur
 const TOWER_SUPPLY = 32;
 const INHIB_SUPPLY = 12;
 const LOG_SIZE = 80;
+const OBJECTIVE_GROUPS = 3; // victoire à l'objectif : 3 groupes complets
+const TEAM_NAMES = { blue: 'Bleue', red: 'Rouge' };
 
 const PLAYER_COLORS = ['#0ac8b9', '#e84057', '#b27cff', '#f0a030', '#6fd16a'];
 
@@ -133,6 +135,24 @@ const CHEST_CARDS = [
   { text: 'Zhonya ! Garde cette carte pour sortir de Prison.', act: (g, p) => { p.jailCards += 1; } },
 ];
 
+/** Générateur pseudo-aléatoire (mulberry32) dont l'état tient dans un nombre : sauvegardable et rejouable. */
+function seededRandom(game) {
+  return () => {
+    game.rngState = (game.rngState + 0x6d2b79f5) >>> 0;
+    let t = game.rngState;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Actions enregistrées pour revoir la partie (appelées de l'extérieur, au premier niveau). */
+const RECORDED = [
+  'roll', 'ghostChoice', 'buy', 'skipBuy', 'payTax', 'payJail', 'useJailCard', 'endTurn', 'forfeit',
+  'proposeTrade', 'respondTrade', 'cancelTrade', 'useSpell', 'usePerk', 'buyItem', 'sellItem', 'useBoots',
+  'useHerald', 'build', 'sell', 'mortgage', 'unmortgage', 'autoStep', 'giveGold',
+];
+
 function shuffle(list, random) {
   const a = list.map((_, i) => i);
   for (let i = a.length - 1; i > 0; i--) {
@@ -149,9 +169,15 @@ function shuffle(list, random) {
 class Game {
   /**
    * @param {Array<{key: string, name: string, icon: number}>} players  dans l'ordre de jeu
-   * @param {{random?: () => number}} [options]
+   * @param {{random?: () => number, seed?: number, rules?: object}} [options]
+   *   seed : partie rejouable (tirages déterministes + journal des actions dans `record`)
    */
-  constructor(players, { random = Math.random, rules = {} } = {}) {
+  constructor(players, { random = Math.random, rules = {}, seed } = {}) {
+    if (Number.isInteger(seed)) {
+      this.rngState = seed >>> 0;
+      random = seededRandom(this);
+      this.record = { seed: seed >>> 0, players: structuredClone(players), rules: structuredClone(rules), actions: [] };
+    }
     this.random = random;
     this.rules = sanitizeRules(rules);
     this.id = Math.floor(random() * 1e9).toString(36);
@@ -162,6 +188,7 @@ class Game {
       pawn: p.pawn || 'classic',
       skin: SKINS[p.skin] ? p.skin : 'base',
       bot: p.bot || null, // niveau du bot (easy | normal | hard), null pour un humain
+      team: this.rules.teams && (p.team === 'blue' || p.team === 'red') ? p.team : null,
       color: PLAYER_COLORS[i % PLAYER_COLORS.length],
       pos: 0,
       gold: this.rules.startGold + (this.rules.passives ? PASSIVES[p.pawn]?.start || 0 : 0),
@@ -218,7 +245,86 @@ class Game {
     this.fx = [];
     this.log = [];
     this.lastRent = 0;
+    /** Valeur de chaque joueur au début de chaque tour de table (courbe des statistiques). */
+    this.history = [];
+    this.snapshotHistory();
+    this.winnerTeam = null;
     this.say(`La partie commence ! ${this.players[0].name} ouvre le bal.`);
+  }
+
+  // --- Équipes (2 contre 2), objectif, historique -------------------------------
+
+  sameTeam(a, b) {
+    return Boolean(this.rules.teams && a && b && a.team && a.team === b.team);
+  }
+
+  partnerOf(p) {
+    return this.players.find((q) => q !== p && this.sameTeam(p, q)) || null;
+  }
+
+  /** Le groupe est-il tenu par ce joueur (ou par son équipe, en 2 contre 2) ? */
+  controlsGroup(key, group) {
+    const p = this.player(key);
+    return groupMembers(group).every((i) => {
+      const owner = this.props[i]?.owner;
+      return owner === key || (owner && this.sameTeam(p, this.player(owner)));
+    });
+  }
+
+  /** Groupes complets et sans hypothèque (victoire à l'objectif). */
+  objectiveCount(p) {
+    return Object.keys(GROUPS).filter((g) => this.controlsGroup(p.key, g) && groupMembers(g).every((i) => !this.props[i].mortgaged)).length;
+  }
+
+  /** Victoire à l'objectif : 3 groupes complets = Nexus détruit. */
+  checkObjective(p) {
+    if (!this.rules.objective || this.phase === 'over' || !p || p.bankrupt) return;
+    if (this.objectiveCount(p) < OBJECTIVE_GROUPS) return;
+    const team = this.rules.teams ? p.team : null;
+    this.finish(p, team);
+    this.effect({ type: 'objective', key: p.key, team });
+    this.say(`${team ? `L’équipe ${TEAM_NAMES[team]}` : p.name} tient ${OBJECTIVE_GROUPS} groupes complets et détruit le Nexus adverse !`);
+  }
+
+  /** Fin de partie : vainqueur (et son équipe), places des autres selon leur valeur. */
+  finish(winner, team = null) {
+    this.phase = 'over';
+    this.trade = null;
+    this.winner = winner?.key ?? null;
+    this.winnerTeam = team;
+    const alive = this.alivePlayers().sort((a, b) => {
+      const ta = team && a.team === team ? 1 : 0;
+      const tb = team && b.team === team ? 1 : 0;
+      return (b === winner) - (a === winner) || tb - ta || this.netWorth(b) - this.netWorth(a);
+    });
+    alive.forEach((q, k) => { this.stats[q.key].place = k + 1; });
+    this.snapshotHistory();
+  }
+
+  snapshotHistory() {
+    const point = { round: this.round, worth: Object.fromEntries(this.players.map((p) => [p.key, p.bankrupt ? 0 : this.netWorth(p)])) };
+    const last = this.history[this.history.length - 1];
+    if (last && last.round === point.round) this.history[this.history.length - 1] = point;
+    else this.history.push(point);
+  }
+
+  /** 2 contre 2 : donner de l'Or à son partenaire. */
+  giveGold(key, to, amount) {
+    const p = this.player(key);
+    const partner = this.player(to);
+    const value = Number(amount);
+    if (!this.rules.teams || !p || !partner || !this.sameTeam(p, partner)) return { ok: false, error: 'Tu ne peux donner des PO qu’à ton partenaire.' };
+    if (this.phase === 'over' || p.bankrupt || partner.bankrupt) return { ok: false, error: 'Action impossible.' };
+    if (!Number.isInteger(value) || value <= 0) return { ok: false, error: 'Montant invalide.' };
+    if (value > p.gold) return { ok: false, error: 'Pas assez de PO.' };
+    if (p === this.currentPlayer && this.phase === 'debt') return { ok: false, error: 'Règle d’abord ta dette.' };
+    p.gold -= value;
+    partner.gold += value;
+    this.effect({ type: 'gold', key: p.key, amount: -value });
+    this.effect({ type: 'gold', key: partner.key, amount: value });
+    this.say(`${p.name} donne ${value} PO à son partenaire ${partner.name}.`);
+    this.checkDebt();
+    return { ok: true };
   }
 
   // --- Lecture ---------------------------------------------------------------
@@ -262,7 +368,7 @@ class Game {
     let rent = 0;
     if (sq.type === 'property') {
       rent = sq.rent[st.level];
-      if (st.level === 0 && this.ownsGroup(st.owner, sq.group)) rent *= 2;
+      if (st.level === 0 && this.controlsGroup(st.owner, sq.group)) rent *= 2;
     } else if (sq.type === 'dragon') {
       const count = DRAGON_INDEXES.filter((i) => this.props[i]?.owner === st.owner).length;
       rent = 25 * 2 ** (count - 1);
@@ -589,6 +695,10 @@ class Game {
         return;
       }
       if (st.owner === p.key) return;
+      if (this.sameTeam(p, this.player(st.owner))) {
+        this.say(`${sq.name} appartient à ${this.player(st.owner).name}, son partenaire : pas de loyer.`);
+        return;
+      }
       if (st.mortgaged) {
         this.say(`${sq.name} est hypothéqué : pas de loyer.`);
         return;
@@ -790,6 +900,8 @@ class Game {
     this.stats[key].bought += 1;
     this.checkQuest(p);
     this.checkSoul(p);
+    this.checkObjective(p);
+    if (this.phase === 'over') return { ok: true };
     this.pendingIndex = null;
     this.phase = 'end';
     this.settle();
@@ -861,6 +973,7 @@ class Game {
     } while (this.players[next].bankrupt && next !== before);
     if (next <= before) {
       this.round += 1;
+      this.snapshotHistory();
       if (this.rules.maxRounds && this.round > this.rules.maxRounds) {
         this.endByRounds();
         return;
@@ -923,12 +1036,18 @@ class Game {
 
   /** Partie rapide : à la fin du dernier tour, le plus riche gagne. */
   endByRounds() {
-    const ranking = this.alivePlayers().sort((a, b) => this.netWorth(b) - this.netWorth(a));
-    ranking.forEach((p, k) => { this.stats[p.key].place = k + 1; });
-    this.phase = 'over';
-    this.winner = ranking[0]?.key ?? null;
-    this.trade = null;
-    this.say(`Fin des ${this.rules.maxRounds} tours !${ranking[0] ? ` ${ranking[0].name} est le plus riche et remporte la partie.` : ''}`);
+    const alive = this.alivePlayers();
+    if (this.rules.teams) {
+      const worth = (team) => alive.filter((p) => p.team === team).reduce((sum, p) => sum + this.netWorth(p), 0);
+      const team = worth('blue') >= worth('red') ? 'blue' : 'red';
+      const best = alive.filter((p) => p.team === team).sort((a, b) => this.netWorth(b) - this.netWorth(a))[0];
+      this.finish(best, team);
+      this.say(`Fin des ${this.rules.maxRounds} tours ! L’équipe ${TEAM_NAMES[team]} est la plus riche et remporte la partie.`);
+      return;
+    }
+    const ranking = alive.sort((a, b) => this.netWorth(b) - this.netWorth(a));
+    this.finish(ranking[0]);
+    this.say(`Fin des ${this.rules.maxRounds || this.round} tours !${ranking[0] ? ` ${ranking[0].name} est le plus riche et remporte la partie.` : ''}`);
   }
 
   // --- Sorts d'invocateur, récompenses de quête, objets, Héraut -------------------
@@ -1120,7 +1239,9 @@ class Game {
     const sq = BOARD[index];
     const st = this.props[index];
     const members = groupMembers(sq.group);
-    if (!this.ownsGroup(key, sq.group)) return { ok: false, error: `Il te faut toutes les cases ${GROUPS[sq.group].label}.` };
+    if (!this.controlsGroup(key, sq.group)) {
+      return { ok: false, error: `Il te faut toutes les cases ${GROUPS[sq.group].label}${this.rules.teams ? ' (avec ton partenaire)' : ''}.` };
+    }
     if (members.some((i) => this.props[i].mortgaged)) return { ok: false, error: 'Une case du groupe est hypothéquée.' };
     if (st.level >= MAX_LEVEL) return { ok: false, error: 'Inhibiteur déjà construit.' };
     const minLevel = Math.min(...members.map((i) => this.props[i].level));
@@ -1218,6 +1339,7 @@ class Game {
     st.mortgaged = false;
     this.effect({ type: 'gold', key, amount: -cost });
     this.say(`${p.name} lève l’hypothèque de ${sq.name} (-${cost} PO).`);
+    this.checkObjective(p);
     return { ok: true };
   }
 
@@ -1311,6 +1433,7 @@ class Game {
       if (q.quest && q.quest.id === 'SUPP') q.quest.trades += 1;
       this.checkQuest(q);
       this.checkSoul(q);
+      this.checkObjective(q);
     }
     this.effect({ type: 'trade-done', accepted: true, from: t.from, to: t.to, give: t.give, get: t.get });
     const part = ({ gold, props }) => [...props.map((i) => BOARD[i].name), ...(gold ? [`${gold} PO`] : [])].join(', ') || 'rien';
@@ -1388,11 +1511,13 @@ class Game {
     this.say(`${p.name} est éliminé !${owned.length ? ' Ses cases retournent à la banque.' : ''}`);
 
     const alive = this.alivePlayers();
-    if (alive.length <= 1) {
-      this.phase = 'over';
-      this.winner = alive[0]?.key ?? null;
-      if (alive[0]) this.stats[alive[0].key].place = 1;
-      if (alive[0]) this.say(`Victoire de ${alive[0].name} !`);
+    const teamsLeft = new Set(alive.map((q) => q.team));
+    if (alive.length <= 1 || (this.rules.teams && teamsLeft.size === 1 && !teamsLeft.has(null))) {
+      const team = this.rules.teams ? alive[0]?.team ?? null : null;
+      const best = [...alive].sort((a, b) => this.netWorth(b) - this.netWorth(a))[0];
+      this.finish(best, team);
+      if (team) this.say(`Victoire de l’équipe ${TEAM_NAMES[team]} (${alive.map((q) => q.name).join(' et ')}) !`);
+      else if (best) this.say(`Victoire de ${best.name} !`);
       return;
     }
     if (p === this.currentPlayer) this.nextTurn();
@@ -1441,7 +1566,7 @@ class Game {
 
   /** État complet (pour la sauvegarde sur disque). */
   toJSON() {
-    const { random, fx, ...rest } = this;
+    const { random, fx, recordDepth, ...rest } = this;
     return rest;
   }
 
@@ -1457,8 +1582,11 @@ class Game {
     game.ghostDice ??= null;
     game.event ??= null;
     game.turnId ??= 0;
+    game.history ||= [];
+    game.winnerTeam ??= null;
     for (const p of game.players) {
       p.skin ||= 'base';
+      p.team ??= null;
       p.bot ??= null;
       p.passiveCd ??= 0;
       p.reborn ??= false;
@@ -1473,7 +1601,7 @@ class Game {
       p.herald ||= 0;
       p.canShop ??= false;
     }
-    game.random = random;
+    game.random = Number.isInteger(game.rngState) ? seededRandom(game) : random;
     game.fx = [];
     return game;
   }
@@ -1500,6 +1628,9 @@ class Game {
       catalog: { spells: SPELLS, items: ITEMS, quests: QUESTS, maxItems: MAX_ITEMS, passives: PASSIVES, events: EVENTS },
       prices: { sale: this.eventIs('sale') },
       winner: this.winner,
+      winnerTeam: this.winnerTeam,
+      history: this.history,
+      objectiveGoal: OBJECTIVE_GROUPS,
       supply: { ...this.supply },
       stats: this.stats,
       trade: this.trade,
@@ -1510,6 +1641,8 @@ class Game {
         pawn: p.pawn,
         skin: p.skin,
         bot: p.bot,
+        team: p.team,
+        objective: this.rules.objective ? this.objectiveCount(p) : 0,
         passiveCd: p.passiveCd,
         reborn: p.reborn,
         color: p.color,
@@ -1544,4 +1677,35 @@ class Game {
   }
 }
 
-module.exports = { Game, BOARD, GROUPS, START_GOLD, GO_BONUS, JAIL_FINE, BARON_ROUND, MAX_LEVEL };
+// Enregistrement : chaque action appelée de l'extérieur (joueurs, bots, jeu automatique) est notée
+// dans `record.actions` ; avec la graine, cela suffit pour rejouer toute la partie à l'identique.
+for (const name of RECORDED) {
+  const original = Game.prototype[name];
+  Game.prototype[name] = function recorded(...args) {
+    if (!this.record || this.recordDepth) return original.apply(this, args);
+    this.record.actions.push([name, ...structuredClone(args)]);
+    this.recordDepth = 1;
+    try {
+      return original.apply(this, args);
+    } finally {
+      this.recordDepth = 0;
+    }
+  };
+}
+
+/**
+ * Rejoue une partie enregistrée : renvoie la suite des états (comme ceux envoyés aux joueurs),
+ * un par action. `onFrame(state, index)` est appelé pour chacun.
+ */
+Game.replay = function replay(record, onFrame) {
+  const game = new Game(structuredClone(record.players), { seed: record.seed, rules: structuredClone(record.rules) });
+  game.record = null; // on ne réenregistre pas
+  onFrame(game.serialize(), 0);
+  record.actions.forEach(([name, ...args], k) => {
+    if (typeof game[name] === 'function' && RECORDED.includes(name)) game[name](...structuredClone(args));
+    onFrame(game.serialize(), k + 1);
+  });
+  return game;
+};
+
+module.exports = { Game, BOARD, GROUPS, START_GOLD, GO_BONUS, JAIL_FINE, BARON_ROUND, MAX_LEVEL, TEAM_NAMES, OBJECTIVE_GROUPS };

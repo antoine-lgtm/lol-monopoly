@@ -113,6 +113,8 @@ const DEFAULT_RULES = {
   herald: true,
   passives: true, // pouvoir de chaque pion
   events: true, // événements de la Faille
+  teams: false, // 2 contre 2 (4 joueurs)
+  objective: false, // victoire immédiate avec 3 groupes complets
   startGold: 1500,
   maxRounds: 0, // 0 = partie normale ; 20 = partie rapide (le plus riche gagne)
   turnTimer: 60, // secondes par tour (0 = pas de chrono)
@@ -122,7 +124,7 @@ const DEFAULT_RULES = {
 /** Règles maison reçues du salon : on ne garde que des valeurs valides. */
 function sanitizeRules(raw = {}) {
   const rules = { ...DEFAULT_RULES };
-  for (const key of ['spells', 'quests', 'items', 'dragons', 'herald', 'passives', 'events', 'fountainDouble']) {
+  for (const key of ['spells', 'quests', 'items', 'dragons', 'herald', 'passives', 'events', 'teams', 'objective', 'fountainDouble']) {
     if (typeof raw[key] === 'boolean') rules[key] = raw[key];
   }
   if ([1000, 1500, 2000].includes(raw.startGold)) rules.startGold = raw.startGold;

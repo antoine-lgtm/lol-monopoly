@@ -36,16 +36,17 @@ function wantsToBuy(game, p, lv) {
     if (lv === LEVELS.hard && theirs.length === group.length - 1 && new Set(theirs.map((i) => game.props[i].owner)).size === 1) return left >= 0;
   }
   if (sq.type === 'dragon' && lv === LEVELS.hard) return left >= 0;
-  return left >= lv.buyMargin && game.random() < lv.buyChance;
+  return left >= lv.buyMargin && Math.random() < lv.buyChance;
 }
 
 /** Une construction utile (groupe complet, case la moins construite), ou null. */
 function buildTarget(game, p, lv) {
-  if (game.random() > lv.build) return null;
+  // les bots tirent leur hasard à part : les tirages de la partie restent rejouables
+  if (Math.random() > lv.build) return null;
   const groups = new Set(game.ownedBy(p.key).map((i) => BOARD[i].group).filter(Boolean));
   const options = [];
   for (const group of groups) {
-    if (!game.ownsGroup(p.key, group)) continue;
+    if (!game.controlsGroup(p.key, group)) continue;
     const idx = members(group);
     if (idx.some((i) => game.props[i].mortgaged)) continue;
     const min = Math.min(...idx.map((i) => game.props[i].level));
@@ -53,7 +54,8 @@ function buildTarget(game, p, lv) {
     const cost = game.buildCost(p, group);
     if (p.gold - cost < lv.reserve) continue;
     // on vise d'abord le palier T3 (le plus rentable), puis les groupes les plus chers
-    const target = idx.find((i) => game.props[i].level === min);
+    const target = idx.find((i) => game.props[i].level === min && game.props[i].owner === p.key);
+    if (target === undefined) continue; // la case la moins construite est à son partenaire
     options.push({ index: target, score: (min < 3 ? 10 : 0) + GROUPS[group].house / 50 });
   }
   options.sort((a, b) => b.score - a.score);
@@ -188,9 +190,7 @@ function botStep(game, key) {
     case 'debt': {
       // revendre un objet, puis les constructions et hypothèques (automatique)
       if (p.items.length) return game.sellItem(key, p.items[p.items.length - 1].id);
-      game.autoLiquidate(p);
-      game.checkDebt();
-      return { ok: true };
+      return game.autoStep(); // liquidation automatique (action enregistrée pour le replay)
     }
     case 'end': {
       const extra = tryAll(
