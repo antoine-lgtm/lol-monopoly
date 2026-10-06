@@ -67,6 +67,7 @@
     renderInvites(lobby);
     renderPartyCard(lobby);
     App.renderProfile();
+    if (document.getElementById('modal-rules')?.open) fillRules();
   }
   // L'icône ou le pseudo peuvent arriver après le premier état du salon
   document.addEventListener('app:login', renderLobby);
@@ -109,6 +110,14 @@
 
 
     renderPawnPicker(el, player, lobby, me);
+    renderSpells(el, player, lobby, me);
+    const quest = $('.banner__quest', el);
+    const q = player.role && lobby.rules?.quests !== false ? lobby.quests?.[player.role] : null;
+    quest.hidden = !q;
+    if (q) {
+      quest.textContent = `Quête : ${q.text}`;
+      quest.title = `${q.name} — récompense : ${q.reward}`;
+    }
 
     const current = $('.role-picker__current', el);
     $('.role-icon', current).dataset.role = player.role || '';
@@ -419,6 +428,157 @@
       return li;
     }));
   }
+
+  // ---------------------------------------------------------------------------
+  // Sorts d'invocateur : deux emplacements, un clic ouvre la liste des sorts
+  // ---------------------------------------------------------------------------
+
+  const spellIcon = (id) => `assets/spells/${id}.svg`;
+
+  function renderSpells(el, player, lobby, me) {
+    const box = $('.spell-slots', el);
+    const enabled = lobby.rules?.spells !== false;
+    box.hidden = !enabled;
+    if (!enabled) return;
+    const byId = new Map((lobby.spellList || []).map((sp) => [sp.id, sp]));
+    const spells = player.spells || ['flash', 'heal'];
+    $$('.spell-slot', box).forEach((btn, k) => {
+      const sp = byId.get(spells[k]);
+      $('img', btn).src = spellIcon(spells[k]);
+      btn.title = sp ? `${sp.name} — ${sp.text} (recharge ${sp.cd} tours)` : '';
+      btn.disabled = !me || lobby.status !== 'lobby';
+      btn.setAttribute('aria-label', sp ? `Sort ${k + 1} : ${sp.name}` : `Sort ${k + 1}`);
+    });
+    if (!me) return;
+    const picker = $('.spell-picker', box);
+    picker.replaceChildren(...(lobby.spellList || []).map((sp) => {
+      const opt = document.createElement('button');
+      opt.type = 'button';
+      opt.className = 'spell-picker__option';
+      opt.dataset.spell = sp.id;
+      opt.setAttribute('role', 'option');
+      opt.setAttribute('aria-selected', String(spells.includes(sp.id)));
+      const img = document.createElement('img');
+      img.src = spellIcon(sp.id);
+      img.alt = '';
+      const txt = document.createElement('span');
+      const name = document.createElement('b');
+      name.textContent = `${sp.name} · ${sp.cd} tours`;
+      const desc = document.createElement('small');
+      desc.textContent = sp.text;
+      txt.append(name, desc);
+      opt.append(img, txt);
+      return opt;
+    }));
+  }
+
+  let spellSlotOpen = null;
+  function closeSpellPickers() {
+    $$('.spell-picker', banners).forEach((p) => { p.hidden = true; });
+    spellSlotOpen = null;
+  }
+  banners.addEventListener('click', (event) => {
+    const slot = event.target.closest('.spell-slot');
+    if (slot && !slot.disabled) {
+      const picker = slot.parentElement.querySelector('.spell-picker');
+      const k = Number(slot.dataset.spellSlot);
+      const reopen = picker.hidden || spellSlotOpen !== k;
+      closeSpellPickers();
+      closePawnPickers();
+      closeRolePickers();
+      if (reopen) {
+        picker.hidden = false;
+        spellSlotOpen = k;
+      }
+      return;
+    }
+    const option = event.target.closest('.spell-picker__option');
+    if (option && spellSlotOpen !== null) {
+      const me = App.lobby.slots.find((s) => s.player?.name === App.me.name)?.player;
+      const spells = [...(me?.spells || ['flash', 'heal'])];
+      const chosen = option.dataset.spell;
+      const other = spells[1 - spellSlotOpen];
+      // choisir le sort de l'autre emplacement les échange
+      if (chosen === other) spells[1 - spellSlotOpen] = spells[spellSlotOpen];
+      spells[spellSlotOpen] = chosen;
+      closeSpellPickers();
+      socket.emit('lobby:setSpells', { spells }, (res) => {
+        if (!res?.ok) App.toast(res?.error || 'Choix impossible.', 'error');
+      });
+    }
+  });
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('.spell-slots')) closeSpellPickers();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Règles de la partie : règles maison (réglées par le chef) et aide
+  // ---------------------------------------------------------------------------
+
+  const rulesForm = document.getElementById('rules-form');
+  function fillRules() {
+    const lobby = App.lobby;
+    if (!lobby) return;
+    const rules = lobby.rules || {};
+    const owner = isOwner() && lobby.status === 'lobby';
+    for (const el of rulesForm.elements) {
+      if (!el.name) continue;
+      if (el.type === 'checkbox') el.checked = rules[el.name] !== false;
+      else if (el.tagName === 'SELECT') el.value = String(rules[el.name] ?? el.value);
+      el.disabled = !owner;
+    }
+    rulesForm.elements.fountainDouble.checked = Boolean(rules.fountainDouble);
+    document.getElementById('rules-who').textContent = owner
+      ? 'Tu es le chef du salon : tes réglages s’appliquent à toute la partie.'
+      : `Réglées par le chef du salon (${lobby.owner}).`;
+    // aide : sorts, objets, quêtes
+    const help = document.getElementById('rules-help-body');
+    const section = (title, rows) => {
+      const h = document.createElement('h3');
+      h.textContent = title;
+      const ul = document.createElement('ul');
+      for (const [name, text] of rows) {
+        const li = document.createElement('li');
+        const b = document.createElement('b');
+        b.textContent = name;
+        li.append(b, ` — ${text}`);
+        ul.append(li);
+      }
+      return [h, ul];
+    };
+    help.replaceChildren(
+      ...section('Sorts d’invocateur (2 par joueur)', (lobby.spellList || []).map((sp) => [`${sp.name} (${sp.cd} tours)`, sp.text])),
+      ...section('Quêtes de rôle', Object.entries(lobby.quests || {}).map(([role, q]) => [`${ROLE_LABELS[role]} — ${q.name}`, `${q.text}. Récompense : ${q.reward}.`])),
+      ...section('Objets (3 au maximum, achetés à la Fontaine ou à la Boutique)', Object.values(lobby.items || {}).map((it) => [`${it.name} (${it.price} Or${it.tier === 'late' ? ', fin de partie' : ''})`, it.text])),
+      ...section('Grands objectifs', [
+        ['Âme du Dragon', 'Posséder les 4 Dragons : +30 % sur tous tes loyers pendant 5 tours.'],
+        ['Dragon Ancien (tour 15)', 'Le premier à tomber sur une case Dragon : +30 % sur tous ses loyers pendant 5 tours (cumulable avec l’Âme).'],
+        ['Héraut de la Faille (tour 8)', 'Apparaît dans la fosse du Baron : le joueur qui le récupère détruit une construction adverse.'],
+        ['Baron Nashor (tour 3)', 'Loyers +50 % et +300 Or au prochain passage par la Fontaine.'],
+      ]),
+    );
+  }
+  App.openRules = () => {
+    fillRules();
+    App.openModal('modal-rules');
+  };
+  rulesForm.addEventListener('change', () => {
+    if (!isOwner()) return;
+    const el = rulesForm.elements;
+    const rules = {
+      spells: el.spells.checked,
+      quests: el.quests.checked,
+      items: el.items.checked,
+      dragons: el.dragons.checked,
+      herald: el.herald.checked,
+      fountainDouble: el.fountainDouble.checked,
+      startGold: Number(el.startGold.value),
+      maxRounds: Number(el.maxRounds.value),
+    };
+    socket.emit('lobby:setRules', { rules }, (res) => {
+      if (!res?.ok) App.toast(res?.error || 'Réglage impossible.', 'error');
+    });
+  });
 
   function closePawnPickers() {
     $$('.pawn-picker__list', banners).forEach((list) => {

@@ -606,6 +606,34 @@
   </dialog>
 
   <!-- Paramètres -->
+  <dialog class="modal modal--wide hextech-frame" id="modal-rules" aria-labelledby="modal-rules-title">
+    <form method="dialog" class="modal__body" id="rules-form">
+      <h2 class="modal__title" id="modal-rules-title">Règles de la partie</h2>
+      <p class="rules__who" id="rules-who"></p>
+      <div class="rules__grid">
+        <label class="field field--checkbox"><input type="checkbox" name="spells"><span>Sorts d'invocateur</span></label>
+        <label class="field field--checkbox"><input type="checkbox" name="quests"><span>Quêtes de rôle</span></label>
+        <label class="field field--checkbox"><input type="checkbox" name="items"><span>Objets (Fontaine et Boutique)</span></label>
+        <label class="field field--checkbox"><input type="checkbox" name="dragons"><span>Âme du Dragon et Dragon Ancien</span></label>
+        <label class="field field--checkbox"><input type="checkbox" name="herald"><span>Héraut de la Faille (tour 8)</span></label>
+        <label class="field field--checkbox"><input type="checkbox" name="fountainDouble"><span>Double gain en s'arrêtant sur la Fontaine</span></label>
+        <label class="field field--inline"><span class="field__label">Or de départ</span>
+          <select class="field__select" name="startGold"><option value="1000">1 000 Or</option><option value="1500">1 500 Or</option><option value="2000">2 000 Or</option></select>
+        </label>
+        <label class="field field--inline"><span class="field__label">Durée</span>
+          <select class="field__select" name="maxRounds"><option value="0">Normale (jusqu'au dernier)</option><option value="20">Rapide : 20 tours, le plus riche gagne</option></select>
+        </label>
+      </div>
+      <details class="rules__help" id="rules-help">
+        <summary>Sorts, objets et quêtes en détail</summary>
+        <div id="rules-help-body"></div>
+      </details>
+      <div class="modal__actions">
+        <button class="btn btn--primary" type="submit" value="close">Fermer</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog class="modal hextech-frame" id="modal-settings" aria-labelledby="modal-settings-title">
     <form method="dialog" class="modal__body" id="settings-form">
       <h2 class="modal__title" id="modal-settings-title">Paramètres</h2>
@@ -785,6 +813,14 @@
             <li class="role-picker__option" role="option" data-role="ADC"><span class="role-icon" data-role="ADC"></span>Adc</li>
             <li class="role-picker__option" role="option" data-role="SUPP"><span class="role-icon" data-role="SUPP"></span>Supp</li>
           </ul>
+        </div>
+
+        <!-- Quête du rôle et sorts d'invocateur (2) -->
+        <p class="banner__quest" hidden></p>
+        <div class="spell-slots">
+          <button class="spell-slot" type="button" data-spell-slot="0"><img alt=""></button>
+          <button class="spell-slot" type="button" data-spell-slot="1"><img alt=""></button>
+          <div class="spell-picker" role="listbox" hidden></div>
         </div>
       </div>
     </div>

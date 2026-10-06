@@ -335,7 +335,7 @@
     const action = event.target.closest('[data-action]')?.dataset.action;
     if (action === 'settings') openSettings();
     if (action === 'add-friend') openAddFriend();
-    if (action === 'rules') App.toast('Les règles détaillées arriveront avec le plateau (étape 4).', 'info');
+    if (action === 'rules') App.openRules?.();
   });
 
   // ---------------------------------------------------------------------------

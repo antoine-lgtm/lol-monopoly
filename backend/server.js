@@ -16,6 +16,7 @@ const crypto = require('crypto');
 const express = require('express');
 const { Server } = require('socket.io');
 const { Game } = require('./game');
+const { SPELLS, ITEMS, QUESTS, DEFAULT_SPELLS, DEFAULT_RULES, sanitizeRules, sanitizeSpells } = require('./features');
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -182,6 +183,10 @@ function serializeLobby(lobby) {
     minPlayers: MIN_PLAYERS_TO_START,
     roles: ROLES,
     pawns: PAWNS,
+    rules: lobby.rules,
+    spellList: Object.entries(SPELLS).map(([id, sp]) => ({ id, name: sp.name, cd: sp.cd, text: sp.text })),
+    quests: QUESTS,
+    items: ITEMS,
     slots: lobby.slots.map((slot, index) => {
       if (!slot) return { index, player: null, pendingInvite: pendingBySlot.get(index) ?? null };
       const user = users.get(slot.key);
@@ -192,6 +197,7 @@ function serializeLobby(lobby) {
           icon: user.icon,
           role: slot.role,
           pawn: slot.pawn,
+          spells: slot.spells || [...DEFAULT_SPELLS],
           isOwner: slot.key === lobby.ownerKey,
           connected: Boolean(user.socketId),
         },
@@ -230,6 +236,7 @@ function createLobby(ownerKey) {
     chat: [],
     game: null,
     autoplayTimer: null,
+    rules: { ...DEFAULT_RULES }, // règles maison, réglées par le chef du salon
   };
   lobbies.set(id, lobby);
   lobbyCodes.set(code, id);
@@ -248,7 +255,7 @@ function addToLobby(user, lobby, preferredSlot = null) {
   if (index === -1) return false;
 
   const taken = new Set(lobby.slots.filter(Boolean).map((s) => s.pawn));
-  lobby.slots[index] = { key: user.key, role: null, pawn: PAWNS.find((p) => !taken.has(p)) };
+  lobby.slots[index] = { key: user.key, role: null, pawn: PAWNS.find((p) => !taken.has(p)), spells: [...DEFAULT_SPELLS] };
   lobby.invites.delete(user.key);
   user.lobbyId = lobby.id;
 
@@ -606,6 +613,27 @@ io.on('connection', (socket) => {
     reply(ack, { ok: true });
   }));
 
+  socket.on('lobby:setSpells', authed(({ spells }, ack) => {
+    const lobby = currentLobby(me);
+    if (!lobby) return fail(ack, 'Aucun salon.');
+    if (lobby.status !== 'lobby') return fail(ack, 'La partie est déjà lancée.');
+    const clean = sanitizeSpells(spells);
+    if (!Array.isArray(spells) || clean.join() !== spells.join()) return fail(ack, 'Choisis deux sorts différents.');
+    lobby.slots.find((s) => s && s.key === me.key).spells = clean;
+    broadcastLobby(lobby);
+    reply(ack, { ok: true });
+  }));
+
+  socket.on('lobby:setRules', authed(({ rules }, ack) => {
+    const lobby = currentLobby(me);
+    if (!lobby) return fail(ack, 'Aucun salon.');
+    if (lobby.ownerKey !== me.key) return fail(ack, 'Seul le chef du salon règle la partie.');
+    if (lobby.status !== 'lobby') return fail(ack, 'La partie est déjà lancée.');
+    lobby.rules = sanitizeRules({ ...lobby.rules, ...(rules || {}) });
+    broadcastLobby(lobby);
+    reply(ack, { ok: true });
+  }));
+
   socket.on('lobby:kick', authed(({ name }, ack) => {
     const lobby = currentLobby(me);
     if (!lobby || lobby.ownerKey !== me.key) return fail(ack, 'Seul le chef du salon peut exclure.');
@@ -633,8 +661,8 @@ io.on('connection', (socket) => {
     const order = [...players].sort((a, b) => (a.key === lobby.ownerKey ? -1 : b.key === lobby.ownerKey ? 1 : 0));
     lobby.game = new Game(order.map((s) => {
       const u = users.get(s.key);
-      return { key: u.key, name: u.name, icon: u.icon, pawn: s.pawn };
-    }));
+      return { key: u.key, name: u.name, icon: u.icon, pawn: s.pawn, role: s.role, spells: s.spells };
+    }), { rules: lobby.rules });
     systemMessage(lobby, 'Partie trouvée ! Chargement de la Faille…');
     broadcastLobby(lobby);
     broadcastLobbyPresence(lobby);
@@ -664,6 +692,13 @@ io.on('connection', (socket) => {
     'game:trade': (g, offer) => g.proposeTrade(me.key, offer || {}),
     'game:tradeRespond': (g, { accept } = {}) => g.respondTrade(me.key, Boolean(accept)),
     'game:tradeCancel': (g) => g.cancelTrade(me.key),
+    'game:spell': (g, { spell, arg } = {}) => g.useSpell(me.key, String(spell), arg),
+    'game:perk': (g, { perk, arg } = {}) => g.usePerk(me.key, String(perk), arg),
+    'game:buyItem': (g, { item } = {}) => g.buyItem(me.key, String(item)),
+    'game:sellItem': (g, { item } = {}) => g.sellItem(me.key, String(item)),
+    'game:boots': (g) => g.useBoots(me.key),
+    'game:ghost': (g, { die } = {}) => g.ghostChoice(me.key, Number(die)),
+    'game:herald': (g, { index } = {}) => g.useHerald(me.key, Number(index)),
   };
   for (const [event, action] of Object.entries(GAME_ACTIONS)) {
     socket.on(event, authed((payload, ack) => {
@@ -753,6 +788,7 @@ function snapshot() {
       open: l.open,
       slots: l.slots,
       chat: l.chat,
+      rules: l.rules,
       game: l.game ? l.game.toJSON() : null,
     })),
   });
@@ -780,6 +816,7 @@ function loadSave() {
     for (const l of data.lobbies || []) {
       const lobby = {
         ...l,
+        rules: sanitizeRules(l.rules || {}),
         invites: new Map(),
         autoplayTimer: null,
         game: l.game ? Game.fromJSON(l.game) : null,
