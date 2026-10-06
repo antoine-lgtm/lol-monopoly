@@ -8,7 +8,7 @@
  * (bas du plateau) vers +Z.
  */
 import * as THREE from '/vendor/three/three.module.js';
-import { buildPawn } from './pawns3d.js';
+import { buildPawn, preloadPawnModels } from './pawns3d.js';
 import { buildTowerStatue, animateStatues } from './tower3d.js';
 import { buildRock, buildHextechChest, buildRuneterra, buildBaron } from './props3d.js';
 
@@ -95,6 +95,8 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   const { cellOf, track, CORNER, UNIT } = geo;
 
   // --- Rendu ----------------------------------------------------------------
+  // modèles 3D des pions (s'il y en a) : chargés pendant que la scène se construit
+  const modelsReady = preloadPawnModels().catch(() => {});
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.shadowMap.enabled = true;
@@ -2009,6 +2011,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   // d'un cran tant que l'image saccade (moins de 28 images/s).
   const FORCE_HQ = new URLSearchParams(location.search).get('hq') === '1'; // ?hq=1 : toujours au maximum
   if (FORCE_HQ) window.__boardTop = topCanvas; // pour les captures de test
+  if (FORCE_HQ) window.__pawns3d = pawns; // tests : pions de la scène
   let autoQuality = FORCE_HQ ? false : initialQuality === 'auto';
   let quality = FORCE_HQ ? 'high'
     : QUALITY[initialQuality] ? initialQuality
@@ -2273,5 +2276,6 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     onClick: null,
     onDrag: null,
   };
+  await modelsReady;
   return api;
 }

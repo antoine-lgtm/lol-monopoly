@@ -12,6 +12,87 @@
 import * as THREE from '/vendor/three/three.module.js';
 import { mergeGeometries } from '/vendor/three-addons/utils/BufferGeometryUtils.js';
 
+// ---------------------------------------------------------------------------
+// Modèles 3D déposés dans frontend/assets/pawns/models/ (poro.glb, teemo.glb…)
+// Ils remplacent le pion dessiné en formes simples ; sinon on garde ce dernier.
+// ---------------------------------------------------------------------------
+
+const MODEL_HEIGHT = 0.56; // hauteur visée (comme les pions dessinés)
+const loadedModels = new Map(); // kind -> { scene, animations }
+
+/** Charge les modèles présents sur le serveur (liste dans /pawn-models.json). À attendre avant buildPawn. */
+export async function preloadPawnModels() {
+  let files = [];
+  try {
+    files = await (await fetch('/pawn-models.json')).json();
+  } catch {
+    return;
+  }
+  if (!files.length) return;
+  const { GLTFLoader } = await import('/vendor/three-addons/loaders/GLTFLoader.js');
+  const loader = new GLTFLoader();
+  await Promise.all(files.map(async (file) => {
+    const kind = file.replace(/\.(glb|gltf)$/i, '').toLowerCase();
+    if (loadedModels.has(kind)) return;
+    try {
+      const gltf = await loader.loadAsync(`/assets/pawns/models/${file}`);
+      loadedModels.set(kind, { scene: gltf.scene, animations: gltf.animations || [] });
+    } catch (err) {
+      console.warn(`[pions] modèle ${file} illisible :`, err?.message || err);
+    }
+  }));
+}
+
+/** Copie du modèle chargé, posée sur le socle, à la bonne taille, avec son animation (s'il en a une). */
+async function cloneModel(kind) {
+  const entry = loadedModels.get(kind);
+  if (!entry) return null;
+  const hasSkin = entry.scene.getObjectByProperty('isSkinnedMesh', true);
+  let scene;
+  if (hasSkin) {
+    const { clone } = await import('/vendor/three-addons/utils/SkeletonUtils.js');
+    scene = clone(entry.scene);
+  } else {
+    scene = entry.scene.clone(true);
+  }
+  // mise à l'échelle et centrage : pieds sur le socle, centré, hauteur fixe
+  const box = new THREE.Box3().setFromObject(scene);
+  const size = box.getSize(new THREE.Vector3());
+  const k = MODEL_HEIGHT / Math.max(size.y, size.x * 0.8, size.z * 0.8, 1e-6);
+  scene.scale.multiplyScalar(k);
+  box.setFromObject(scene);
+  const center = box.getCenter(new THREE.Vector3());
+  scene.position.x -= center.x;
+  scene.position.z -= center.z;
+  scene.position.y -= box.min.y;
+  const wrap = new THREE.Group();
+  wrap.add(scene);
+  scene.traverse((o) => {
+    if (o.isMesh) {
+      o.castShadow = true;
+      o.frustumCulled = false; // les modèles animés sortent parfois de leur boîte
+    }
+  });
+  // animation : la première du fichier (ou celle qui s'appelle idle), plus vive quand c'est son tour
+  if (entry.animations.length) {
+    const mixer = new THREE.AnimationMixer(scene);
+    const clip = entry.animations.find((a) => /idle|repos/i.test(a.name)) || entry.animations[0];
+    mixer.clipAction(clip).play();
+    let last = null;
+    wrap.userData.animate = (t, active) => {
+      const dt = last === null ? 0 : Math.min(0.1, t - last);
+      last = t;
+      mixer.update(dt * (active ? 1.3 : 1));
+    };
+  } else {
+    // sans animation : léger balancement
+    wrap.userData.animate = (t, active) => {
+      scene.rotation.z = Math.sin(t * 2) * (active ? 0.06 : 0.025);
+    };
+  }
+  return wrap;
+}
+
 /** Fusionne des petites pièces identiques en un seul objet (moins de dessins par image). */
 function merged(geo, params, transforms) {
   const m = new THREE.Matrix4();
@@ -467,6 +548,22 @@ function applySkin(model, skin) {
 
 /** Construit le pion `kind` (posé sur un socle doré liseré à la couleur du joueur), avec son skin. */
 export function buildPawn(kind, color, skin = 'base') {
+  const root = buildPawnSync(kind, color, skin);
+  // un modèle 3D déposé remplace le pion dessiné dès qu'il est prêt
+  if (loadedModels.has(kind)) {
+    cloneModel(kind).then((model) => {
+      if (!model) return;
+      applySkin(model, skin);
+      const holder = root.userData.holder;
+      holder.clear();
+      holder.add(model);
+      root.userData.animate = (t, active) => model.userData.animate?.(t, active);
+    }).catch((err) => console.warn('[pions]', err));
+  }
+  return root;
+}
+
+function buildPawnSync(kind, color, skin) {
   const root = new THREE.Group();
   const hex = new THREE.Color(color).getHex();
   const base = mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.05, 32), GOLD, 0, 0.025, 0);
@@ -481,6 +578,7 @@ export function buildPawn(kind, color, skin = 'base') {
   holder.add(model);
   root.add(base, band, holder);
   root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  root.userData.holder = holder;
   root.userData.animate = (t, active) => model.userData.animate?.(t, active);
   return root;
 }

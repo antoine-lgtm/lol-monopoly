@@ -1,0 +1,27 @@
+Modèles 3D des pions (facultatif)
+=================================
+
+Dépose ici un modèle 3D par pion. Il remplace le pion dessiné sur le plateau 3D
+(le socle doré à la couleur du joueur est gardé). Pas besoin de redémarrer : recharge la page.
+
+Noms des fichiers (format .glb de préférence, sinon .gltf) :
+
+  poro.glb      Poro
+  teemo.glb     Champignon de Teemo
+  ward.glb      Balise (ward)
+  minion.glb    Sbire
+  zhonya.glb    Sablier de Zhonya
+  blade.glb     Lame de Doran
+  tibbers.glb   Tibbers
+  egg.glb       Œuf d'Anivia
+  classic.glb   Pion classique (facultatif)
+
+Le jeu s'occupe tout seul de :
+  - la taille (ramené à la hauteur d'un pion) et du centrage sur le socle ;
+  - l'animation : la première du fichier est jouée en boucle (ou celle nommée « idle ») ;
+  - les skins (Hextech, Obscur, Prestige…) : les couleurs du modèle sont teintées.
+
+Conseils :
+  - le modèle doit regarder vers l'avant (+Z, l'avant habituel des .glb) et être debout (+Y) ;
+  - textures incluses dans le .glb ;
+  - moins de 5 Mo et moins de 30 000 triangles par modèle, pour rester fluide.

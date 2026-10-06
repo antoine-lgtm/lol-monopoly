@@ -70,6 +70,15 @@ app.get('/board-art.json', (_req, res) => {
   } catch { /* dossier absent */ }
   res.set('Cache-Control', 'no-cache').json(files);
 });
+// Modèles 3D des pions déposés dans frontend/assets/pawns/models/ (poro.glb…)
+const PAWN_MODELS_DIR = path.join(__dirname, '..', 'frontend', 'assets', 'pawns', 'models');
+app.get('/pawn-models.json', (_req, res) => {
+  let files = [];
+  try {
+    files = fs.readdirSync(PAWN_MODELS_DIR).filter((f) => /\.(glb|gltf)$/i.test(f));
+  } catch { /* dossier absent */ }
+  res.set('Cache-Control', 'no-cache').json(files);
+});
 // Répliques des champions déposées dans frontend/assets/voices/ (yasuo.mp3, yasuo-2.ogg…)
 const VOICES_DIR = path.join(__dirname, '..', 'frontend', 'assets', 'voices');
 app.get('/voices.json', (_req, res) => {
