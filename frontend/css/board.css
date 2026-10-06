@@ -2486,3 +2486,21 @@ body.reduce-motion .gv-pawn.is-current .gv-standee__body {
   .gv-kit__btn, .gv-kit__slot { width: 36px; height: 36px; }
   .gv-player__quest > span:first-child { font-size: 10px; }
 }
+
+/* Coins du plateau de secours : ton image en médaillon au-dessus du nom */
+.gv-sq--corner.has-art .gv-sq__art {
+  position: relative;
+  inset: auto;
+  flex: none;
+  width: 46%;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid #c89b3c;
+  box-shadow: 0 0 14px rgba(200, 170, 110, 0.5);
+  object-fit: cover;
+  -webkit-mask: none;
+  mask: none;
+}
+.gv-sq--corner.has-art .gv-sq__inner { justify-content: center; gap: 4px; }
+.gv-sq--corner.has-art .gv-sq__inner::before { display: none; }

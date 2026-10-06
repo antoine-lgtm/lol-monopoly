@@ -421,8 +421,28 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
       roundRect(ctx, -bw / 2 + 4 * K, -bh / 2 + 4 * K, bw - 8 * K, bh - 8 * K, 4 * K);
       ctx.stroke();
     } else {
-      // coins : halo du thème, anneaux décoratifs et grand titre
+      // coins : halo du thème, anneaux décoratifs et grand titre (et ton image en médaillon s'il y en a une)
       const tint = { go: '#2ad8e0', jail: '#9aa8b8', baron: '#b27cff', gotojail: '#ffd25a' }[sq.type] || '#c8aa6e';
+      if (img) {
+        medallion(img, 0, -bw * 0.14, bw * 0.24, tint);
+        ctx.textAlign = 'center';
+        ctx.shadowColor = 'rgba(0,0,0,0.9)';
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = '#f0e6d2';
+        ctx.font = `800 ${Math.round(12 * K)}px Cinzel, Georgia, serif`;
+        const lines = wrapText(ctx, name, bw * 0.78);
+        lines.forEach((l, k) => ctx.fillText(l, 0, bw * 0.2 + k * 13 * K));
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#c89b3c';
+        ctx.font = `600 ${Math.round(9 * K)}px Barlow, Arial, sans-serif`;
+        ctx.fillText(sub, 0, bw * 0.2 + lines.length * 13 * K + 2 * K);
+        ctx.restore();
+        bevel(x0 * K, y0 * K, w * K, h * K);
+        ctx.strokeStyle = 'rgba(200,170,110,0.5)';
+        ctx.lineWidth = 1.2 * K;
+        ctx.strokeRect(x0 * K, y0 * K, w * K, h * K);
+        return;
+      }
       const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, bw * 0.62);
       halo.addColorStop(0, `${tint}40`);
       halo.addColorStop(1, `${tint}00`);

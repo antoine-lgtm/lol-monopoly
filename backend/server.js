@@ -51,6 +51,15 @@ const io = new Server(server, {
   pingTimeout: 8_000,
 });
 
+// Liste des images officielles déposées dans frontend/assets/board/real/ (dragons, Baron, Prison…)
+const REAL_ART_DIR = path.join(__dirname, '..', 'frontend', 'assets', 'board', 'real');
+app.get('/board-art.json', (_req, res) => {
+  let files = [];
+  try {
+    files = fs.readdirSync(REAL_ART_DIR).filter((f) => /\.(png|webp|jpe?g|svg)$/i.test(f));
+  } catch { /* dossier absent */ }
+  res.set('Cache-Control', 'no-cache').json(files);
+});
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 // Three.js (plateau 3D) servi depuis node_modules : pas besoin d'Internet pour jouer
 app.use('/vendor/three', express.static(path.join(__dirname, '..', 'node_modules', 'three', 'build')));

@@ -1,10 +1,23 @@
 Images officielles du jeu (facultatif)
 ======================================
 
-Dépose ici les vraies images de League of Legends pour remplacer nos dessins :
+Dépose ici les vraies images de League of Legends pour remplacer nos dessins.
+Formats : .png, .webp ou .jpg — de préférence carrées (environ 512 × 512), fond transparent si possible.
 
-  chest.png  ->  Coffre Hextech (cases « Coffre Hextech » et paquet de cartes)
-  ping.png   ->  Ping « ? » (cases « Ping SS » et paquet de cartes)
+  dragon-ocean.png      Dragon Océan
+  dragon-mountain.png   Dragon Montagne
+  dragon-infernal.png   Dragon Infernal
+  dragon-cloud.png      Dragon Vent
+  potion-hp.png         Potion de vie
+  potion-mana.png       Potion de mana
+  sbires.png            Sbires (impôt)
+  boutique.png          Boutique
+  chest.png             Coffre Hextech (cases et paquet de cartes)
+  ping.png              Ping SS (cases et paquet de cartes)
+  fountain.png          Fontaine (coin de départ)
+  jail.png              Prison
+  baron.png             Baron Nashor (coin)
+  blitzcrank.png        Grab de Blitzcrank (coin « aller en prison »)
 
-Le format .webp marche aussi (chest.webp, ping.webp).
-Le plateau les utilise automatiquement : recharge simplement la page (Cmd + Maj + R).
+Une case sans image garde son dessin (les coins gardent juste leur nom).
+Le jeu les utilise automatiquement : recharge simplement la page (Cmd + Maj + R).

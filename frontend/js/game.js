@@ -268,14 +268,31 @@
     ],
   };
 
-  function artSources(name) {
-    const drawn = `assets/board/${name}.svg`;
-    if (!OFFICIAL_ART[name]) return [drawn];
-    return [`assets/board/real/${name}.png`, `assets/board/real/${name}.webp`, ...OFFICIAL_ART[name], drawn];
+  // Images déposées dans frontend/assets/board/real/ : la liste vient du serveur
+  let realArt = null; // Set des noms de fichiers, ou null tant que la liste n'est pas arrivée
+  const realArtReady = fetch('/board-art.json').then((r) => r.json()).then((list) => {
+    realArt = new Set(list.map((f) => f.toLowerCase()));
+  }).catch(() => { realArt = new Set(); });
+  const DRAWN = new Set(['chest', 'ping', 'sbires', 'boutique', 'baron', 'dragon-ocean', 'dragon-mountain', 'dragon-infernal',
+    'dragon-cloud', 'potion-hp', 'potion-mana']);
+
+  /** Sources d'une illustration : ton image (real/), puis l'image officielle en ligne, puis notre dessin. */
+  function artSources(name, { drawnFallback = true } = {}) {
+    const mine = realArt
+      ? ['png', 'webp', 'jpg', 'jpeg', 'svg'].filter((ext) => realArt.has(`${name}.${ext}`)).map((ext) => `assets/board/real/${name}.${ext}`)
+      : [`assets/board/real/${name}.png`, `assets/board/real/${name}.webp`];
+    const drawn = drawnFallback && DRAWN.has(name) ? [`assets/board/${name}.svg`] : [];
+    return [...mine, ...(OFFICIAL_ART[name] || []), ...drawn];
   }
 
   /** Illustration des cases spéciales (dragons, potions, cartes, taxes). */
   function specialArt(sq) {
+    // coins : seulement ton image s'il y en a une (pas de dessin par défaut)
+    const corner = { go: 'fountain', jail: 'jail', baron: 'baron', gotojail: 'blitzcrank' }[sq.type];
+    if (corner) {
+      const list = artSources(corner, { drawnFallback: false });
+      return list.length ? list : null;
+    }
     const name = {
       dragon: `dragon-${sq.element}`,
       potion: `potion-${sq.kind}`,
@@ -1901,6 +1918,7 @@
   function onGameState(next) {
     queue = queue.then(async () => {
       if (next.id !== gameId) {
+        await realArtReady; // liste de tes images, pour que les cases les utilisent dès le départ
         gameId = next.id;
         board = next.board;
         groups = next.groups;
