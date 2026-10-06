@@ -3819,3 +3819,78 @@ body.hide-chat-time .chat__time {
 .rules__help li { margin: 3px 0; line-height: 1.35; }
 .rules__help b { color: var(--gold-1, #f0e6d2); }
 #modal-rules .modal__body { max-height: calc(100vh - 80px); overflow: auto; }
+
+/* ----- Bots dans le salon ----- */
+.banner__bots {
+  --u: min(calc(100cqi / 210), calc(100cqh / 500));
+  position: absolute;
+  top: calc(var(--u) * 190);
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.banner__bots[hidden] { display: none; }
+.banner__bots-label { font-size: 11px; color: var(--grey-1, #a09b8c); letter-spacing: 0.04em; }
+.banner__bots-row { display: flex; flex-direction: column; gap: 5px; width: min(78%, 130px); }
+.banner__bot-btn {
+  padding: 4px 6px;
+  border: 1px solid rgba(200, 170, 110, 0.45);
+  border-radius: 3px;
+  background: rgba(1, 10, 19, 0.6);
+  color: #c8aa6e;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.banner__bot-btn:hover:not(:disabled) { background: rgba(200, 170, 110, 0.16); border-color: #c8aa6e; color: #f0e6d2; }
+.banner__bot-btn[data-bot="easy"] { border-color: rgba(111, 209, 106, 0.5); color: #8fdf8a; }
+.banner__bot-btn[data-bot="hard"] { border-color: rgba(232, 64, 87, 0.55); color: #ff8a98; }
+.banner.is-bot .banner__status { color: #7fe9f0; }
+.banner__remove-bot {
+  margin-top: 4px;
+  padding: 2px 8px;
+  border: 1px solid rgba(232, 64, 87, 0.5);
+  border-radius: 3px;
+  background: rgba(1, 10, 19, 0.5);
+  color: #ff8a98;
+  font-size: 10px;
+  cursor: pointer;
+}
+.banner__remove-bot[hidden] { display: none; }
+.pawn-picker__passive { display: block; font-size: 10px; line-height: 1.2; color: #7fe9f0; margin-top: 2px; }
+
+/* ----- Skins de pions ----- */
+.skin-picker { display: flex; gap: 5px; margin-top: 4px; }
+.skin-picker[hidden] { display: none; }
+.skin-picker__chip {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid rgba(200, 170, 110, 0.6);
+  border-radius: 50%;
+  cursor: pointer;
+  background: var(--skin-dot, #5b5a56);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.skin-picker__chip:hover:not(:disabled) { transform: scale(1.2); }
+.skin-picker__chip[aria-pressed="true"] { box-shadow: 0 0 0 2px #010a13, 0 0 0 3px #f0e6d2; }
+.skin-picker__chip.is-locked { opacity: 0.35; cursor: not-allowed; filter: grayscale(0.8); }
+.skin-picker__chip[data-skin="base"] { --skin-dot: radial-gradient(circle at 35% 35%, #f0e6d2, #785a28); }
+.skin-picker__chip[data-skin="hextech"] { --skin-dot: radial-gradient(circle at 35% 35%, #c8f8ff, #0ac8b9 60%, #005a82); }
+.skin-picker__chip[data-skin="shadow"] { --skin-dot: radial-gradient(circle at 35% 35%, #b78cff, #3a1a5c 60%, #0b0414); }
+.skin-picker__chip[data-skin="gold"] { --skin-dot: radial-gradient(circle at 35% 35%, #fff4c0, #f0c040 55%, #8a5a10); }
+.skin-picker__chip[data-skin="crystal"] { --skin-dot: radial-gradient(circle at 35% 35%, #ffffff, #bfe8ff 55%, #6aa6d8); }
+.skin-picker__chip[data-skin="infernal"] { --skin-dot: radial-gradient(circle at 35% 35%, #ffd27a, #ff5a1f 55%, #7a1408); }
+
+/* Aperçu du skin sur les images de pion (salon, plateau plat) */
+img[data-skin="hextech"] { filter: hue-rotate(150deg) saturate(1.4) drop-shadow(0 0 6px rgba(63, 216, 255, 0.9)); }
+img[data-skin="shadow"] { filter: brightness(0.6) saturate(0.7) drop-shadow(0 0 7px rgba(160, 80, 255, 0.95)); }
+img[data-skin="gold"] { filter: sepia(1) saturate(3) hue-rotate(-8deg) brightness(1.1) drop-shadow(0 0 6px rgba(240, 200, 80, 0.9)); }
+img[data-skin="crystal"] { filter: hue-rotate(180deg) saturate(0.5) brightness(1.45) drop-shadow(0 0 7px rgba(200, 240, 255, 0.95)); }
+img[data-skin="infernal"] { filter: sepia(1) saturate(5) hue-rotate(-25deg) drop-shadow(0 0 7px rgba(255, 90, 31, 0.95)); }

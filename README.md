@@ -37,6 +37,24 @@ TEST_3D=1 npm run test:browser    # + chargement du plateau 3D (plus lent)
 
 `CHROMIUM_PATH=/chemin/vers/chromium` permet d'utiliser un Chromium déjà installé.
 
+## Bots, chrono, pouvoirs et événements
+
+- **Bots** : dans le salon, le chef remplit une place libre avec un bot **Facile**, **Normal** ou
+  **Difficile** (ils achètent, construisent, échangent, utilisent sorts et objets). Clic droit ou
+  « Retirer le bot » pour l'enlever.
+- **Chrono** : 60 s par tour par défaut (30, 60, 90 ou sans chrono dans les règles). Une fois le
+  temps écoulé, le jeu lance les dés, n'achète rien et termine le tour à la place du joueur.
+- **Pouvoir des pions** : chaque pion a un petit passif (Poro +20 Or à la Fontaine, Zhonya annule
+  un loyer, Œuf d'Anivia survit une fois à la faillite…). Détail dans « Règles ».
+- **Événements de la Faille** : tous les 4 tours, un événement d'un tour (Ruée des sbires,
+  Nouveau patch, Brouillard de guerre, Soldes, Snowdown, Prime de guerre).
+- **Skins de pions** : Hextech (1 partie), Obscur (3 parties), Prestige (1 victoire), Cristal
+  (3 victoires), Infernal (10 parties). À choisir sous le pion, dans le salon.
+- **Emotes et pings** : bouton ☺ en haut du plateau ; ping sur une case avec le bouton ! ou
+  **Alt + clic**.
+- **Répliques des champions** : une bulle quand on achète une case ou qu'on paye un loyer.
+  Pour les entendre, déposer des sons dans `frontend/assets/voices/` (voir `LISEZMOI.txt`).
+
 ## Réglages en jeu
 
 Bouton ⚙ (ou Paramètres dans le salon) :
@@ -50,15 +68,17 @@ s'affiche, avec un bandeau qui explique pourquoi. `?3d=1` force la 3D, `?3d=0` l
 
 ## Images officielles (facultatif)
 
-Déposer `chest.png` (Coffre Hextech) et `ping.png` (Ping SS) dans `frontend/assets/board/real/`
-pour remplacer les dessins par défaut.
+Déposer ses images dans `frontend/assets/board/real/` (dragons, potions, coffre, ping, coins…) :
+la liste des noms est dans `LISEZMOI.txt`. Elles remplacent les dessins par défaut.
 
 ## Organisation
 
 | Dossier | Contenu |
 | --- | --- |
 | `backend/game.js` | règles : plateau, cartes, loyers, constructions et réserve de la banque, hypothèques, échanges, faillite, statistiques |
-| `backend/server.js` | serveur Express + Socket.io : comptes, amis, salons, parties, sauvegarde |
+| `backend/features.js` | sorts, objets, quêtes, pouvoirs des pions, événements, skins, règles maison |
+| `backend/bot.js` | bots (Facile, Normal, Difficile) |
+| `backend/server.js` | serveur Express + Socket.io : comptes, amis, salons, bots, chrono, parties, sauvegarde |
 | `frontend/js/main.js`, `lobby.js` | client : connexion, accueil, salon |
 | `frontend/js/game.js` | écran de jeu (actions, journal, échanges, fin de partie, sons) |
 | `frontend/js/board3d.js` | plateau 3D (Three.js) |

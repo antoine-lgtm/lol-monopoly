@@ -1,0 +1,18 @@
+Répliques des champions (facultatif)
+====================================
+
+Dépose ici des sons (mp3, ogg, wav, m4a ou webm). Le jeu les joue quand un joueur
+achète la case du champion ou paye un loyer chez lui, en même temps que la bulle.
+
+Nom du fichier = nom du champion en minuscules, sans accent ni espace :
+
+  sivir  skarner  lissandra  volibear  ornn  shen  karma  irelia  azir  renekton
+  nasus  sion  kled  swain  taric  leona  diana  warwick  singed  urgot  yone  yasuo
+
+Plusieurs répliques pour un même champion : ajoute -2, -3… (une est tirée au hasard).
+  yasuo.mp3
+  yasuo-2.mp3
+  yasuo-3.ogg
+
+Garde des sons courts (2 à 4 secondes) et légers (moins de 300 Ko chacun).
+Pas besoin de redémarrer le serveur : recharge simplement la page.

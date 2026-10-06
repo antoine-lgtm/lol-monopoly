@@ -616,7 +616,12 @@
         <label class="field field--checkbox"><input type="checkbox" name="items"><span>Objets (Fontaine et Boutique)</span></label>
         <label class="field field--checkbox"><input type="checkbox" name="dragons"><span>Âme du Dragon et Dragon Ancien</span></label>
         <label class="field field--checkbox"><input type="checkbox" name="herald"><span>Héraut de la Faille (tour 8)</span></label>
+        <label class="field field--checkbox"><input type="checkbox" name="passives"><span>Pouvoir de chaque pion</span></label>
+        <label class="field field--checkbox"><input type="checkbox" name="events"><span>Événements de la Faille (tous les 4 tours)</span></label>
         <label class="field field--checkbox"><input type="checkbox" name="fountainDouble"><span>Double gain en s'arrêtant sur la Fontaine</span></label>
+        <label class="field field--inline"><span class="field__label">Chrono par tour</span>
+          <select class="field__select" name="turnTimer"><option value="0">Pas de chrono</option><option value="30">30 secondes</option><option value="60">60 secondes</option><option value="90">90 secondes</option></select>
+        </label>
         <label class="field field--inline"><span class="field__label">Or de départ</span>
           <select class="field__select" name="startGold"><option value="1000">1 000 Or</option><option value="1500">1 500 Or</option><option value="2000">2 000 Or</option></select>
         </label>
@@ -704,8 +709,11 @@
         <span class="gv-pill">Tour <b id="gv-round">1</b></span>
         <span class="gv-pill gv-pill--baron" id="gv-baron">Baron au 3ᵉ tour</span>
         <span class="gv-pill gv-pill--event" id="gv-event" hidden></span>
+        <span class="gv-pill gv-pill--timer" id="gv-timer" hidden></span>
       </div>
       <div class="gv-top__tools">
+        <button class="gv-icon-btn" type="button" id="gv-emote" title="Emotes et pings" aria-label="Emotes et pings">☺</button>
+        <button class="gv-icon-btn" type="button" id="gv-ping" title="Ping sur une case (ou Alt + clic)" aria-label="Ping" aria-pressed="false">!</button>
         <button class="gv-icon-btn" type="button" id="gv-music" title="Musique" aria-pressed="true" aria-label="Musique">♪</button>
         <button class="gv-icon-btn" type="button" id="gv-settings" title="Paramètres" aria-label="Paramètres">⚙</button>
         <button class="gv-btn gv-btn--ghost" type="button" id="gv-forfeit">Abandonner</button>
@@ -713,6 +721,10 @@
     </header>
 
     <aside class="gv-players" id="gv-players" aria-label="Joueurs"></aside>
+    <div class="gv-emotes" id="gv-emotes" hidden></div>
+    <div class="gv-bubbles" id="gv-bubbles" aria-hidden="true"></div>
+    <div class="gv-quote" id="gv-quote" hidden aria-live="polite"></div>
+    <div class="gv-eventfx" id="gv-eventfx" hidden aria-live="polite"></div>
 
     <div class="gv-scene" id="gv-scene">
       <div class="gv-camera" id="gv-camera">
@@ -794,6 +806,7 @@
         </div>
         <span class="banner__name"><span class="banner__name-text"></span></span>
         <span class="banner__status"></span>
+        <button class="banner__remove-bot" type="button" hidden>Retirer le bot</button>
 
         <div class="pawn-picker">
           <button class="pawn-picker__current" type="button" aria-haspopup="listbox" aria-expanded="false">
@@ -802,6 +815,8 @@
           </button>
           <ul class="pawn-picker__list" role="listbox" hidden></ul>
         </div>
+        <!-- Skins du pion (débloqués en jouant) -->
+        <div class="skin-picker" hidden></div>
 
         <div class="role-picker">
           <button class="role-picker__current" type="button" aria-haspopup="listbox" aria-expanded="false">
@@ -840,6 +855,15 @@
         <span class="banner__pending-icon" aria-hidden="true"></span>
         <span class="banner__pending-label">Invitation envoyée</span>
         <span class="banner__pending-name"></span>
+      </div>
+      <!-- Le chef peut remplir la place avec un bot -->
+      <div class="banner__bots" hidden>
+        <span class="banner__bots-label">ou ajouter un bot</span>
+        <div class="banner__bots-row">
+          <button class="banner__bot-btn" type="button" data-bot="easy">Facile</button>
+          <button class="banner__bot-btn" type="button" data-bot="normal">Normal</button>
+          <button class="banner__bot-btn" type="button" data-bot="hard">Difficile</button>
+        </div>
       </div>
     </div>
   </template>

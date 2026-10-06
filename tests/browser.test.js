@@ -161,6 +161,29 @@ test.describe('dans le navigateur', { skip }, () => {
     noErrors(a, b);
   });
 
+  test('bots : le chef ajoute un bot, il joue tout seul ; emote et chrono', async () => {
+    const a = await openPlayer(PORT, 'Kayle');
+    await login(a, 'Kayle', 3);
+    await a.click('#home-confirm');
+    await a.click('.banner__bots:not([hidden]) .banner__bot-btn[data-bot="easy"]');
+    await a.waitForSelector('.banner.is-bot');
+    await a.click('#find-match');
+    await a.waitForSelector('#board-view:not([hidden])');
+    await a.waitForSelector('#gv-timer:not([hidden])');
+    await a.click('#gv-emote');
+    await a.click('.gv-emotes__btn[data-emote="gg"]');
+    await a.waitForSelector('.gv-bubble');
+    // on joue notre tour (lancer, acheter, fin du tour) : le bot doit ensuite jouer le sien
+    const botPlayed = () => a.evaluate(() => [...document.querySelectorAll('#gv-log li')].some((l) => /\(bot\) lance les dés/.test(l.textContent)));
+    for (let k = 0; k < 40 && !(await botPlayed()); k++) {
+      const primary = await a.$('#gv-buttons .gv-btn--primary:not([disabled])');
+      if (primary) await primary.click().catch(() => {});
+      await sleep(600);
+    }
+    assert.ok(await botPlayed(), 'le bot a lancé les dés');
+    noErrors(a);
+  });
+
   test('sauvegarde : la partie reprend après un redémarrage du serveur', async () => {
     const port = 3192;
     const save = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'lolm-')), 'save.json');

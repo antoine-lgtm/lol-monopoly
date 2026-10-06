@@ -2504,3 +2504,199 @@ body.reduce-motion .gv-pawn.is-current .gv-standee__body {
 }
 .gv-sq--corner.has-art .gv-sq__inner { justify-content: center; gap: 4px; }
 .gv-sq--corner.has-art .gv-sq__inner::before { display: none; }
+
+/* ---------- Bots, pouvoirs des pions ---------- */
+.gv-tag--bot { background: rgba(127, 233, 240, 0.12); color: #9ff0f5; border-color: rgba(127, 233, 240, 0.45); }
+.gv-tag--passive { background: rgba(240, 230, 210, 0.08); color: #e8dcc0; border-color: rgba(200, 170, 110, 0.4); }
+
+/* Skins sur le plateau plat et dans la liste des joueurs */
+.gv-pawn[data-skin="hextech"] .gv-standee__body, .gv-player__pawn[data-skin="hextech"] { filter: hue-rotate(150deg) saturate(1.4) drop-shadow(0 0 5px rgba(63, 216, 255, 0.9)); }
+.gv-pawn[data-skin="shadow"] .gv-standee__body, .gv-player__pawn[data-skin="shadow"] { filter: brightness(0.6) saturate(0.7) drop-shadow(0 0 6px rgba(160, 80, 255, 0.95)); }
+.gv-pawn[data-skin="gold"] .gv-standee__body, .gv-player__pawn[data-skin="gold"] { filter: sepia(1) saturate(3) hue-rotate(-8deg) brightness(1.1) drop-shadow(0 0 5px rgba(240, 200, 80, 0.9)); }
+.gv-pawn[data-skin="crystal"] .gv-standee__body, .gv-player__pawn[data-skin="crystal"] { filter: hue-rotate(180deg) saturate(0.5) brightness(1.45) drop-shadow(0 0 6px rgba(200, 240, 255, 0.95)); }
+.gv-pawn[data-skin="infernal"] .gv-standee__body, .gv-player__pawn[data-skin="infernal"] { filter: sepia(1) saturate(5) hue-rotate(-25deg) drop-shadow(0 0 6px rgba(255, 90, 31, 0.95)); }
+
+/* ---------- Chrono du tour ---------- */
+.gv-pill--timer {
+  --left: 1;
+  min-width: 70px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: #e8dcc0;
+  background:
+    linear-gradient(90deg, rgba(10, 200, 185, 0.35) calc(var(--left) * 100%), rgba(1, 10, 19, 0.7) 0);
+  border-color: rgba(10, 200, 185, 0.45);
+}
+.gv-pill--timer[hidden] { display: none; }
+.gv-pill--timer.is-low {
+  color: #fff;
+  border-color: #e84057;
+  background: linear-gradient(90deg, rgba(232, 64, 87, 0.55) calc(var(--left) * 100%), rgba(1, 10, 19, 0.7) 0);
+}
+.gv-pill--timer.is-low.is-mine { animation: pill-pulse 0.9s ease-in-out infinite; }
+
+/* ---------- Événement de la Faille (annonce au centre) ---------- */
+.gv-eventfx {
+  position: absolute;
+  left: 50%;
+  top: 16%;
+  z-index: 7;
+  transform: translateX(-50%);
+  width: min(460px, calc(100% - 32px));
+  padding: 14px 22px 16px;
+  text-align: center;
+  color: #f0e6d2;
+  background: linear-gradient(180deg, rgba(30, 20, 60, 0.92), rgba(6, 10, 22, 0.94));
+  border: 1px solid #c8aa6e;
+  box-shadow: 0 0 0 1px rgba(1, 10, 19, 0.8), 0 18px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(178, 124, 255, 0.35);
+  pointer-events: none;
+}
+.gv-eventfx[hidden] { display: none; }
+.gv-eventfx.is-shown { animation: eventfx-in 3.8s ease both; }
+@keyframes eventfx-in {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-14px) scale(0.92); }
+  10%, 85% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+}
+.gv-eventfx__kicker { margin: 0; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: #b27cff; }
+.gv-eventfx__title { margin: 4px 0 6px; font-family: var(--font-display); font-size: 24px; font-weight: 800; letter-spacing: 0.06em; color: #f0c860; }
+.gv-eventfx__text { margin: 0; font-size: 15px; }
+
+/* ---------- Réplique de champion ---------- */
+.gv-quote {
+  position: absolute;
+  left: 50%;
+  bottom: 150px;
+  z-index: 6;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(520px, calc(100% - 32px));
+  padding: 8px 18px 8px 8px;
+  background: rgba(1, 10, 19, 0.88);
+  border: 1px solid rgba(200, 170, 110, 0.6);
+  border-radius: 40px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+.gv-quote[hidden] { display: none; }
+.gv-quote.is-shown { animation: quote-in 3.2s ease both; }
+@keyframes quote-in {
+  0% { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  8%, 88% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(4px); }
+}
+.gv-quote__img { width: 52px; height: 52px; flex: none; border-radius: 50%; object-fit: cover; object-position: center 20%; border: 2px solid #c8aa6e; background: #0a1620; }
+.gv-quote__text { margin: 0; font-style: italic; font-size: 15px; color: #f0e6d2; }
+.gv-quote__who { margin: 2px 0 0; font-size: 11px; color: #c8aa6e; letter-spacing: 0.04em; }
+
+/* ---------- Emotes ---------- */
+.gv-emotes {
+  position: absolute;
+  top: 56px;
+  right: 16px;
+  z-index: 9;
+  width: 300px;
+  padding: 10px 12px;
+  background: rgba(1, 10, 19, 0.95);
+  border: 1px solid #785a28;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.7);
+}
+.gv-emotes[hidden] { display: none; }
+.gv-emotes__row { display: flex; flex-wrap: wrap; gap: 6px; }
+.gv-emotes__row + .gv-emotes__row { margin-top: 10px; }
+.gv-emotes__title { flex-basis: 100%; margin: 0; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #a09b8c; }
+.gv-emotes__btn {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  height: 40px;
+  padding: 0 8px;
+  border: 1px solid rgba(200, 170, 110, 0.4);
+  border-radius: 6px;
+  background: #0a1620;
+  color: #f0e6d2;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.12s;
+}
+.gv-emotes__btn:hover { transform: translateY(-2px); border-color: #c8aa6e; }
+.gv-emotes__btn img { width: 28px; height: 28px; object-fit: contain; }
+.gv-emotes__btn--ping { color: var(--c, #f0e6d2); border-color: color-mix(in srgb, var(--c, #c8aa6e) 60%, transparent); font-size: 18px; }
+.gv-emote--mastery { padding: 1px 6px; border-radius: 4px; background: linear-gradient(160deg, #5be0d0, #1a6a8a); color: #fff; font-size: 13px; }
+
+.gv-bubbles { position: absolute; inset: 0; z-index: 7; pointer-events: none; }
+.gv-bubble {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 46px;
+  padding: 6px 10px 4px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #f0e6d2;
+  background: rgba(1, 10, 19, 0.92);
+  border: 2px solid var(--c, #c8aa6e);
+  border-radius: 14px;
+  transform: translate(-50%, calc(-100% - 12px));
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6), 0 0 14px color-mix(in srgb, var(--c, #c8aa6e) 45%, transparent);
+  animation: bubble-pop 2.8s ease both;
+}
+.gv-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  border: 7px solid transparent;
+  border-top-color: var(--c, #c8aa6e);
+  border-bottom: 0;
+  transform: translateX(-50%);
+}
+.gv-bubble img { width: 34px; height: 34px; object-fit: contain; }
+.gv-bubble__who { font-size: 10px; font-weight: 600; color: #a09b8c; }
+.gv-bubble.is-floating { left: 140px; top: 120px; transform: none; }
+@keyframes bubble-pop {
+  0% { opacity: 0; scale: 0.4; }
+  10% { opacity: 1; scale: 1.12; }
+  16%, 85% { scale: 1; opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ---------- Pings ---------- */
+.board-view.is-pinging, .board-view.is-pinging .gv-webgl { cursor: crosshair; }
+#gv-ping[aria-pressed="true"] { background: rgba(232, 64, 87, 0.3); border-color: #e84057; }
+.gv-ping {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border: 3px solid var(--c);
+  border-radius: 50%;
+  color: var(--c);
+  font-weight: 900;
+  font-size: 18px;
+  background: rgba(1, 10, 19, 0.75);
+  box-shadow: 0 0 16px var(--c);
+  animation: ping-pulse 0.7s ease-out 3;
+  pointer-events: none;
+}
+@keyframes ping-pulse {
+  from { box-shadow: 0 0 0 0 var(--c); }
+  to { box-shadow: 0 0 0 22px transparent; }
+}
+.gv-log__ping { color: var(--c); font-weight: 600; }
+
+@media (max-width: 760px) {
+  .gv-emotes { top: 50px; right: 8px; width: calc(100% - 16px); }
+  .gv-quote { bottom: 190px; }
+  .gv-eventfx { top: 12%; }
+}

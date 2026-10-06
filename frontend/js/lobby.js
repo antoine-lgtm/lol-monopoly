@@ -101,15 +101,22 @@
     el.classList.toggle('is-me', me);
     el.classList.toggle('is-owner', player.isOwner);
     el.classList.toggle('is-disconnected', !player.connected);
+    el.classList.toggle('is-bot', Boolean(player.bot));
 
     $('.banner__name-text', el).textContent = player.name;
     $('.banner__crown', el).hidden = !player.isOwner;
     const status = $('.banner__status', el);
-    status.textContent = !player.connected ? 'Reconnexion…' : titleFor(player.name);
+    status.textContent = player.bot
+      ? `Bot · ${lobby.botLevels?.[player.bot] || player.bot}`
+      : !player.connected ? 'Reconnexion…' : titleFor(player.name);
     status.title = player.isOwner ? 'Chef du salon' : '';
+    const removeBot = $('.banner__remove-bot', el);
+    removeBot.hidden = !player.bot || !isOwner() || lobby.status !== 'lobby';
+    removeBot.dataset.slot = slot.index;
 
 
     renderPawnPicker(el, player, lobby, me);
+    renderSkins(el, player, lobby, me);
     renderSpells(el, player, lobby, me);
     const quest = $('.banner__quest', el);
     const q = player.role && lobby.rules?.quests !== false ? lobby.quests?.[player.role] : null;
@@ -146,8 +153,29 @@
       pending.hidden = false;
       $('.banner__pending-name', pending).textContent = slot.pendingInvite;
     }
+    const bots = $('.banner__bots', el);
+    bots.hidden = !canInvite || !isOwner() || Boolean(slot.pendingInvite);
+    $$('.banner__bot-btn', bots).forEach((b) => { b.dataset.slot = slot.index; });
     return el;
   }
+
+  // Bots : ajoutés par le chef sur une place libre, retirés par lui
+  banners.addEventListener('click', (event) => {
+    const add = event.target.closest('.banner__bot-btn');
+    if (add) {
+      add.disabled = true;
+      socket.emit('lobby:addBot', { slot: Number(add.dataset.slot), level: add.dataset.bot }, (res) => {
+        if (!res?.ok) App.toast(res?.error || 'Impossible d’ajouter un bot.', 'error');
+      });
+      return;
+    }
+    const remove = event.target.closest('.banner__remove-bot');
+    if (remove) {
+      socket.emit('lobby:removeBot', { slot: Number(remove.dataset.slot) }, (res) => {
+        if (!res?.ok) App.toast(res?.error || 'Impossible de retirer ce bot.', 'error');
+      });
+    }
+  });
 
   function renderTools(lobby) {
     $('#lobby-code-value').textContent = lobby.code;
@@ -339,8 +367,15 @@
     event.preventDefault();
     const name = banner.dataset.name;
     if (!isOwner() || name === App.me.name) return;
+    const bot = banner.classList.contains('is-bot');
     App.openContextMenu(event.clientX, event.clientY, {
       kick: () => {
+        if (bot) {
+          socket.emit('lobby:removeBot', { slot: Number(banner.dataset.slot) }, (res) => {
+            if (!res?.ok) App.toast(res?.error, 'error');
+          });
+          return;
+        }
         socket.emit('lobby:kick', { name }, (res) => {
           if (!res?.ok) App.toast(res?.error, 'error');
         });
@@ -399,10 +434,14 @@
   function renderPawnPicker(el, player, lobby, me) {
     const current = $('.pawn-picker__current', el);
     const pawn = player.pawn || 'classic';
-    $('.pawn-picker__img', current).src = pawnImage(pawn);
-    $('.pawn-picker__label', current).textContent = PAWN_LABELS[pawn];
+    const passive = lobby.rules?.passives !== false ? lobby.passives?.[pawn] : null;
+    const img = $('.pawn-picker__img', current);
+    img.src = pawnImage(pawn);
+    img.dataset.skin = player.skin || 'base';
+    const skin = player.skin && player.skin !== 'base' ? ` · ${lobby.skins?.[player.skin]?.name || ''}` : '';
+    $('.pawn-picker__label', current).textContent = `${PAWN_LABELS[pawn]}${skin}`;
     current.disabled = !me || lobby.status !== 'lobby';
-    current.title = me ? 'Choisir mon pion' : `Pion de ${player.name}`;
+    current.title = `${me ? 'Choisir mon pion' : `Pion de ${player.name}`}${passive ? `\nPouvoir — ${passive.name} : ${passive.text}` : ''}`;
     if (!me) return;
 
     // Liste des pions : ceux déjà pris par un autre joueur sont grisés
@@ -418,16 +457,60 @@
       li.setAttribute('aria-selected', String(id === pawn));
       const owner = takenBy.get(id);
       if (owner) li.setAttribute('aria-disabled', 'true');
-      li.title = owner ? `${PAWN_LABELS[id]} — pris par ${owner}` : PAWN_LABELS[id];
+      const pv = lobby.rules?.passives !== false ? lobby.passives?.[id] : null;
+      li.title = owner ? `${PAWN_LABELS[id]} — pris par ${owner}` : `${PAWN_LABELS[id]}${pv ? ` — ${pv.name} : ${pv.text}` : ''}`;
       const img = document.createElement('img');
       img.src = pawnImage(id);
       img.alt = '';
       const label = document.createElement('span');
       label.textContent = PAWN_LABELS[id];
+      if (pv) {
+        const small = document.createElement('small');
+        small.className = 'pawn-picker__passive';
+        small.textContent = pv.text;
+        label.append(small);
+      }
       li.append(img, label);
       return li;
     }));
   }
+
+  // ---------------------------------------------------------------------------
+  // Skins du pion : débloqués en jouant (parties jouées, victoires)
+  // ---------------------------------------------------------------------------
+
+  const unlocked = (skin, stats = {}) => (stats.games || 0) >= skin.games && (stats.wins || 0) >= skin.wins;
+  const unlockHint = (skin) => [
+    skin.games ? `${skin.games} partie${skin.games > 1 ? 's' : ''} jouée${skin.games > 1 ? 's' : ''}` : '',
+    skin.wins ? `${skin.wins} victoire${skin.wins > 1 ? 's' : ''}` : '',
+  ].filter(Boolean).join(' et ');
+
+  function renderSkins(el, player, lobby, me) {
+    const box = $('.skin-picker', el);
+    box.hidden = !me || !lobby.skins;
+    if (box.hidden) return;
+    const current = player.skin || 'base';
+    box.replaceChildren(...Object.entries(lobby.skins).map(([id, skin]) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'skin-picker__chip';
+      b.dataset.skin = id;
+      const open = unlocked(skin, player.stats);
+      b.disabled = !open || lobby.status !== 'lobby';
+      b.classList.toggle('is-locked', !open);
+      b.setAttribute('aria-pressed', String(id === current));
+      b.title = open ? `Skin ${skin.name}` : `${skin.name} — se débloque après ${unlockHint(skin)}`;
+      b.setAttribute('aria-label', b.title);
+      return b;
+    }));
+  }
+  banners.addEventListener('click', (event) => {
+    const chip = event.target.closest('.skin-picker__chip');
+    if (!chip || chip.disabled) return;
+    socket.emit('lobby:setSkin', { skin: chip.dataset.skin }, (res) => {
+      if (!res?.ok) App.toast(res?.error || 'Skin indisponible.', 'error');
+    });
+  });
 
   // ---------------------------------------------------------------------------
   // Sorts d'invocateur : deux emplacements, un clic ouvre la liste des sorts
@@ -550,6 +633,8 @@
       ...section('Sorts d’invocateur (2 par joueur)', (lobby.spellList || []).map((sp) => [`${sp.name} (${sp.cd} tours)`, sp.text])),
       ...section('Quêtes de rôle', Object.entries(lobby.quests || {}).map(([role, q]) => [`${ROLE_LABELS[role]} — ${q.name}`, `${q.text}. Récompense : ${q.reward}.`])),
       ...section('Objets (3 au maximum, achetés à la Fontaine ou à la Boutique)', Object.values(lobby.items || {}).map((it) => [`${it.name} (${it.price} Or${it.tier === 'late' ? ', fin de partie' : ''})`, it.text])),
+      ...(lobby.rules?.passives !== false ? section('Pouvoirs des pions', Object.entries(lobby.passives || {}).map(([id, pv]) => [`${PAWN_LABELS[id]} — ${pv.name}`, pv.text])) : []),
+      ...(lobby.rules?.events !== false ? section('Événements de la Faille (un tous les 4 tours)', Object.values(lobby.events || {}).map((ev) => [ev.name, ev.text])) : []),
       ...section('Grands objectifs', [
         ['Âme du Dragon', 'Posséder les 4 Dragons : +30 % sur tous tes loyers pendant 5 tours.'],
         ['Dragon Ancien (tour 15)', 'Le premier à tomber sur une case Dragon : +30 % sur tous ses loyers pendant 5 tours (cumulable avec l’Âme).'],
@@ -571,9 +656,12 @@
       items: el.items.checked,
       dragons: el.dragons.checked,
       herald: el.herald.checked,
+      passives: el.passives.checked,
+      events: el.events.checked,
       fountainDouble: el.fountainDouble.checked,
       startGold: Number(el.startGold.value),
       maxRounds: Number(el.maxRounds.value),
+      turnTimer: Number(el.turnTimer.value),
     };
     socket.emit('lobby:setRules', { rules }, (res) => {
       if (!res?.ok) App.toast(res?.error || 'Réglage impossible.', 'error');

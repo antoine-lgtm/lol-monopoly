@@ -210,6 +210,24 @@
         case 'defeat':
           [440, 415, 349, 262].forEach((f, k) => tone(f, k * 0.22, 0.7, 0.05, 'sawtooth'));
           break;
+        case 'tick': // chrono presque écoulé
+          tone(1400, 0, 0.06, 0.05, 'square');
+          break;
+        case 'ping': // ping LoL : deux bips montants
+          tone(880, 0, 0.12, 0.06, 'triangle');
+          tone(1320, 0.08, 0.18, 0.06, 'triangle');
+          break;
+        case 'danger':
+          tone(660, 0, 0.12, 0.07, 'square');
+          tone(440, 0.12, 0.2, 0.07, 'square');
+          break;
+        case 'emote':
+          bell(1568, 0, 0.3, 0.035);
+          break;
+        case 'event': // annonce d'un événement de la Faille
+          tone(196, 0, 0.9, 0.06, 'sawtooth');
+          [523, 659, 784].forEach((f, k) => bell(f, 0.15 + k * 0.1, 0.8, 0.045));
+          break;
         default:
       }
     } catch { /* audio indisponible */ }
@@ -497,7 +515,10 @@
       });
       view.classList.add('is-webgl');
       b3.onHover = hoverSquare;
-      b3.onClick = (i) => { if (matchMedia('(hover: none)').matches) openInspect(i); };
+      b3.onClick = (i) => {
+        if (maybePing(i)) return;
+        if (matchMedia('(hover: none)').matches) openInspect(i);
+      };
       b3.onDrag = () => hoverSquare(null);
     } catch (err) {
       console.warn('[plateau] WebGL indisponible, plateau CSS utilisé.', err);
@@ -536,6 +557,7 @@
       y: y + Math.sin(angle) * r,
       color: p?.color,
       pawn: p?.pawn,
+      skin: p?.skin,
       hop,
       glide: el.classList.contains('is-gliding'),
       current: p?.key === state.current,
@@ -557,6 +579,7 @@
         el.style.setProperty('--c', p.color);
         // Pion choisi dans le salon (le pion classique garde la couleur du joueur)
         el.dataset.pawn = p.pawn || 'classic';
+        el.dataset.skin = p.skin || 'base';
         if (p.pawn && p.pawn !== 'classic') el.style.setProperty('--pawn-img', `url("/assets/pawns/${p.pawn}.svg")`);
         el.dataset.key = p.key;
         const label = document.createElement('span');
@@ -832,6 +855,26 @@
         case 'trade-offer':
           if (fx.to === myKey()) sfx('card');
           break;
+        case 'event': {
+          const ev = catalog().events?.[fx.event];
+          sfx('event');
+          showEventBanner(ev);
+          await sleep(600);
+          break;
+        }
+        case 'passive': {
+          const who = state.players.find((p) => p.key === fx.key);
+          const pv = catalog().passives?.[fx.pawn];
+          sfx('spell');
+          App.toast(`${who?.name} — ${pv?.name || 'Pouvoir'} !`, 'info', 3500);
+          break;
+        }
+        case 'rent':
+          if (Math.random() < 0.45) championQuote(fx.index, 'rent');
+          break;
+        case 'buy':
+          championQuote(fx.index, 'buy');
+          break;
         case 'trade-done':
           if (fx.from === myKey() || fx.to === myKey()) {
             sfx(fx.accepted ? 'trade' : 'loss');
@@ -866,6 +909,7 @@
       })));
       b3.setPending(state.pendingIndex);
       b3.setObjectives?.({ herald: state.herald?.active, elder: state.elder?.active });
+      b3.setAtmosphere?.({ round: state.round, baron: state.baron?.active, elder: state.elder?.active });
     }
   }
 
@@ -883,6 +927,7 @@
       const pawn = document.createElement('span');
       pawn.className = 'gv-player__pawn';
       pawn.dataset.pawn = p.pawn || 'classic';
+      pawn.dataset.skin = p.skin || 'base';
       if (p.pawn && p.pawn !== 'classic') pawn.style.setProperty('--pawn-img', `url("/assets/pawns/${p.pawn}.svg")`);
       const info = document.createElement('div');
       info.className = 'gv-player__info';
@@ -909,6 +954,12 @@
       if (p.soul) tag('soul', `Âme ${p.soul}t`, `Âme du Dragon : +30 % sur ses loyers (${p.soul} tours)`);
       if (p.elderBuff) tag('elder', `Ancien ${p.elderBuff}t`, `Dragon Ancien : +30 % sur ses loyers (${p.elderBuff} tours)`);
       if (p.herald) tag('herald', 'Héraut', 'Peut détruire une construction adverse');
+      if (p.bot) tag('bot', 'Bot', `Joué par l’ordinateur (${{ easy: 'Facile', normal: 'Normal', hard: 'Difficile' }[p.bot] || p.bot})`);
+      const pv = state.rules?.passives !== false ? catalog().passives?.[p.pawn || 'classic'] : null;
+      if (pv && !p.bankrupt) {
+        const used = (p.pawn === 'egg' && p.reborn) || (p.pawn === 'zhonya' && p.passiveCd);
+        tag('passive', used ? `${pv.name} ${p.passiveCd ? `${p.passiveCd}t` : '✓'}` : pv.name, `Pouvoir du pion — ${pv.text}`);
+      }
 
       // Petites pastilles des groupes possédés
       const owned = document.createElement('div');
@@ -966,9 +1017,321 @@
     const events = [];
     if (state.herald?.active) events.push('Héraut dans la fosse');
     if (state.elder?.active) events.push('Dragon Ancien éveillé');
+    if (state.event) events.unshift(`⚡ ${state.event.name}`);
     if (state.rules?.maxRounds) events.push(`Partie rapide : ${state.round}/${state.rules.maxRounds}`);
     event.hidden = !events.length;
     event.textContent = events.join(' · ');
+    event.title = state.event ? `${state.event.name} : ${state.event.text}` : '';
+    renderTimer();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Chrono du tour
+  // ---------------------------------------------------------------------------
+
+  let timerTick = null;
+  let lastTickSecond = null;
+  function renderTimer() {
+    const pill = $('#gv-timer');
+    clearInterval(timerTick);
+    if (!state.timer || state.phase === 'over' || !state.timerDeadline) {
+      pill.hidden = true;
+      return;
+    }
+    const mineTurn = isMyTurn();
+    const update = () => {
+      const left = Math.max(0, Math.ceil((state.timerDeadline - performance.now()) / 1000));
+      pill.hidden = false;
+      pill.textContent = `⏱ ${left} s`;
+      pill.classList.toggle('is-low', left <= 10);
+      pill.classList.toggle('is-mine', mineTurn);
+      pill.style.setProperty('--left', String(Math.min(1, left / (state.timer.total / 1000))));
+      pill.title = left ? `Temps restant pour ${mineTurn ? 'ton' : 'ce'} tour` : 'Temps écoulé : le jeu joue à sa place';
+      if (mineTurn && left <= 5 && left > 0 && left !== lastTickSecond) {
+        lastTickSecond = left;
+        sfx('tick');
+      }
+    };
+    update();
+    timerTick = setInterval(update, 250);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Événements de la Faille, répliques des champions
+  // ---------------------------------------------------------------------------
+
+  function showEventBanner(ev) {
+    if (!ev) return;
+    const box = $('#gv-eventfx');
+    box.replaceChildren();
+    const title = el('p', 'gv-eventfx__title', ev.name);
+    const text = el('p', 'gv-eventfx__text', ev.text);
+    box.append(el('p', 'gv-eventfx__kicker', 'Événement de la Faille'), title, text);
+    box.hidden = false;
+    box.classList.remove('is-shown');
+    void box.offsetWidth;
+    box.classList.add('is-shown');
+    clearTimeout(showEventBanner.timer);
+    showEventBanner.timer = setTimeout(() => { box.hidden = true; }, 3800);
+  }
+
+  // Répliques (bulles) : une ou deux par champion, pour l'achat et le loyer
+  const QUOTES = {
+    Sivir: ['Payez-moi et on en reste là.', 'Une affaire, c’est une affaire.'],
+    Skarner: ['Les cristaux m’appartiennent.', 'Je protège ce qui est à moi.'],
+    Lissandra: ['La glace ne pardonne pas.', 'Tout finit par geler.'],
+    Volibear: ['La tempête gronde !', 'Je suis le tonnerre.'],
+    Ornn: ['Du travail bien forgé.', 'Je n’ai besoin de personne.'],
+    Shen: ['L’équilibre a un prix.', 'Je veille.'],
+    Karma: ['L’âme s’élève.', 'Tout acte a ses conséquences.'],
+    Irelia: ['Les lames dansent pour Ionia.', 'Je ne plierai pas.'],
+    Azir: ['Shurima ! Ton empereur est revenu.', 'Inclinez-vous devant l’empereur.'],
+    Renekton: ['Tout est fureur !', 'Je les dévorerai tous.'],
+    Nasus: ['Ce qui est à moi revient toujours.', 'Le cycle de la vie continue.'],
+    Sion: ['Plus de sang !', 'Noxus ne tombe jamais.'],
+    Kled: ['C’est MON terrain !', 'Skaarl, à l’attaque !'],
+    Swain: ['Noxus prospère.', 'Chaque faiblesse se paie.'],
+    Taric: ['Quelle magnifique fortune.', 'La beauté protège.'],
+    Leona: ['L’aube arrive.', 'Le soleil se lève sur Targon.'],
+    Diana: ['La lune se lève.', 'Ma lumière est froide.'],
+    Warwick: ['Je sens l’odeur de l’or.', 'La chasse commence.'],
+    Singed: ['Hé hé hé… tu vas payer.', 'Une petite expérience ?'],
+    Urgot: ['La douleur est un rappel.', 'Zaun réclame son dû.'],
+    Yone: ['Une lame pour les vivants, une pour les morts.', 'Je ne serai pas oublié.'],
+    Yasuo: ['La mort, c’est comme le vent : toujours à mes côtés.', 'Ma route n’est pas finie.'],
+  };
+  const LINES = {
+    buy: (name) => `${name} rejoint ton camp !`,
+    rent: (name) => `${name} encaisse le loyer.`,
+  };
+  let voiceFiles = [];
+  fetch('/voices.json').then((r) => r.json()).then((list) => { voiceFiles = list; }).catch(() => {});
+  /** Son déposé dans frontend/assets/voices/ : yasuo.mp3, yasuo-2.ogg… (au hasard s'il y en a plusieurs). */
+  function playVoice(champ) {
+    const volume = (App.settings?.volume ?? 60) / 100;
+    if (!volume || view.hidden) return false;
+    const id = champ.toLowerCase();
+    const files = voiceFiles.filter((f) => new RegExp(`^${id}(-\\d+)?\\.[a-z0-9]+$`, 'i').test(f));
+    if (!files.length) return false;
+    const audio = new Audio(`assets/voices/${files[Math.floor(Math.random() * files.length)]}`);
+    audio.volume = Math.min(1, volume);
+    audio.play().catch(() => {});
+    return true;
+  }
+  function championQuote(index, kind) {
+    const sq = board?.[index];
+    if (!sq || sq.type !== 'property') return;
+    const champ = champId(sq);
+    const quotes = QUOTES[champ];
+    if (!quotes) return;
+    const box = $('#gv-quote');
+    box.replaceChildren();
+    const portrait = champImage('gv-quote__img', portraitUrl(sq));
+    const body = el('div', 'gv-quote__body');
+    body.append(el('p', 'gv-quote__text', `« ${quotes[Math.floor(Math.random() * quotes.length)]} »`), el('p', 'gv-quote__who', LINES[kind](sq.name)));
+    box.append(portrait, body);
+    box.hidden = false;
+    box.classList.remove('is-shown');
+    void box.offsetWidth;
+    box.classList.add('is-shown');
+    playVoice(champ);
+    clearTimeout(championQuote.timer);
+    championQuote.timer = setTimeout(() => { box.hidden = true; }, 3200);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Emotes et pings
+  // ---------------------------------------------------------------------------
+
+  const EMOTES = {
+    gg: { label: 'GG' },
+    wp: { label: 'Bien joué !' },
+    lol: { label: '😂' },
+    question: { label: '?' },
+    angry: { label: '😠' },
+    cry: { label: '😢' },
+    thumb: { label: '👍' },
+    heart: { label: '❤️' },
+    mastery: { label: 'M7', cls: 'mastery', title: 'Maîtrise 7' },
+    poro: { img: 'assets/pawns/poro.svg', title: 'Poro' },
+  };
+  const PINGS = {
+    ping: { label: 'Signal', glyph: '◎' },
+    danger: { label: 'Danger', glyph: '!', color: '#ff4655', sound: 'danger' },
+    omw: { label: 'J’arrive', glyph: '➜', color: '#3fa7ff' },
+    question: { label: 'Question', glyph: '?', color: '#f0c040' },
+  };
+
+  function emoteContent(id) {
+    const e = EMOTES[id];
+    if (!e) return null;
+    if (e.img) {
+      const img = document.createElement('img');
+      img.src = e.img;
+      img.alt = e.title || '';
+      return img;
+    }
+    const span = el('span', e.cls ? `gv-emote--${e.cls}` : '', e.label);
+    return span;
+  }
+
+  /** Point (px dans la vue) au-dessus d'un pion, en 3D comme sur le plateau plat. */
+  function pawnScreenPoint(key) {
+    const viewRect = view.getBoundingClientRect();
+    if (b3) {
+      const pos = b3.screenOf(key);
+      const canvas = $('canvas.gv-webgl', view);
+      if (pos && canvas) {
+        const r = canvas.getBoundingClientRect();
+        return { x: r.left - viewRect.left + pos.x, y: r.top - viewRect.top + pos.y };
+      }
+    }
+    const pawn = pawns.get(key);
+    if (!pawn) return null;
+    const r = $('.gv-standee__body', pawn)?.getBoundingClientRect() || pawn.getBoundingClientRect();
+    return { x: r.left - viewRect.left + r.width / 2, y: r.top - viewRect.top };
+  }
+
+  function showEmote({ key, name, emote }) {
+    if (!state || view.hidden) return;
+    const content = emoteContent(emote);
+    if (!content) return;
+    sfx('emote');
+    const layer = $('#gv-bubbles');
+    $$(`.gv-bubble[data-key="${CSS.escape(key)}"]`, layer).forEach((b) => b.remove());
+    const bubble = el('div', 'gv-bubble');
+    bubble.dataset.key = key;
+    const color = state.players.find((p) => p.key === key)?.color || '#c8aa6e';
+    bubble.style.setProperty('--c', color);
+    bubble.append(content, el('span', 'gv-bubble__who', name));
+    layer.append(bubble);
+    const place = () => {
+      const pt = pawnScreenPoint(key);
+      if (!pt) return false;
+      bubble.style.left = `${pt.x}px`;
+      bubble.style.top = `${pt.y}px`;
+      return true;
+    };
+    if (!place()) {
+      bubble.classList.add('is-floating'); // pion introuvable : bulle près de la liste des joueurs
+    }
+    // la bulle suit le pion (rotation de la caméra) pendant 2,8 s
+    const until = performance.now() + 2800;
+    const follow = () => {
+      if (!bubble.isConnected) return;
+      if (performance.now() > until) {
+        bubble.remove();
+        return;
+      }
+      place();
+      requestAnimationFrame(follow);
+    };
+    requestAnimationFrame(follow);
+  }
+  socket.on('game:emote', showEmote);
+
+  function showPing({ name, index, kind, color }) {
+    if (!state || view.hidden) return;
+    const def = PINGS[kind] || PINGS.ping;
+    const c = def.color || color;
+    sfx(def.sound || 'ping');
+    b3?.ping(index, c);
+    const sq = squares[index];
+    if (sq) {
+      const mark = el('span', 'gv-ping', def.glyph);
+      mark.style.setProperty('--c', c);
+      sq.append(mark);
+      setTimeout(() => mark.remove(), 2300);
+    }
+    if (board?.[index]) {
+      const log = $('#gv-log');
+      const li = el('li', 'gv-log__ping', `${name} — ${def.label} : ${board[index].name}`);
+      li.style.setProperty('--c', c);
+      log?.prepend(li);
+    }
+  }
+  socket.on('game:ping', showPing);
+
+  // Bouton emote : roue d'emotes ; bouton ping : choisir le type puis cliquer une case
+  let pingMode = null;
+  function setPingMode(kind) {
+    pingMode = kind;
+    view.classList.toggle('is-pinging', Boolean(kind));
+    $('#gv-ping').setAttribute('aria-pressed', String(Boolean(kind)));
+    if (kind) App.toast(`${PINGS[kind].label} : clique sur une case (Échap pour annuler).`, 'info', 2500);
+  }
+  function sendPing(index, kind = 'ping') {
+    socket.emit('game:ping', { index, kind }, (res) => {
+      if (!res?.ok && res?.error) App.toast(res.error, 'error', 1500);
+    });
+  }
+  function buildEmotePanel() {
+    const panel = $('#gv-emotes');
+    const row = (title, entries) => {
+      const wrap = el('div', 'gv-emotes__row');
+      wrap.append(el('p', 'gv-emotes__title', title), ...entries);
+      return wrap;
+    };
+    const emoteBtns = Object.keys(EMOTES).map((id) => {
+      const b = el('button', 'gv-emotes__btn');
+      b.type = 'button';
+      b.dataset.emote = id;
+      b.title = EMOTES[id].title || EMOTES[id].label;
+      b.append(emoteContent(id));
+      return b;
+    });
+    const pingBtns = Object.entries(PINGS).map(([id, def]) => {
+      const b = el('button', 'gv-emotes__btn gv-emotes__btn--ping', def.glyph);
+      b.type = 'button';
+      b.dataset.ping = id;
+      b.title = `${def.label} (puis clique une case)`;
+      if (def.color) b.style.setProperty('--c', def.color);
+      return b;
+    });
+    panel.replaceChildren(row('Emotes', emoteBtns), row('Pings — Alt + clic sur une case', pingBtns));
+  }
+  buildEmotePanel();
+  $('#gv-emote').addEventListener('click', (event) => {
+    event.stopPropagation();
+    const panel = $('#gv-emotes');
+    panel.hidden = !panel.hidden;
+  });
+  $('#gv-ping').addEventListener('click', (event) => {
+    event.stopPropagation();
+    setPingMode(pingMode ? null : 'ping');
+  });
+  $('#gv-emotes').addEventListener('click', (event) => {
+    const b = event.target.closest('button');
+    if (!b) return;
+    $('#gv-emotes').hidden = true;
+    if (b.dataset.ping) return setPingMode(b.dataset.ping);
+    socket.emit('game:emote', { emote: b.dataset.emote }, (res) => {
+      if (!res?.ok && res?.error) App.toast(res.error, 'error', 1500);
+    });
+  });
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('#gv-emotes, #gv-emote')) $('#gv-emotes').hidden = true;
+  });
+  let altDown = false;
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Alt') altDown = true;
+    if (e.key === 'Escape' && pingMode) setPingMode(null);
+  });
+  window.addEventListener('keyup', (e) => { if (e.key === 'Alt') altDown = false; });
+  window.addEventListener('blur', () => { altDown = false; });
+  /** Clic sur une case : ping si le mode ping est actif ou si Alt est enfoncé. Renvoie true si consommé. */
+  function maybePing(index, event) {
+    if (!state || index === null || index === undefined) return false;
+    if (pingMode) {
+      sendPing(index, pingMode);
+      setPingMode(null);
+      return true;
+    }
+    if (event?.altKey || altDown) {
+      sendPing(index, 'ping');
+      return true;
+    }
+    return false;
   }
 
   function button(label, action, { primary = false, payload = {}, disabled = false, hint = '' } = {}) {
@@ -1755,6 +2118,7 @@
   // Sur écran tactile, pas de survol : on garde le toucher pour ouvrir la fiche
   boardEl.addEventListener('click', (event) => {
     const sq = event.target.closest('.gv-sq');
+    if (sq && !dragMoved && maybePing(Number(sq.dataset.index), event)) return;
     if (!sq || dragMoved || !matchMedia('(hover: none)').matches) return;
     openInspect(Number(sq.dataset.index));
   });
@@ -1916,6 +2280,8 @@
   let queue = Promise.resolve();
 
   function onGameState(next) {
+    // échéance du chrono, calculée à la réception (avant les animations)
+    if (next.timer) next.timerDeadline = performance.now() + next.timer.left;
     queue = queue.then(async () => {
       if (next.id !== gameId) {
         await realArtReady; // liste de tes images, pour que les cases les utilisent dès le départ
