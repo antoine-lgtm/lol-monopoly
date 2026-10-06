@@ -431,8 +431,42 @@ function classic(color) {
 
 const BUILDERS = { poro, teemo, ward, minion, zhonya, blade, tibbers, egg };
 
-/** Construit le pion `kind` (posé sur un socle doré liseré à la couleur du joueur). */
-export function buildPawn(kind, color) {
+// Skins : recoloration des matériaux du modèle (le socle garde la couleur du joueur)
+const SKIN_LOOKS = {
+  hextech: { tint: 0x7fe9f0, mix: 0.4, emissive: 0x0ac8b9, glow: 0.35, metalness: 0.6, roughness: 0.25 },
+  shadow: { tint: 0x1a0f2a, mix: 0.7, emissive: 0x7a2ae0, glow: 0.4, metalness: 0.3, roughness: 0.5 },
+  gold: { tint: 0xf0c040, mix: 0.75, emissive: 0x6a4a00, glow: 0.2, metalness: 0.95, roughness: 0.22 },
+  crystal: { tint: 0xd8f2ff, mix: 0.65, emissive: 0x6fbfff, glow: 0.25, metalness: 0.1, roughness: 0.05, opacity: 0.82 },
+  infernal: { tint: 0xff5a1f, mix: 0.55, emissive: 0xff3a00, glow: 0.45, metalness: 0.3, roughness: 0.4 },
+};
+
+function applySkin(model, skin) {
+  const look = SKIN_LOOKS[skin];
+  if (!look) return;
+  const tint = new THREE.Color(look.tint);
+  model.traverse((o) => {
+    if (!o.isMesh) return;
+    o.material = [].concat(o.material).map((m) => {
+      const c = m.clone();
+      if (c.color) c.color.lerp(tint, look.mix);
+      if ('emissive' in c) {
+        c.emissive = new THREE.Color(look.emissive);
+        c.emissiveIntensity = Math.max(c.emissiveIntensity || 0, look.glow);
+      }
+      if ('metalness' in c) c.metalness = look.metalness;
+      if ('roughness' in c) c.roughness = look.roughness;
+      if (look.opacity) {
+        c.transparent = true;
+        c.opacity = look.opacity;
+      }
+      return c;
+    });
+    if (o.material.length === 1) [o.material] = o.material;
+  });
+}
+
+/** Construit le pion `kind` (posé sur un socle doré liseré à la couleur du joueur), avec son skin. */
+export function buildPawn(kind, color, skin = 'base') {
   const root = new THREE.Group();
   const hex = new THREE.Color(color).getHex();
   const base = mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.05, 32), GOLD, 0, 0.025, 0);
@@ -441,6 +475,7 @@ export function buildPawn(kind, color) {
     color: hex, emissive: hex, emissiveIntensity: 0.6, roughness: 0.4,
   }, 0, 0.022, 0);
   const model = (BUILDERS[kind] || (() => classic(color)))();
+  applySkin(model, skin);
   const holder = new THREE.Group(); // l'animation du modèle bouge ce groupe, pas le socle
   holder.position.y = 0.05;
   holder.add(model);

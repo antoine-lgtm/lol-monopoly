@@ -29,6 +29,7 @@ const BASE_Y = 0.36; // épaisseur du socle sous les cases
 const toWorld = (x, y, h = TOP) => new THREE.Vector3(x / 100 - S / 2, h, y / 100 - S / 2);
 const lerp = (a, b, t) => a + (b - a) * t;
 const ease = (t) => 1 - (1 - t) ** 3;
+const easeBack = (t) => 1 + 2.7 * (t - 1) ** 3 + 1.7 * (t - 1) ** 2;
 
 /** Charge une image (avec CORS) en essayant plusieurs adresses ; null si aucune ne marche. */
 function loadImage(sources) {
@@ -139,7 +140,8 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   composer.addPass(new OutputPass());
 
   // Lumières : ciel froid + soleil chaud qui projette les ombres, lueurs des deux Nexus
-  scene.add(new THREE.HemisphereLight(0xcfe4ff, 0x1a1408, 1.05));
+  const hemi = new THREE.HemisphereLight(0xcfe4ff, 0x1a1408, 1.05);
+  scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xffe6c0, 2.1);
   sun.position.set(5, 11, 7);
   sun.castShadow = true;
@@ -1393,7 +1395,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
 
   const pawns = new Map(); // key -> { group, body, ring, target, from, t0, dur, hop }
 
-  function ensurePawn(key, { color, pawn }) {
+  function ensurePawn(key, { color, pawn, skin }) {
     let p = pawns.get(key);
     if (p) return p;
     const group = new THREE.Group();
@@ -1406,7 +1408,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     group.add(blob, ring);
     group.scale.setScalar(1.2);
     // Pion modélisé en 3D (pawns3d.js), qui se tourne doucement vers la caméra
-    const body = buildPawn(pawn || 'classic', color);
+    const body = buildPawn(pawn || 'classic', color, skin);
     group.add(body);
     scene.add(group);
     p = { group, body, ring, from: null, target: null, t0: 0, dur: 0, hop: false, current: false, hidden: false, phase: pawns.size * 1.7 };
@@ -1415,8 +1417,8 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   }
 
   /** Place un pion (coordonnées plateau) ; hop = petit saut, glide = glissade. */
-  function setPawn(key, { x, y, color, pawn, hop = false, glide = false, current = false, hidden = false }) {
-    const p = ensurePawn(key, { color, pawn });
+  function setPawn(key, { x, y, color, pawn, skin, hop = false, glide = false, current = false, hidden = false }) {
+    const p = ensurePawn(key, { color, pawn, skin });
     const target = toWorld(x, y);
     p.current = current;
     p.hidden = hidden;
@@ -1497,11 +1499,31 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   scene.add(baronLight);
 
   let lastBuildings = null;
+  // Animation de construction : la tour sort de terre, l'inhibiteur s'allume, un anneau de poussière
+  let builtKeys = null; // null = premier affichage, sans animation
+  const rising = []; // { obj, scale, t0, kind }
+  const bursts = []; // anneaux et éclairs éphémères { mesh, t0, dur, grow }
+  const burstGeo = new THREE.RingGeometry(0.12, 0.2, 40);
+  /** pos : position monde (x, y, z) du sol ; y : petit décalage au-dessus. */
+  function burst(pos, color, { dur = 700, grow = 3, y = BAND_H + 0.012 } = {}) {
+    const mesh = new THREE.Mesh(burstGeo, new THREE.MeshBasicMaterial({
+      color, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+    }));
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(pos.x, (pos.y || 0) + y, pos.z);
+    scene.add(mesh);
+    bursts.push({ mesh, t0: performance.now(), dur, grow });
+  }
 
   function setBuildings({ towers, inhibs, flags, baron }) {
     lastBuildings = { towers, inhibs, flags, baron };
     buildings.clear();
     animated.length = 0;
+    const seen = new Set();
+    const isNew = (key) => {
+      seen.add(key);
+      return builtKeys !== null && !builtKeys.has(key);
+    };
     // Tours : des gardiens de pierre (tower3d.js), tournés vers l'extérieur du plateau.
     // À 3 ou 4 sur une case, ils rapetissent un peu et se placent en quinconce.
     for (const t of towers) {
@@ -1514,6 +1536,11 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
       statue.position.copy(pos);
       statue.rotation.y = Math.atan2(facing.x, facing.z);
       buildings.add(statue);
+      if (isNew(`t:${t.x.toFixed(0)}:${t.y.toFixed(0)}:${t.slot}:${count}`)) {
+        rising.push({ obj: statue, scale: statue.scale.x, t0: performance.now() + (t.slot || 0) * 90, kind: 'tower' });
+        statue.scale.setScalar(0.001);
+        burst(pos, 0xe8d8b0, { dur: 650, grow: 2.6 });
+      }
     }
     for (const h of inhibs) {
       const g = new THREE.Group();
@@ -1528,6 +1555,12 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
       g.position.copy(toWorld(h.x, h.y));
       buildings.add(g);
       animated.push({ kind: 'inhib', obj: crystal, phase: Math.random() * 6 });
+      if (isNew(`i:${h.x.toFixed(0)}:${h.y.toFixed(0)}`)) {
+        rising.push({ obj: g, scale: 1, t0: performance.now(), kind: 'inhib', crystal });
+        g.scale.setScalar(0.001);
+        burst(g.position, new THREE.Color(h.color), { dur: 900, grow: 4.5 });
+        burst(g.position, 0xffffff, { dur: 500, grow: 2.2, y: BAND_H + 0.04 });
+      }
     }
     for (const f of flags) {
       const g = new THREE.Group();
@@ -1546,6 +1579,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
       buildings.add(g);
       if (!f.mortgaged) animated.push({ kind: 'flag', obj: cloth, base: clothGeo.attributes.position.array.slice(), phase: Math.random() * 6 });
     }
+    builtKeys = seen;
     baronModel.visible = Boolean(baron);
     if (baron) {
       const pos = toWorld(baron.x, baron.y, TOP + 0.05);
@@ -1640,6 +1674,54 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     g.flashColor = new THREE.Color(color);
   }
 
+  // --- Pings (comme dans LoL : un signal lumineux sur une case) ------------------
+  const pings = [];
+  const beamGeo = new THREE.CylinderGeometry(0.05, 0.12, 1.4, 16, 1, true);
+  beamGeo.translate(0, 0.7, 0);
+  function ping(index, color = '#f0e6d2') {
+    const { x, y } = squareCenter(index);
+    const c = toWorld(x, y);
+    const col = new THREE.Color(color);
+    const beam = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({
+      color: col, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+    }));
+    beam.position.set(c.x, TOP, c.z);
+    scene.add(beam);
+    pings.push({ beam, t0: performance.now(), pos: new THREE.Vector3(c.x, TOP, c.z), color: col, pulses: 0 });
+  }
+
+  // --- Ambiance : le jour tombe au fil des tours, le Baron et l'Ancien teintent la lumière ---
+  const DAY = { sun: new THREE.Color(0xffe6c0), sunI: 2.1, sky: new THREE.Color(0xcfe4ff), skyI: 1.05, exposure: 1.05, bg: 1, fog: new THREE.Color(0x08121e), nexus: 1 };
+  const NIGHT = { sun: new THREE.Color(0x7f98ff), sunI: 0.5, sky: new THREE.Color(0x4a62a8), skyI: 0.42, exposure: 0.82, bg: 0.4, fog: new THREE.Color(0x03050a), nexus: 1.8 };
+  const BARON_TINT = new THREE.Color(0xb27cff);
+  const ELDER_TINT = new THREE.Color(0x9fe8ff);
+  const atmo = { night: 0, tNight: 0, baron: 0, tBaron: 0, elder: 0, tElder: 0 };
+  /** round : tour de table (8 tours = un jour complet) ; baron / elder : objectifs en jeu. */
+  function setAtmosphere({ round = 1, baron = false, elder = false } = {}) {
+    atmo.tNight = (1 - Math.cos((2 * Math.PI * (round - 1)) / 8)) / 2;
+    atmo.tBaron = baron ? 1 : 0;
+    atmo.tElder = elder ? 1 : 0;
+  }
+  const tmpColor = new THREE.Color();
+  let atmoLast = 0;
+  function updateAtmosphere(now) {
+    // transition douce (~4 s pour le jour, ~2 s pour les objectifs), quel que soit le nombre d'images/s
+    const dt = atmoLast ? Math.min(0.5, (now - atmoLast) / 1000) : 1;
+    atmoLast = now;
+    atmo.night += (atmo.tNight - atmo.night) * (1 - Math.exp(-dt / 1.4));
+    atmo.baron += (atmo.tBaron - atmo.baron) * (1 - Math.exp(-dt / 0.7));
+    atmo.elder += (atmo.tElder - atmo.elder) * (1 - Math.exp(-dt / 0.7));
+    const n = atmo.night;
+    sun.color.copy(DAY.sun).lerp(NIGHT.sun, n);
+    sun.intensity = lerp(DAY.sunI, NIGHT.sunI, n);
+    hemi.color.copy(DAY.sky).lerp(NIGHT.sky, n).lerp(BARON_TINT, atmo.baron * 0.35).lerp(ELDER_TINT, atmo.elder * 0.3);
+    hemi.intensity = lerp(DAY.skyI, NIGHT.skyI, n) + atmo.baron * 0.15;
+    renderer.toneMappingExposure = lerp(DAY.exposure, NIGHT.exposure, n);
+    scene.backgroundIntensity = lerp(DAY.bg, NIGHT.bg, n);
+    scene.fog.color.copy(tmpColor.copy(DAY.fog).lerp(NIGHT.fog, n));
+    return lerp(DAY.nexus, NIGHT.nexus, n);
+  }
+
   // --- Dés -------------------------------------------------------------------
   function faceTexture(v) {
     const cv = document.createElement('canvas');
@@ -1676,7 +1758,8 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     scene.add(m);
     return m;
   });
-  const diceHome = [toWorld(560, 560), toWorld(640, 600)];
+  // zone libre entre le Nexus et la rangée du bas (les dés y restent visibles)
+  const diceHome = [toWorld(452, 692), toWorld(530, 708)];
   let diceAnim = null;
 
   function quatForValue(v, yaw) {
@@ -1692,14 +1775,16 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
       end.y = DIE / 2;
       d.userData.end = end;
       d.userData.qEnd = quatForValue(values[k], (Math.random() - 0.5) * 0.9);
-      d.userData.start = end.clone().add(new THREE.Vector3(-1.4 + k * 0.3, 1.6, 1.2));
-      d.userData.spin = new THREE.Vector3((Math.random() + 1.5) * 9, (Math.random() + 1) * 6, (Math.random() + 1.5) * 9);
+      // lancés depuis le bord du plateau : ils volent, rebondissent trois fois puis roulent jusqu'à l'arrêt
+      d.userData.start = end.clone().add(new THREE.Vector3(-2.6 + k * 0.5, 1.5, 2.2 - k * 0.3));
+      d.userData.spin = new THREE.Vector3((Math.random() + 1.5) * 12, (Math.random() + 1) * 8, (Math.random() + 1.5) * 12);
+      d.userData.bounced = 0;
       if (!animate) {
         d.position.copy(end);
         d.quaternion.copy(d.userData.qEnd);
       }
     });
-    if (animate) diceAnim = { t0: performance.now(), dur: 950 };
+    if (animate) diceAnim = { t0: performance.now(), dur: 1150 };
   }
 
   // --- Caméra ----------------------------------------------------------------
@@ -2038,8 +2123,47 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     }
     for (const animate of ambient) animate(t);
     animateStatues(t);
-    blueNexus.intensity = 5 + Math.sin(t * 2) * 2;
-    redNexus.intensity = 5 + Math.sin(t * 2 + Math.PI) * 2;
+    const nexusBoost = updateAtmosphere(now);
+    blueNexus.intensity = (5 + Math.sin(t * 2) * 2) * nexusBoost;
+    redNexus.intensity = (5 + Math.sin(t * 2 + Math.PI) * 2) * nexusBoost;
+
+    // constructions qui sortent de terre
+    for (let n = rising.length - 1; n >= 0; n--) {
+      const r = rising[n];
+      const k = Math.max(0, Math.min(1, (now - r.t0) / (r.kind === 'inhib' ? 900 : 650)));
+      r.obj.scale.setScalar(Math.max(0.001, r.scale * easeBack(k)));
+      if (r.crystal) r.crystal.material.emissiveIntensity = 0.6 + (1 - k) * 2.5;
+      if (k >= 1) rising.splice(n, 1);
+    }
+    for (let n = bursts.length - 1; n >= 0; n--) {
+      const b = bursts[n];
+      const k = (now - b.t0) / b.dur;
+      if (k >= 1) {
+        scene.remove(b.mesh);
+        b.mesh.material.dispose();
+        bursts.splice(n, 1);
+        continue;
+      }
+      b.mesh.scale.setScalar(1 + ease(k) * b.grow);
+      b.mesh.material.opacity = 0.9 * (1 - k);
+    }
+    // pings : faisceau + trois ondes
+    for (let n = pings.length - 1; n >= 0; n--) {
+      const pg = pings[n];
+      const k = (now - pg.t0) / 2200;
+      if (k >= 1) {
+        scene.remove(pg.beam);
+        pg.beam.material.dispose();
+        pings.splice(n, 1);
+        continue;
+      }
+      pg.beam.material.opacity = 0.8 * (1 - k) * (0.75 + Math.sin(t * 18) * 0.25);
+      pg.beam.scale.set(1, Math.min(1, k * 6), 1);
+      if (pg.pulses < 3 && k > pg.pulses * 0.22) {
+        pg.pulses += 1;
+        burst(pg.pos, pg.color, { dur: 700, grow: 3.4, y: 0.02 });
+      }
+    }
 
     // surbrillances des cases
     for (const [index, g] of glowMats) {
@@ -2062,10 +2186,23 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
       const k = Math.min(1, (now - diceAnim.t0) / diceAnim.dur);
       dice.forEach((d) => {
         const { start, end, qEnd, spin } = d.userData;
-        const e = ease(k);
+        const e = 1 - (1 - k) ** 2.2;
         d.position.lerpVectors(start, end, e);
-        d.position.y = lerp(start.y, end.y, e) + Math.abs(Math.sin(k * Math.PI * 2.2)) * (1 - k) * 0.9;
-        const rest = 1 - e;
+        // vol puis rebonds de plus en plus petits (paraboles successives)
+        const hops = [[0, 0.34, 1.5], [0.34, 0.62, 0.42], [0.62, 0.82, 0.14], [0.82, 0.94, 0.04]];
+        let y = 0;
+        hops.forEach(([a, b, h], n) => {
+          if (k >= a && k < b) {
+            const u = (k - a) / (b - a);
+            y = n === 0 ? lerp(start.y - end.y, 0, u) + Math.sin(Math.PI * u) * 0.5 * (1 - u) : 4 * h * u * (1 - u);
+          }
+          if (k >= b && d.userData.bounced <= n) {
+            d.userData.bounced = n + 1;
+            if (n < 2) burst({ x: d.position.x, y: 0, z: d.position.z }, 0xf0e6d2, { dur: 380, grow: 1.6, y: 0.01 });
+          }
+        });
+        d.position.y = end.y + y;
+        const rest = (1 - e) ** 1.4;
         const qSpin = new THREE.Quaternion().setFromEuler(new THREE.Euler(spin.x * rest, spin.y * rest, spin.z * rest));
         d.quaternion.copy(qEnd).premultiply(qSpin);
       });
@@ -2082,6 +2219,19 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     /** Ouvre le coffre hextech du centre (carte Coffre Hextech tirée). */
     openChest() { chest?.userData.open(); },
     setObjectives,
+    setAtmosphere,
+    /** Signal sur une case (ping d'un joueur). */
+    ping,
+    /** Position d'un pion à l'écran (px dans le conteneur), pour les bulles d'emote. */
+    screenOf(key) {
+      const p = pawns.get(key);
+      if (!p || !p.group.visible) return null;
+      tmp.copy(p.group.position);
+      tmp.y += 0.9;
+      tmp.project(camera);
+      if (tmp.z > 1) return null;
+      return { x: ((tmp.x + 1) / 2) * container.clientWidth, y: ((1 - tmp.y) / 2) * container.clientHeight };
+    },
     /** 'auto' | 'high' | 'medium' | 'low' */
     setQuality(q) {
       autoQuality = q === 'auto' && !FORCE_HQ;
