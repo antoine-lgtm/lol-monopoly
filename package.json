@@ -10,7 +10,7 @@
     "predev": "node tools/download-champions.js",
     "dev": "node --watch backend/server.js",
     "images": "node tools/download-champions.js",
-    "test": "node --test tests/rules.test.js",
+    "test": "node --test tests/rules.test.js tests/features.test.js",
     "test:browser": "node --test --test-concurrency=1 tests/browser.test.js",
     "test:all": "npm test && npm run test:browser"
   },

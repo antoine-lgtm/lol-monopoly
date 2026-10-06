@@ -11,6 +11,11 @@
  * Dragons = gares, Potions = compagnies, Fontaine = Départ.
  */
 
+const {
+  SPELLS, ITEMS, MAX_ITEMS, QUESTS, SOUL_BONUS, ELDER_BONUS, BUFF_ROUNDS, HERALD_ROUND, ELDER_ROUND,
+  sanitizeRules, sanitizeSpells,
+} = require('./features');
+
 const START_GOLD = 1500;
 const GO_BONUS = 200;
 const JAIL_FINE = 50;
@@ -102,12 +107,12 @@ const CHANCE_CARDS = [
   { text: 'Tu pars farmer chez Yasuo.', act: (g, p) => g.moveTo(p, 39) },
   { text: 'Roaming bot : va sur Sion. Si tu passes par la Fontaine, reçois 200 Or.', act: (g, p) => g.moveTo(p, 21) },
   { text: 'Gank réussi chez Shen : avance jusqu’à lui.', act: (g, p) => g.moveTo(p, 11) },
-  { text: 'Blitzcrank t’attrape ! Va directement en Prison.', act: (g, p) => g.sendToJail(p) },
+  { bad: true, text: 'Blitzcrank t’attrape ! Va directement en Prison.', act: (g, p) => g.sendToJail(p) },
   { text: 'First Blood ! Reçois 150 Or.', act: (g, p) => g.gain(p, 150) },
   { text: 'Tu voles le buff bleu adverse : reçois 50 Or.', act: (g, p) => g.gain(p, 50) },
-  { text: 'Gank raté, tu offres un kill : paye 15 Or.', act: (g, p) => g.charge(p, 15, null) },
-  { text: 'Élu shotcaller de l’équipe : paye 50 Or à chaque joueur.', act: (g, p) => g.payEachPlayer(p, 50) },
-  { text: 'Réparation des structures : 25 Or par tour, 100 Or par inhibiteur.', act: (g, p) => g.repairs(p, 25, 100) },
+  { bad: true, text: 'Gank raté, tu offres un kill : paye 15 Or.', act: (g, p) => g.charge(p, 15, null) },
+  { bad: true, text: 'Élu shotcaller de l’équipe : paye 50 Or à chaque joueur.', act: (g, p) => g.payEachPlayer(p, 50) },
+  { bad: true, text: 'Réparation des structures : 25 Or par tour, 100 Or par inhibiteur.', act: (g, p) => g.repairs(p, 25, 100) },
   { text: 'Zhonya ! Garde cette carte pour sortir de Prison.', act: (g, p) => { p.jailCards += 1; } },
 ];
 
@@ -120,10 +125,10 @@ const CHEST_CARDS = [
   { text: 'Soins de Soraka : reçois 100 Or.', act: (g, p) => g.gain(p, 100) },
   { text: 'Tu hérites des économies de Gangplank : reçois 100 Or.', act: (g, p) => g.gain(p, 100) },
   { text: 'Honorable mention de ton équipe : reçois 25 Or.', act: (g, p) => g.gain(p, 25) },
-  { text: 'Frais de l’hôpital de Zaun : paye 100 Or.', act: (g, p) => g.charge(p, 100, null) },
-  { text: 'Tu achètes une Zhonya trop tôt : paye 50 Or.', act: (g, p) => g.charge(p, 50, null) },
-  { text: 'Taxe du Conseil de Piltover : 40 Or par tour, 115 Or par inhibiteur.', act: (g, p) => g.repairs(p, 40, 115) },
-  { text: 'Report de ta partie classée : va directement en Prison.', act: (g, p) => g.sendToJail(p) },
+  { bad: true, text: 'Frais de l’hôpital de Zaun : paye 100 Or.', act: (g, p) => g.charge(p, 100, null) },
+  { bad: true, text: 'Tu achètes une Zhonya trop tôt : paye 50 Or.', act: (g, p) => g.charge(p, 50, null) },
+  { bad: true, text: 'Taxe du Conseil de Piltover : 40 Or par tour, 115 Or par inhibiteur.', act: (g, p) => g.repairs(p, 40, 115) },
+  { bad: true, text: 'Report de ta partie classée : va directement en Prison.', act: (g, p) => g.sendToJail(p) },
   { text: 'Zhonya ! Garde cette carte pour sortir de Prison.', act: (g, p) => { p.jailCards += 1; } },
 ];
 
@@ -145,8 +150,9 @@ class Game {
    * @param {Array<{key: string, name: string, icon: number}>} players  dans l'ordre de jeu
    * @param {{random?: () => number}} [options]
    */
-  constructor(players, { random = Math.random } = {}) {
+  constructor(players, { random = Math.random, rules = {} } = {}) {
     this.random = random;
+    this.rules = sanitizeRules(rules);
     this.id = Math.floor(random() * 1e9).toString(36);
     this.players = players.map((p, i) => ({
       key: p.key,
@@ -155,7 +161,17 @@ class Game {
       pawn: p.pawn || 'classic',
       color: PLAYER_COLORS[i % PLAYER_COLORS.length],
       pos: 0,
-      gold: START_GOLD,
+      gold: this.rules.startGold,
+      role: QUESTS[p.role] ? p.role : null,
+      spells: this.rules.spells ? sanitizeSpells(p.spells).map((id) => ({ id, cd: 0 })) : [],
+      items: [], // { id, cd }
+      armed: {}, // sorts / objets préparés : flash (±1), boots, ghost, barrier, ignite
+      quest: this.rules.quests && QUESTS[p.role] ? { id: p.role, progress: 0, done: false, trades: 0, paid: 0 } : null,
+      perks: {}, // récompenses de quête : freeTp, freeRecall, jungle, adc, support, cardShield
+      soulUntil: 0,
+      elderUntil: 0,
+      herald: 0,
+      canShop: false,
       inJail: false,
       jailTurns: 0,
       jailCards: 0,
@@ -172,10 +188,14 @@ class Game {
     this.rollAgain = false;
     this.pendingIndex = null;
     this.baron = { active: false, taken: false, holder: null };
+    this.herald = { active: false, taken: false };
+    this.elder = { active: false, taken: false };
+    this.soulTaken = null;
+    this.ghostDice = null;
     this.supply = { towers: TOWER_SUPPLY, inhibs: INHIB_SUPPLY };
     /** Statistiques de fin de partie, par joueur. */
     this.stats = Object.fromEntries(this.players.map((p) => [p.key, {
-      bought: 0, built: 0, rentEarned: 0, rentPaid: 0, trades: 0, peakWorth: START_GOLD, eliminatedRound: null, place: null,
+      bought: 0, built: 0, rentEarned: 0, rentPaid: 0, trades: 0, peakWorth: this.rules.startGold, eliminatedRound: null, place: null,
     }]));
     this.eliminated = 0;
     /** Échange proposé par le joueur dont c'est le tour, en attente de réponse. */
@@ -241,8 +261,98 @@ class Game {
       const both = BOARD.every((s, i) => s.type !== 'potion' || this.props[i]?.owner === st.owner);
       rent = (diceTotal || 7) * (both ? 10 : 4);
     }
-    if (owner?.baron) rent = Math.round(rent * BARON_RENT_MULT);
-    return rent;
+    if (owner?.baron) rent *= BARON_RENT_MULT;
+    if (owner) rent *= 1 + this.rentBonus(owner);
+    return Math.round(rent);
+  }
+
+  /** Bonus du propriétaire sur ses loyers : quête ADC, Dent de Nashor, Âme du Dragon, Dragon Ancien. */
+  rentBonus(owner) {
+    let bonus = 0;
+    if (owner.perks.adc) bonus += 0.05;
+    if (this.hasItem(owner, 'nashor')) bonus += 0.12;
+    if (this.round < owner.soulUntil) bonus += SOUL_BONUS;
+    if (this.round < owner.elderUntil) bonus += ELDER_BONUS;
+    return bonus;
+  }
+
+  hasItem(p, id) {
+    return p.items.some((it) => it.id === id);
+  }
+
+  /** Le joueur paye le loyer d'une case : réductions, Embrasement et Barrière compris. */
+  payRent(p, owner, index) {
+    const sq = BOARD[index];
+    let rent = this.rentFor(index, this.dice ? this.dice[0] + this.dice[1] : 7);
+    let cut = 0;
+    if (p.perks.support) cut += 0.05;
+    if (this.hasItem(p, 'frozen')) cut += 0.12;
+    rent *= 1 - cut;
+    const notes = [];
+    if (owner.armed.ignite) {
+      rent *= 1.5;
+      owner.armed.ignite = false;
+      notes.push('Embrasement ×1,5');
+    }
+    rent = Math.round(rent);
+    if (p.armed.barrier) {
+      const saved = Math.min(300, rent);
+      rent -= saved;
+      p.armed.barrier = false;
+      notes.push(`Barrière −${saved}`);
+    }
+    this.say(`${p.name} paye ${rent} Or de loyer à ${owner.name} (${sq.name})${notes.length ? ` — ${notes.join(', ')}` : ''}.`);
+    this.stats[p.key].rentPaid += rent;
+    this.stats[owner.key].rentEarned += rent;
+    if (p.quest && p.quest.id === 'SUPP') p.quest.paid += 1;
+    this.checkQuest(p);
+    this.checkQuest(owner);
+    this.charge(p, rent, owner);
+  }
+
+  // --- Quêtes de rôle, Âme du Dragon ---------------------------------------------
+
+  questProgress(p) {
+    const q = p.quest;
+    switch (q.id) {
+      case 'TOP': return q.progress; // passages par la Fontaine (compté dans passGo)
+      case 'JGL': return DRAGON_INDEXES.filter((i) => this.props[i]?.owner === p.key).length;
+      case 'MID': return this.stats[p.key].built;
+      case 'ADC': return this.stats[p.key].rentEarned;
+      case 'SUPP': return Math.max(q.trades, Math.floor((q.paid * 2) / 3));
+      default: return 0;
+    }
+  }
+
+  checkQuest(p) {
+    const q = p.quest;
+    if (!q || q.done || p.bankrupt) return;
+    q.progress = this.questProgress(p);
+    const def = QUESTS[q.id];
+    const done = q.id === 'SUPP' ? q.trades >= 2 || q.paid >= 3 : q.progress >= def.goal;
+    if (!done) return;
+    q.done = true;
+    q.progress = def.goal;
+    switch (q.id) {
+      case 'TOP': p.perks.freeTp = 1; this.gain(p, 50); break;
+      case 'JGL': p.perks.jungle = true; break;
+      case 'MID': p.perks.freeRecall = 1; break;
+      case 'ADC': p.perks.adc = true; break;
+      case 'SUPP': p.perks.support = true; p.perks.cardShield = 1; break;
+      default:
+    }
+    this.effect({ type: 'quest', key: p.key, role: q.id });
+    this.say(`${p.name} accomplit sa quête « ${def.name} » : ${def.reward}.`);
+  }
+
+  /** Âme du Dragon : le premier joueur qui possède les 4 Dragons. */
+  checkSoul(p) {
+    if (!this.rules.dragons || this.soulTaken || p.bankrupt) return;
+    if (!DRAGON_INDEXES.every((i) => this.props[i]?.owner === p.key)) return;
+    this.soulTaken = p.key;
+    p.soulUntil = this.round + BUFF_ROUNDS;
+    this.effect({ type: 'soul', key: p.key });
+    this.say(`${p.name} obtient l’Âme du Dragon : +30 % sur ses loyers pendant ${BUFF_ROUNDS} tours !`);
   }
 
   // --- Journal & effets --------------------------------------------------------
@@ -350,6 +460,12 @@ class Game {
   passGo(p) {
     this.gain(p, GO_BONUS);
     this.say(`${p.name} passe par la Fontaine : +${GO_BONUS} Or.`);
+    if (this.rules.items) p.canShop = true; // on peut acheter des objets en passant à la base
+    if (this.hasItem(p, 'potion')) this.gain(p, 30);
+    if (p.quest && p.quest.id === 'TOP' && !p.quest.done) {
+      p.quest.progress += 1;
+      this.checkQuest(p);
+    }
     if (p.baron) {
       p.baron = false;
       this.baron.holder = null;
@@ -363,6 +479,16 @@ class Game {
     const from = p.pos;
     const to = (((from + steps) % 40) + 40) % 40;
     if (steps > 0 && from + steps >= 40) this.passGo(p);
+    if (steps > 0 && to === 0 && this.rules.fountainDouble) {
+      this.gain(p, GO_BONUS);
+      this.say(`${p.name} s’arrête pile sur la Fontaine : +${GO_BONUS} Or de plus !`);
+    }
+    if (steps > 0 && p.perks.jungle) {
+      // quête Jungle : +15 Or par case Dragon traversée (ou atteinte)
+      let crossed = 0;
+      for (let k = 1; k <= steps; k++) if (DRAGON_INDEXES.includes((from + k) % 40)) crossed += 1;
+      if (crossed) this.gain(p, 15 * crossed);
+    }
     p.pos = to;
     this.effect({ type: 'move', key: p.key, from, to, steps, direct });
     this.land(p);
@@ -388,6 +514,13 @@ class Game {
   land(p) {
     const index = p.pos;
     const sq = BOARD[index];
+    if (sq.type === 'dragon' && this.elder.active) {
+      this.elder.active = false;
+      this.elder.taken = true;
+      p.elderUntil = this.round + BUFF_ROUNDS;
+      this.effect({ type: 'elder', key: p.key });
+      this.say(`${p.name} terrasse le Dragon Ancien : +30 % sur ses loyers pendant ${BUFF_ROUNDS} tours !`);
+    }
     if (BUYABLE.has(sq.type)) {
       const st = this.props[index];
       if (!st) {
@@ -400,18 +533,14 @@ class Game {
         this.say(`${sq.name} est hypothéqué : pas de loyer.`);
         return;
       }
-      const owner = this.player(st.owner);
-      const rent = this.rentFor(index, this.dice ? this.dice[0] + this.dice[1] : 7);
-      this.say(`${p.name} paye ${rent} Or de loyer à ${owner.name} (${sq.name}).`);
-      this.stats[p.key].rentPaid += rent;
-      this.stats[owner.key].rentEarned += rent;
-      this.charge(p, rent, owner);
+      this.payRent(p, this.player(st.owner), index);
       return;
     }
     switch (sq.type) {
       case 'tax':
         if (sq.kind === 'boutique') {
           this.say(`${p.name} passe à la Boutique : -${sq.amount} Or.`);
+          if (this.rules.items) p.canShop = true;
           this.charge(p, sq.amount, null);
         } else {
           this.phase = 'tax';
@@ -426,6 +555,13 @@ class Game {
         this.sendToJail(p);
         return;
       case 'baron':
+        if (this.herald.active) {
+          this.herald.active = false;
+          this.herald.taken = true;
+          p.herald += 1;
+          this.effect({ type: 'herald', key: p.key });
+          this.say(`${p.name} récupère le Héraut de la Faille : il peut détruire une tour adverse !`);
+        }
         if (this.baron.active && !this.baron.taken) {
           this.baron.taken = true;
           this.baron.active = false;
@@ -449,6 +585,16 @@ class Game {
     const title = deckName === 'chance' ? 'Ping SS' : 'Coffre Hextech';
     this.effect({ type: 'card', key: p.key, deck: deckName, title, text: card.text });
     this.say(`${p.name} — ${title} : ${card.text}`);
+    if (card.bad) {
+      const veil = p.items.find((it) => it.id === 'banshee' && !it.cd);
+      if (veil || p.perks.cardShield) {
+        if (veil) veil.cd = ITEMS.banshee.cd;
+        else p.perks.cardShield = 0;
+        this.effect({ type: 'card-blocked', key: p.key });
+        this.say(`${veil ? 'Le Voile de la banshee' : 'Le gardien (quête Support)'} annule la carte de ${p.name} !`);
+        return;
+      }
+    }
     card.act(this, p);
   }
 
@@ -481,8 +627,35 @@ class Game {
     if (error) return { ok: false, error };
     const p = this.currentPlayer;
     const [a, b] = this.rollDice();
-    const isDouble = a === b;
     this.effect({ type: 'dice', key, values: [a, b] });
+    if (p.armed.ghost && !p.inJail) {
+      // Fantôme : on garde les dés ou on en relance un, avant de bouger
+      p.armed.ghost = false;
+      this.ghostDice = [a, b];
+      this.phase = 'ghost';
+      this.say(`${p.name} lance ${a} + ${b} et peut relancer un dé (Fantôme).`);
+      return { ok: true };
+    }
+    return this.resolveRoll(p, a, b);
+  }
+
+  /** Fantôme : die = -1 pour garder, 0 ou 1 pour relancer ce dé. */
+  ghostChoice(key, die) {
+    const error = this.guard(key, ['ghost']);
+    if (error) return { ok: false, error };
+    const p = this.currentPlayer;
+    const dice = [...this.ghostDice];
+    if (die === 0 || die === 1) {
+      dice[die] = 1 + Math.floor(this.random() * 6);
+      this.dice = dice;
+      this.effect({ type: 'dice', key, values: dice });
+    }
+    this.ghostDice = null;
+    return this.resolveRoll(p, dice[0], dice[1]);
+  }
+
+  resolveRoll(p, a, b) {
+    const isDouble = a === b;
     this.phase = 'moving';
 
     if (p.inJail) {
@@ -522,8 +695,20 @@ class Game {
       return { ok: true };
     }
     this.rollAgain = isDouble;
-    this.say(`${p.name} lance les dés : ${a} + ${b}${isDouble ? ' (double !)' : ''}.`);
-    this.moveBy(p, a + b);
+    let steps = a + b;
+    const extra = [];
+    if (p.armed.flash) {
+      steps += p.armed.flash;
+      extra.push(`Flash ${p.armed.flash > 0 ? '+1' : '−1'}`);
+      p.armed.flash = 0;
+    }
+    if (p.armed.boots) {
+      steps += 1;
+      extra.push('Bottes +1');
+      p.armed.boots = false;
+    }
+    this.say(`${p.name} lance les dés : ${a} + ${b}${isDouble ? ' (double !)' : ''}${extra.length ? ` — ${extra.join(', ')}` : ''}.`);
+    this.moveBy(p, steps);
     if (this.phase === 'moving') this.phase = 'end';
     this.settle();
     return { ok: true };
@@ -541,6 +726,8 @@ class Game {
     this.effect({ type: 'buy', key, index: this.pendingIndex });
     this.say(`${p.name} achète ${sq.name} pour ${sq.price} Or.`);
     this.stats[key].bought += 1;
+    this.checkQuest(p);
+    this.checkSoul(p);
     this.pendingIndex = null;
     this.phase = 'end';
     this.settle();
@@ -611,19 +798,224 @@ class Game {
     } while (this.players[next].bankrupt && next !== before);
     if (next <= before) {
       this.round += 1;
+      if (this.rules.maxRounds && this.round > this.rules.maxRounds) {
+        this.endByRounds();
+        return;
+      }
       if (this.round >= BARON_ROUND && !this.baron.active && !this.baron.taken) {
         this.baron.active = true;
         this.effect({ type: 'baron-spawn' });
         this.say('Le Baron Nashor apparaît dans la fosse !');
       }
+      // le Héraut occupe la fosse quand le Baron n'y est pas
+      if (this.rules.herald && this.round >= HERALD_ROUND && !this.herald.active && !this.herald.taken && !this.baron.active) {
+        this.herald.active = true;
+        this.effect({ type: 'herald-spawn' });
+        this.say('Le Héraut de la Faille apparaît dans la fosse du Baron !');
+      }
+      if (this.rules.dragons && this.round >= ELDER_ROUND && !this.elder.active && !this.elder.taken) {
+        this.elder.active = true;
+        this.effect({ type: 'elder-spawn' });
+        this.say('Le Dragon Ancien s’éveille : le premier à tomber sur une case Dragon le terrasse !');
+      }
     }
     this.current = next;
+    this.startTurn(this.currentPlayer);
     this.phase = 'roll';
     this.doubles = 0;
     this.rollAgain = false;
     this.pendingIndex = null;
     this.trade = null;
     this.say(`Au tour de ${this.currentPlayer.name}.`);
+  }
+
+  /** Début du tour d'un joueur : recharges, Anneau de Doran. */
+  startTurn(p) {
+    for (const sp of p.spells) if (sp.cd > 0) sp.cd -= 1;
+    for (const it of p.items) if (it.cd > 0) it.cd -= 1;
+    p.canShop = false;
+    if (this.hasItem(p, 'doran')) this.gain(p, 10);
+  }
+
+  /** Partie rapide : à la fin du dernier tour, le plus riche gagne. */
+  endByRounds() {
+    const ranking = this.alivePlayers().sort((a, b) => this.netWorth(b) - this.netWorth(a));
+    ranking.forEach((p, k) => { this.stats[p.key].place = k + 1; });
+    this.phase = 'over';
+    this.winner = ranking[0]?.key ?? null;
+    this.trade = null;
+    this.say(`Fin des ${this.rules.maxRounds} tours !${ranking[0] ? ` ${ranking[0].name} est le plus riche et remporte la partie.` : ''}`);
+  }
+
+  // --- Sorts d'invocateur, récompenses de quête, objets, Héraut -------------------
+
+  /** Lance un sort. arg : direction (+1/-1) pour Flash, case visée pour Téléportation. */
+  useSpell(key, id, arg) {
+    const error = this.guard(key, ['roll', 'end', 'debt']);
+    if (error) return { ok: false, error };
+    const p = this.currentPlayer;
+    const spell = p.spells.find((sp) => sp.id === id);
+    if (!spell) return { ok: false, error: 'Tu n’as pas ce sort.' };
+    if (spell.cd > 0) return { ok: false, error: `${SPELLS[id].name} est en recharge (${spell.cd} tour${spell.cd > 1 ? 's' : ''}).` };
+    const beforeRoll = this.phase === 'roll';
+    switch (id) {
+      case 'flash':
+        if (!beforeRoll || p.inJail) return { ok: false, error: 'Flash se lance avant les dés, hors de Prison.' };
+        if (arg !== 1 && arg !== -1) return { ok: false, error: 'Choisis +1 ou −1.' };
+        p.armed.flash = arg;
+        break;
+      case 'teleport': {
+        if (!beforeRoll || p.inJail) return { ok: false, error: 'La Téléportation remplace ton lancer (hors de Prison).' };
+        const res = this.teleport(p, Number(arg));
+        if (!res.ok) return res;
+        break;
+      }
+      case 'heal':
+        this.gain(p, 100);
+        break;
+      case 'barrier':
+        if (p.armed.barrier) return { ok: false, error: 'Barrière déjà prête.' };
+        p.armed.barrier = true;
+        break;
+      case 'ignite':
+        if (p.armed.ignite) return { ok: false, error: 'Embrasement déjà prêt.' };
+        p.armed.ignite = true;
+        break;
+      case 'ghost':
+        if (!beforeRoll || p.inJail) return { ok: false, error: 'Fantôme se lance avant les dés, hors de Prison.' };
+        p.armed.ghost = true;
+        break;
+      case 'cleanse':
+        if (!beforeRoll || !p.inJail) return { ok: false, error: 'Purge sert à sortir de Prison.' };
+        p.inJail = false;
+        p.jailTurns = 0;
+        break;
+      default:
+        return { ok: false, error: 'Sort inconnu.' };
+    }
+    spell.cd = SPELLS[id].cd;
+    this.effect({ type: 'spell', key, spell: id });
+    this.say(`${p.name} utilise ${SPELLS[id].name}.`);
+    this.checkDebt();
+    return { ok: true };
+  }
+
+  /** Déplacement direct sur une de ses cases, à la place du lancer (pas de bonus de Fontaine). */
+  teleport(p, index) {
+    if (!Number.isInteger(index) || this.props[index]?.owner !== p.key) return { ok: false, error: 'Choisis une de tes cases.' };
+    if (index === p.pos) return { ok: false, error: 'Tu y es déjà.' };
+    const from = p.pos;
+    p.pos = index;
+    this.doubles = 0;
+    this.rollAgain = false;
+    this.effect({ type: 'move', key: p.key, from, to: index, steps: 0, direct: true });
+    this.phase = 'end';
+    this.land(p);
+    this.settle();
+    return { ok: true };
+  }
+
+  /** Récompenses de quête à déclencher : Téléportation gratuite (Top), retour (Mid). */
+  usePerk(key, perk, arg) {
+    const error = this.guard(key, ['roll']);
+    if (error) return { ok: false, error };
+    const p = this.currentPlayer;
+    if (p.inJail) return { ok: false, error: 'Impossible depuis la Prison.' };
+    if (perk === 'freeTp' && p.perks.freeTp) {
+      const res = this.teleport(p, Number(arg));
+      if (!res.ok) return res;
+      p.perks.freeTp = 0;
+      this.say(`${p.name} se téléporte (quête Top).`);
+      return { ok: true };
+    }
+    if (perk === 'freeRecall' && p.perks.freeRecall) {
+      p.perks.freeRecall = 0;
+      const from = p.pos;
+      p.pos = 0;
+      this.doubles = 0;
+      this.rollAgain = false;
+      this.effect({ type: 'move', key: p.key, from, to: 0, steps: 0, direct: true });
+      this.gain(p, 100);
+      if (this.rules.items) p.canShop = true;
+      this.say(`${p.name} rentre à la Fontaine (quête Mid) : +100 Or.`);
+      this.phase = 'end';
+      return { ok: true };
+    }
+    return { ok: false, error: 'Récompense indisponible.' };
+  }
+
+  /** Achat d'un objet (après un passage par la Fontaine ou la Boutique ce tour-ci). */
+  buyItem(key, id) {
+    const error = this.guard(key, ['roll', 'buy', 'tax', 'end']);
+    if (error) return { ok: false, error };
+    const p = this.currentPlayer;
+    const item = ITEMS[id];
+    if (!this.rules.items || !item) return { ok: false, error: 'Objet inconnu.' };
+    if (!p.canShop) return { ok: false, error: 'Passe par la Fontaine ou la Boutique pour acheter.' };
+    if (p.items.length >= MAX_ITEMS) return { ok: false, error: `${MAX_ITEMS} objets au maximum : revends-en un.` };
+    if (this.hasItem(p, id)) return { ok: false, error: 'Tu as déjà cet objet.' };
+    if (p.gold < item.price) return { ok: false, error: 'Pas assez d’Or.' };
+    p.gold -= item.price;
+    p.items.push({ id, cd: 0 });
+    this.effect({ type: 'gold', key, amount: -item.price });
+    this.effect({ type: 'item', key, item: id });
+    this.say(`${p.name} achète ${item.name} (${item.price} Or).`);
+    return { ok: true };
+  }
+
+  /** Revente d'un objet à moitié prix (possible aussi pour éponger une dette). */
+  sellItem(key, id) {
+    const error = this.guard(key, ['roll', 'end', 'debt']);
+    if (error) return { ok: false, error };
+    const p = this.currentPlayer;
+    const k = p.items.findIndex((it) => it.id === id);
+    if (k < 0) return { ok: false, error: 'Tu n’as pas cet objet.' };
+    p.items.splice(k, 1);
+    const refund = Math.floor(ITEMS[id].price / 2);
+    this.gain(p, refund);
+    this.say(`${p.name} revend ${ITEMS[id].name} (+${refund} Or).`);
+    this.checkDebt();
+    return { ok: true };
+  }
+
+  /** Bottes : +1 case au prochain lancer. */
+  useBoots(key) {
+    const error = this.guard(key, ['roll']);
+    if (error) return { ok: false, error };
+    const p = this.currentPlayer;
+    const boots = p.items.find((it) => it.id === 'boots');
+    if (!boots) return { ok: false, error: 'Tu n’as pas de Bottes.' };
+    if (boots.cd > 0) return { ok: false, error: `Bottes en recharge (${boots.cd} tour${boots.cd > 1 ? 's' : ''}).` };
+    if (p.inJail) return { ok: false, error: 'Impossible depuis la Prison.' };
+    p.armed.boots = true;
+    boots.cd = ITEMS.boots.cd;
+    this.say(`${p.name} lace ses Bottes : +1 case au prochain lancer.`);
+    return { ok: true };
+  }
+
+  /** Héraut de la Faille : détruit un niveau de construction chez un adversaire. */
+  useHerald(key, index) {
+    const error = this.guard(key, ['roll', 'end']);
+    if (error) return { ok: false, error };
+    const p = this.currentPlayer;
+    if (!p.herald) return { ok: false, error: 'Tu n’as pas le Héraut.' };
+    const st = this.props[index];
+    if (!st || st.owner === key || !st.level) return { ok: false, error: 'Vise une case adverse avec une construction.' };
+    const victim = this.player(st.owner);
+    if (st.level === MAX_LEVEL) {
+      const back = Math.min(MAX_LEVEL - 1, this.supply.towers);
+      this.supply.inhibs += 1;
+      this.supply.towers -= back;
+      st.level = back;
+    } else {
+      this.supply.towers += 1;
+      st.level -= 1;
+    }
+    p.herald -= 1;
+    this.effect({ type: 'build', key: st.owner, index, level: st.level });
+    this.effect({ type: 'herald-charge', key, index });
+    this.say(`Le Héraut de ${p.name} charge ${BOARD[index].name} : ${victim.name} perd une construction !`);
+    return { ok: true };
   }
 
   // --- Constructions & hypothèques --------------------------------------------
@@ -662,6 +1054,7 @@ class Game {
     p.gold -= cost;
     st.level += 1;
     this.stats[key].built += 1;
+    this.checkQuest(p);
     this.effect({ type: 'gold', key, amount: -cost });
     this.effect({ type: 'build', key, index, level: st.level });
     this.say(st.level === MAX_LEVEL
@@ -829,6 +1222,11 @@ class Game {
     move(to, from, t.get.gold);
     this.stats[from.key].trades += 1;
     this.stats[to.key].trades += 1;
+    for (const q of [from, to]) {
+      if (q.quest && q.quest.id === 'SUPP') q.quest.trades += 1;
+      this.checkQuest(q);
+      this.checkSoul(q);
+    }
     this.effect({ type: 'trade-done', accepted: true, from: t.from, to: t.to, give: t.give, get: t.get });
     const part = ({ gold, props }) => [...props.map((i) => BOARD[i].name), ...(gold ? [`${gold} Or`] : [])].join(', ') || 'rien';
     this.say(`Échange conclu : ${from.name} donne ${part(t.give)} à ${to.name} contre ${part(t.get)}.`);
@@ -845,9 +1243,8 @@ class Game {
 
   // --- Faillite ----------------------------------------------------------------
 
-  bankrupt(p) {
-    if (p.bankrupt) return;
-    // Le créancier ne garde que l'or que le joueur avait vraiment : on reprend le reste
+  /** Le créancier ne garde que l'or que le joueur avait vraiment : on reprend le reste. */
+  clawBack(p) {
     let deficit = Math.max(0, -p.gold);
     for (const debt of [...(p.owes || [])].reverse()) {
       if (!deficit) break;
@@ -861,6 +1258,22 @@ class Game {
       }
     }
     p.owes = [];
+  }
+
+  bankrupt(p) {
+    if (p.bankrupt) return;
+    const angel = this.rules.items ? p.items.findIndex((it) => it.id === 'angel') : -1;
+    if (angel >= 0 && !this.voluntaryForfeit) {
+      // l'Ange gardien sauve le joueur : la dette impayée est effacée, il repart avec 0 Or
+      p.items.splice(angel, 1);
+      this.clawBack(p);
+      p.gold = 0;
+      this.effect({ type: 'angel', key: p.key });
+      this.say(`L’Ange gardien ressuscite ${p.name} ! Il repart avec 0 Or.`);
+      if (p === this.currentPlayer) this.checkDebt();
+      return;
+    }
+    this.clawBack(p);
     p.bankrupt = true;
     this.eliminated += 1;
     this.stats[p.key].eliminatedRound = this.round;
@@ -894,8 +1307,11 @@ class Game {
   forfeit(key) {
     const p = this.player(key);
     if (!p || p.bankrupt || this.phase === 'over') return { ok: false, error: 'Action impossible.' };
-    this.say(`${p.name} abandonne la partie.`);
+    // déclarer faillite pendant une dette laisse l'Ange gardien agir ; abandonner, non
+    this.voluntaryForfeit = !(this.phase === 'debt' && p === this.currentPlayer);
+    if (this.voluntaryForfeit) this.say(`${p.name} abandonne la partie.`);
     this.bankrupt(p);
+    this.voluntaryForfeit = false;
     return { ok: true };
   }
 
@@ -911,6 +1327,8 @@ class Game {
         return this.roll(p.key);
       case 'buy':
         return this.skipBuy(p.key);
+      case 'ghost':
+        return this.ghostChoice(p.key, -1);
       case 'tax':
         return this.payTax(p.key, Math.round(this.netWorth(p) * 0.1) < 200 ? 'percent' : 'flat');
       case 'debt':
@@ -936,6 +1354,24 @@ class Game {
   static fromJSON(data, { random = Math.random } = {}) {
     const game = Object.create(Game.prototype);
     Object.assign(game, structuredClone(data));
+    // parties sauvegardées avant les sorts, objets et quêtes : valeurs par défaut
+    game.rules = sanitizeRules(game.rules || { spells: false, quests: false, items: false, dragons: false, herald: false });
+    game.herald ||= { active: false, taken: false };
+    game.elder ||= { active: false, taken: false };
+    game.soulTaken ??= null;
+    game.ghostDice ??= null;
+    for (const p of game.players) {
+      p.role ??= null;
+      p.spells ||= [];
+      p.items ||= [];
+      p.armed ||= {};
+      p.quest ??= null;
+      p.perks ||= {};
+      p.soulUntil ||= 0;
+      p.elderUntil ||= 0;
+      p.herald ||= 0;
+      p.canShop ??= false;
+    }
     game.random = random;
     game.fx = [];
     return game;
@@ -954,6 +1390,11 @@ class Game {
       dice: this.dice,
       pendingIndex: this.pendingIndex,
       baron: { ...this.baron },
+      herald: { ...this.herald },
+      elder: { ...this.elder },
+      ghostDice: this.ghostDice,
+      rules: this.rules,
+      catalog: { spells: SPELLS, items: ITEMS, quests: QUESTS, maxItems: MAX_ITEMS },
       winner: this.winner,
       supply: { ...this.supply },
       stats: this.stats,
@@ -970,6 +1411,16 @@ class Game {
         jailCards: p.jailCards,
         baron: p.baron,
         bankrupt: p.bankrupt,
+        role: p.role,
+        spells: p.spells,
+        items: p.items,
+        armed: p.armed,
+        quest: p.quest,
+        perks: p.perks,
+        soul: this.round < p.soulUntil ? p.soulUntil - this.round : 0,
+        elderBuff: this.round < p.elderUntil ? p.elderUntil - this.round : 0,
+        herald: p.herald,
+        canShop: p.canShop,
         worth: this.netWorth(p),
       })),
       props: this.props,
