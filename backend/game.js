@@ -13,7 +13,7 @@
 
 const {
   SPELLS, ITEMS, MAX_ITEMS, QUESTS, PASSIVES, EVENTS, EVENT_EVERY, SKINS,
-  SOUL_BONUS, ELDER_BONUS, BUFF_ROUNDS, HERALD_ROUND, ELDER_ROUND,
+  SOUL_BONUS, ELDER_BONUS, BUFF_ROUNDS, HERALD_ROUND, ELDER_ROUND, JUNGLE_GOLD, RECALL_GOLD, TOP_GOLD, ADC_BONUS, SUPPORT_CUT, MID_BUILD_DISCOUNT,
   sanitizeRules, sanitizeSpells,
 } = require('./features');
 
@@ -164,14 +164,14 @@ class Game {
       bot: p.bot || null, // niveau du bot (easy | normal | hard), null pour un humain
       color: PLAYER_COLORS[i % PLAYER_COLORS.length],
       pos: 0,
-      gold: this.rules.startGold + (this.rules.passives && p.pawn === 'classic' ? 100 : 0),
+      gold: this.rules.startGold + (this.rules.passives ? PASSIVES[p.pawn]?.start || 0 : 0),
       passiveCd: 0, // recharge du passif (Zhonya)
       reborn: false, // Renaissance (Œuf d'Anivia) déjà utilisée
       role: QUESTS[p.role] ? p.role : null,
       spells: this.rules.spells ? sanitizeSpells(p.spells).map((id) => ({ id, cd: 0 })) : [],
       items: [], // { id, cd }
       armed: {}, // sorts / objets préparés : flash (±1), boots, ghost, barrier, ignite
-      quest: this.rules.quests && QUESTS[p.role] ? { id: p.role, progress: 0, done: false, trades: 0, paid: 0 } : null,
+      quest: this.rules.quests && QUESTS[p.role] ? { id: p.role, progress: 0, done: false, trades: 0, paid: 0, camps: 0 } : null,
       perks: {}, // récompenses de quête : freeTp, freeRecall, jungle, adc, support, cardShield
       soulUntil: 0,
       elderUntil: 0,
@@ -280,7 +280,7 @@ class Game {
   /** Bonus du propriétaire sur ses loyers : quête ADC, Dent de Nashor, Âme du Dragon, Dragon Ancien. */
   rentBonus(owner) {
     let bonus = 0;
-    if (owner.perks.adc) bonus += 0.05;
+    if (owner.perks.adc) bonus += ADC_BONUS;
     if (this.hasItem(owner, 'nashor')) bonus += 0.12;
     if (this.round < owner.soulUntil) bonus += SOUL_BONUS;
     if (this.round < owner.elderUntil) bonus += ELDER_BONUS;
@@ -303,7 +303,8 @@ class Game {
   /** Prix d'une construction : Tibbers −10 %, Soldes −25 %. */
   buildCost(p, group) {
     let cost = GROUPS[group].house;
-    if (this.hasPassive(p, 'tibbers')) cost *= 0.9;
+    if (this.hasPassive(p, 'tibbers')) cost *= 1 - PASSIVES.tibbers.discount;
+    if (p.perks.mid) cost *= 1 - MID_BUILD_DISCOUNT;
     if (this.eventIs('sale')) cost *= 0.75;
     return Math.round(cost);
   }
@@ -317,7 +318,7 @@ class Game {
     const sq = BOARD[index];
     let rent = this.rentFor(index, this.dice ? this.dice[0] + this.dice[1] : 7);
     let cut = 0;
-    if (p.perks.support) cut += 0.05;
+    if (p.perks.support) cut += SUPPORT_CUT;
     if (this.hasItem(p, 'frozen')) cut += 0.12;
     rent *= 1 - cut;
     const notes = [];
@@ -327,13 +328,13 @@ class Game {
       this.say(`Stase de Zhonya : ${p.name} ne paye pas le loyer de ${sq.name} !`);
       return;
     }
-    if (this.hasPassive(owner, 'blade') && this.random() < 0.1) {
-      rent *= 1.5;
-      notes.push('Coup critique ×1,5');
+    if (this.hasPassive(owner, 'blade') && this.random() < PASSIVES.blade.chance) {
+      rent *= PASSIVES.blade.mult;
+      notes.push(`Coup critique ×${String(PASSIVES.blade.mult).replace('.', ',')}`);
     }
     if (this.hasPassive(owner, 'teemo')) {
-      rent += 10;
-      notes.push('Champignon +10');
+      rent += PASSIVES.teemo.gold;
+      notes.push(`Champignon +${PASSIVES.teemo.gold}`);
     }
     if (owner.armed.ignite) {
       rent *= 1.5;
@@ -363,10 +364,13 @@ class Game {
     const q = p.quest;
     switch (q.id) {
       case 'TOP': return q.progress; // passages par la Fontaine (compté dans passGo)
-      case 'JGL': return DRAGON_INDEXES.filter((i) => this.props[i]?.owner === p.key).length;
-      case 'MID': return this.stats[p.key].built;
+      case 'JGL': {
+        const owned = BOARD.filter((sq, i) => QUESTS.JGL.types.includes(sq.type) && this.props[i]?.owner === p.key).length;
+        return Math.max(owned, Math.floor(((q.camps || 0) * QUESTS.JGL.goal) / QUESTS.JGL.alt));
+      }
+      case 'MID': return this.ownedBy(p.key).length;
       case 'ADC': return this.stats[p.key].rentEarned;
-      case 'SUPP': return Math.max(q.trades, Math.floor((q.paid * 2) / 3));
+      case 'SUPP': return Math.max(q.trades, Math.floor((q.paid * QUESTS.SUPP.goal) / QUESTS.SUPP.alt));
       default: return 0;
     }
   }
@@ -376,14 +380,14 @@ class Game {
     if (!q || q.done || p.bankrupt) return;
     q.progress = this.questProgress(p);
     const def = QUESTS[q.id];
-    const done = q.id === 'SUPP' ? q.trades >= 2 || q.paid >= 3 : q.progress >= def.goal;
+    const done = q.id === 'SUPP' ? q.trades >= def.goal || q.paid >= def.alt : q.progress >= def.goal;
     if (!done) return;
     q.done = true;
     q.progress = def.goal;
     switch (q.id) {
-      case 'TOP': p.perks.freeTp = 1; this.gain(p, 50); break;
+      case 'TOP': p.perks.freeTp = 1; this.gain(p, TOP_GOLD); break;
       case 'JGL': p.perks.jungle = true; break;
-      case 'MID': p.perks.freeRecall = 1; break;
+      case 'MID': p.perks.freeRecall = 1; p.perks.mid = true; break;
       case 'ADC': p.perks.adc = true; break;
       case 'SUPP': p.perks.support = true; p.perks.cardShield = 1; break;
       default:
@@ -511,7 +515,7 @@ class Game {
       this.gain(p, GO_BONUS);
       this.say(`Ruée des sbires : ${p.name} reçoit ${GO_BONUS} Or de plus.`);
     }
-    if (this.hasPassive(p, 'poro')) this.gain(p, 20);
+    if (this.hasPassive(p, 'poro')) this.gain(p, PASSIVES.poro.gold);
     if (this.rules.items) p.canShop = true; // on peut acheter des objets en passant à la base
     if (this.hasItem(p, 'potion')) this.gain(p, 30);
     if (p.quest && p.quest.id === 'TOP' && !p.quest.done) {
@@ -536,10 +540,10 @@ class Game {
       this.say(`${p.name} s’arrête pile sur la Fontaine : +${GO_BONUS} Or de plus !`);
     }
     if (steps > 0 && p.perks.jungle) {
-      // quête Jungle : +15 Or par case Dragon traversée (ou atteinte)
+      // quête Jungle : de l'Or par case Dragon traversée (ou atteinte)
       let crossed = 0;
       for (let k = 1; k <= steps; k++) if (DRAGON_INDEXES.includes((from + k) % 40)) crossed += 1;
-      if (crossed) this.gain(p, 15 * crossed);
+      if (crossed) this.gain(p, JUNGLE_GOLD * crossed);
     }
     p.pos = to;
     this.effect({ type: 'move', key: p.key, from, to, steps, direct });
@@ -566,6 +570,10 @@ class Game {
   land(p) {
     const index = p.pos;
     const sq = BOARD[index];
+    if (p.quest?.id === 'JGL' && !p.quest.done && QUESTS.JGL.types.includes(sq.type)) {
+      p.quest.camps = (p.quest.camps || 0) + 1; // quête Jungle : un arrêt sur un camp
+      this.checkQuest(p);
+    }
     if (sq.type === 'dragon' && this.elder.active) {
       this.elder.active = false;
       this.elder.taken = true;
@@ -637,7 +645,7 @@ class Game {
     const title = deckName === 'chance' ? 'Ping SS' : 'Coffre Hextech';
     this.effect({ type: 'card', key: p.key, deck: deckName, title, text: card.text });
     this.say(`${p.name} — ${title} : ${card.text}`);
-    if (this.hasPassive(p, 'ward')) this.gain(p, 10);
+    if (this.hasPassive(p, 'ward')) this.gain(p, PASSIVES.ward.gold);
     if (card.bad) {
       const veil = p.items.find((it) => it.id === 'banshee' && !it.cd);
       if (veil || p.perks.cardShield) {
@@ -803,7 +811,7 @@ class Game {
     if (error) return { ok: false, error };
     const p = this.currentPlayer;
     let amount = choice === 'percent' ? Math.round(this.netWorth(p) * 0.1) : 200;
-    if (this.hasPassive(p, 'minion')) amount = Math.round(amount / 2);
+    if (this.hasPassive(p, 'minion')) amount = Math.round(amount * PASSIVES.minion.share);
     this.say(`${p.name} paye ${amount} Or aux Sbires.`);
     this.phase = 'end';
     this.charge(p, amount, null);
@@ -1011,9 +1019,9 @@ class Game {
       this.doubles = 0;
       this.rollAgain = false;
       this.effect({ type: 'move', key: p.key, from, to: 0, steps: 0, direct: true });
-      this.gain(p, 100);
+      this.gain(p, RECALL_GOLD);
       if (this.rules.items) p.canShop = true;
-      this.say(`${p.name} rentre à la Fontaine (quête Mid) : +100 Or.`);
+      this.say(`${p.name} rentre à la Fontaine (quête Mid) : +${RECALL_GOLD} Or.`);
       this.phase = 'end';
       return { ok: true };
     }
@@ -1354,9 +1362,9 @@ class Game {
       // Renaissance de l'Œuf d'Anivia : une fois par partie
       p.reborn = true;
       this.clawBack(p);
-      p.gold = 0;
+      p.gold = PASSIVES.egg.gold;
       this.effect({ type: 'passive', key: p.key, pawn: 'egg' });
-      this.say(`Renaissance ! ${p.name} renaît de son œuf avec 0 Or.`);
+      this.say(`Renaissance ! ${p.name} renaît de son œuf avec ${PASSIVES.egg.gold} Or.`);
       if (p === this.currentPlayer) this.checkDebt();
       return;
     }

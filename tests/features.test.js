@@ -165,20 +165,37 @@ test('Ange gardien : sauve une fois de la faillite', () => {
 test('quêtes : chaque rôle a la sienne, récompense quand elle est finie', () => {
   const g = newGame({ n: 5, roles: ROLES });
   assert.deepEqual(g.players.map((p) => p.quest.id), ROLES);
-  // Top : 3 passages par la Fontaine
+  // Top : passages par la Fontaine
   const top = g.players[0];
-  for (let k = 0; k < 3; k++) g.passGo(top);
+  for (let k = 0; k < QUESTS.TOP.goal - 1; k++) g.passGo(top);
+  assert.equal(top.quest.done, false);
+  g.passGo(top);
   assert.equal(top.quest.done, true);
   assert.equal(top.perks.freeTp, 1);
-  // ADC : 600 Or de loyers
+  // Jungle : arrêts sur des camps (Dragons ou Potions)
+  const jgl = g.players[1];
+  for (let k = 0; k < QUESTS.JGL.alt; k++) { jgl.pos = DRAGONS[0]; g.land(jgl); g.pendingIndex = null; g.phase = 'roll'; }
+  assert.equal(jgl.quest.done, true);
+  // Mid : cases possédées, récompense = retour + constructions moins chères
+  const mid = g.players[2];
+  BOARD.forEach((sq, i) => { if (sq.type === 'property' && !g.props[i] && g.ownedBy(mid.key).length < QUESTS.MID.goal) g.props[i] = { owner: mid.key, level: 0, mortgaged: false }; });
+  g.checkQuest(mid);
+  assert.equal(mid.quest.done, true);
+  assert.equal(g.buildCost(mid, 'bleu'), Math.round(200 * 0.9));
+  // ADC : Or de loyers
   const adc = g.players[3];
   const i = firstProperty('bleu');
   g.props[i] = { owner: adc.key, level: 4, mortgaged: false };
-  g.payRent(g.players[1], adc, i);
-  g.payRent(g.players[1], adc, i);
+  g.payRent(g.players[4], adc, i);
   assert.equal(adc.quest.done, true);
   assert.equal(adc.perks.adc, true);
-  assert.equal(QUESTS.ADC.goal, 600);
+  // Support : loyers payés
+  const supp = g.players[4];
+  supp.gold = 1e6;
+  assert.equal(supp.quest.paid, 1);
+  for (let k = 1; k < QUESTS.SUPP.alt; k++) g.payRent(supp, adc, i);
+  assert.equal(supp.quest.done, true);
+  assert.equal(supp.perks.cardShield, 1);
 });
 
 test('Âme du Dragon : 4 Dragons, +30 % pendant 5 tours', () => {

@@ -44,8 +44,11 @@ TEST_3D=1 npm run test:browser    # + chargement du plateau 3D (plus lent)
   « Retirer le bot » pour l'enlever.
 - **Chrono** : 60 s par tour par défaut (30, 60, 90 ou sans chrono dans les règles). Une fois le
   temps écoulé, le jeu lance les dés, n'achète rien et termine le tour à la place du joueur.
-- **Pouvoir des pions** : chaque pion a un petit passif (Poro +20 Or à la Fontaine, Zhonya annule
-  un loyer, Œuf d'Anivia survit une fois à la faillite…). Détail dans « Règles ».
+- **Pouvoir des pions** : chaque pion a un petit passif (Poro : Or en plus à la Fontaine, Zhonya
+  annule un loyer, Œuf d'Anivia survit une fois à la faillite…). Détail dans « Règles ».
+- **Équilibrage** : les valeurs des quêtes et des pouvoirs sont réunies en haut de
+  `backend/features.js` ; `npm run balance` simule des milliers de parties entre bots et donne
+  le taux de victoire de chaque rôle et de chaque pion.
 - **Événements de la Faille** : tous les 4 tours, un événement d'un tour (Ruée des sbires,
   Nouveau patch, Brouillard de guerre, Soldes, Snowdown, Prime de guerre).
 - **Skins de pions** : Hextech (1 partie), Obscur (3 parties), Prestige (1 victoire), Cristal

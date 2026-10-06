@@ -981,7 +981,7 @@
         const label = el('span', '', p.quest.done ? `✓ Quête ${ROLE_NAMES[p.quest.id]}` : `Quête ${ROLE_NAMES[p.quest.id]} · ${def.text}`);
         const bar = el('span', 'gv-player__bar');
         const fill = el('span');
-        const goal = p.quest.id === 'SUPP' ? 2 : def.goal || 1;
+        const goal = def.goal || 1;
         fill.style.width = `${Math.min(100, (p.quest.progress / goal) * 100)}%`;
         bar.append(fill);
         q.append(label, bar);

@@ -24,21 +24,21 @@ const firstOf = (group) => BOARD.findIndex((sq) => sq.group === group);
 
 test('chaque pion a un pouvoir, et la règle peut les couper', () => {
   for (const pawn of ['poro', 'teemo', 'ward', 'minion', 'zhonya', 'blade', 'tibbers', 'egg', 'classic']) assert.ok(PASSIVES[pawn]?.text);
-  assert.equal(newGame({ pawns: ['classic', 'poro'] }).players[0].gold, 1600, 'pion classique : +100 Or');
+  assert.equal(newGame({ pawns: ['classic', 'poro'] }).players[0].gold, 1500 + PASSIVES.classic.start, 'pion classique : Or en plus');
   assert.equal(newGame({ pawns: ['classic', 'poro'], rules: { passives: false } }).players[0].gold, 1500);
   assert.equal(sanitizeRules({ turnTimer: 45 }).turnTimer, 60, 'durée de chrono invalide ignorée');
   assert.equal(sanitizeRules({ turnTimer: 0 }).turnTimer, 0);
 });
 
-test('Poro : +20 Or en passant par la Fontaine', () => {
+test('Poro : de l’Or en plus en passant par la Fontaine', () => {
   const g = newGame({ pawns: ['poro', 'teemo'] });
   const p = g.players[0];
   p.pos = 38;
   g.moveBy(p, 4);
-  assert.equal(p.gold, 1500 + 200 + 20);
+  assert.equal(p.gold, 1500 + 200 + PASSIVES.poro.gold);
 });
 
-test('Champignon de Teemo : +10 Or sur les loyers reçus ; Stase de Zhonya : un loyer annulé', () => {
+test('Champignon de Teemo : de l’Or en plus sur les loyers reçus ; Stase de Zhonya : un loyer annulé', () => {
   const g = newGame({ pawns: ['teemo', 'zhonya'] });
   const [teemo, zhonya] = g.players;
   const i = firstOf('marron');
@@ -48,22 +48,24 @@ test('Champignon de Teemo : +10 Or sur les loyers reçus ; Stase de Zhonya : un 
   g.moveBy(zhonya, 1);
   assert.equal(zhonya.gold, 1500, 'Zhonya ne paye pas');
   assert.equal(zhonya.passiveCd, PASSIVES.zhonya.cd);
+  zhonya.passiveCd = 0; // recharge terminée : on vérifie le champignon sur un joueur sans Stase
+  zhonya.pawn = 'poro';
   zhonya.pos = i - 1;
   g.moveBy(zhonya, 1);
-  const rent = BOARD[i].rent[0] + 10;
-  assert.equal(zhonya.gold, 1500 - rent, 'deuxième fois : loyer + 10 Or du champignon');
+  const rent = BOARD[i].rent[0] + PASSIVES.teemo.gold;
+  assert.equal(zhonya.gold, 1500 - rent, 'loyer + Or du champignon');
   assert.equal(teemo.gold, 1500 + rent);
 });
 
-test('Sbire : moitié prix aux Sbires ; Tibbers : constructions −10 %', () => {
+test('Sbire : moins cher aux Sbires ; Tibbers : constructions moins chères', () => {
   const g = newGame({ pawns: ['minion', 'tibbers'] });
   g.phase = 'tax';
   g.payTax('p0', 'flat');
-  assert.equal(g.players[0].gold, 1400);
+  assert.equal(g.players[0].gold, 1500 - Math.round(200 * PASSIVES.minion.share));
   const h = newGame({ pawns: ['tibbers', 'poro'] });
   for (const i of BOARD.map((sq, k) => (sq.group === 'marron' ? k : -1)).filter((k) => k >= 0)) h.props[i] = { owner: 'p0', level: 0, mortgaged: false };
   assert.equal(h.build('p0', firstOf('marron')).ok, true);
-  assert.equal(h.players[0].gold, 1500 - 45);
+  assert.equal(h.players[0].gold, 1500 - Math.round(50 * (1 - PASSIVES.tibbers.discount)));
 });
 
 test('Œuf d’Anivia : survit une fois à la faillite', () => {
@@ -71,11 +73,11 @@ test('Œuf d’Anivia : survit une fois à la faillite', () => {
   const egg = g.players[0];
   g.current = 1;
   egg.gold = 10;
-  g.charge(egg, 500, g.players[1]);
+  g.charge(egg, 5000, g.players[1]);
   assert.equal(egg.bankrupt, false);
-  assert.equal(egg.gold, 0);
+  assert.equal(egg.gold, PASSIVES.egg.gold);
   assert.equal(egg.reborn, true);
-  g.charge(egg, 500, g.players[1]);
+  g.charge(egg, 5000, g.players[1]);
   assert.equal(egg.bankrupt, true, 'pas deux fois');
 });
 
