@@ -86,6 +86,16 @@ app.get('/pawn-models.json', (_req, res) => {
   } catch { /* dossier absent */ }
   res.set('Cache-Control', 'no-cache').json(files);
 });
+// Icônes d'invocateur officielles (tools/download-icons.js) : frontend/assets/icons/0.png …
+const ICONS_DIR = path.join(__dirname, '..', 'frontend', 'assets', 'icons');
+app.get('/icons.json', (_req, res) => {
+  let files = [];
+  try {
+    files = fs.readdirSync(ICONS_DIR).map((f) => /^(\d+)\.(png|jpe?g|webp)$/i.exec(f)).filter(Boolean)
+      .map((m) => ({ index: Number(m[1]), file: m[0] })).filter((f) => f.index < ICON_COUNT);
+  } catch { /* dossier absent */ }
+  res.set('Cache-Control', 'no-cache').json(files);
+});
 // Répliques des champions déposées dans frontend/assets/voices/ (yasuo.mp3, yasuo-2.ogg…)
 const VOICES_DIR = path.join(__dirname, '..', 'frontend', 'assets', 'voices');
 app.get('/voices.json', (_req, res) => {

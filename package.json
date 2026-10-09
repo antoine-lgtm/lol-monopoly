@@ -5,15 +5,16 @@
   "description": "Monopoly multijoueur privé sur le thème de League of Legends",
   "main": "backend/server.js",
   "scripts": {
-    "prestart": "node tools/download-champions.js",
+    "prestart": "node tools/download-champions.js && node tools/download-icons.js",
     "start": "node backend/server.js",
-    "predev": "node tools/download-champions.js",
+    "predev": "node tools/download-champions.js && node tools/download-icons.js",
     "dev": "node --watch backend/server.js",
     "images": "node tools/download-champions.js",
     "test": "node --test tests/rules.test.js tests/features.test.js tests/extras.test.js tests/modes.test.js tests/profile.test.js",
     "test:browser": "node --test --test-concurrency=1 tests/browser.test.js",
     "test:all": "npm test && npm run test:browser",
-    "balance": "node tools/balance.js"
+    "balance": "node tools/balance.js",
+    "icons": "node tools/download-icons.js"
   },
   "engines": {
     "node": ">=18"

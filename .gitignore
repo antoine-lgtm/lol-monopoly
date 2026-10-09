@@ -7,3 +7,6 @@ frontend/assets/champions/
 
 # Sauvegarde des parties (serveur)
 data/
+
+# Icônes d’invocateur officielles téléchargées par npm start (non versionnées)
+frontend/assets/icons/*.png

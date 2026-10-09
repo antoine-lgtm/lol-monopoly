@@ -87,8 +87,11 @@
   ];
 
   const iconCache = new Map();
+  // Icônes officielles (frontend/assets/icons/N.png, tools/download-icons.js) : à la place des dessins
+  const iconFiles = new Map();
   App.iconUrl = (index) => {
     const i = Number.isInteger(index) ? ((index % ICON_COUNT) + ICON_COUNT) % ICON_COUNT : 0;
+    if (iconFiles.has(i)) return `assets/icons/${iconFiles.get(i)}`;
     if (iconCache.has(i)) return iconCache.get(i);
     const hue = (i * 47) % 360;
     const svg =
@@ -104,6 +107,19 @@
     iconCache.set(i, url);
     return url;
   };
+
+  fetch('/icons.json').then((r) => (r.ok ? r.json() : [])).then((files) => {
+    if (!files.length) return;
+    for (const { index, file } of files) iconFiles.set(index, file);
+    // les écrans déjà affichés reprennent les nouvelles icônes
+    const picker = document.querySelector('#login-icons');
+    picker?.querySelectorAll('label.icon-option img').forEach((img, i) => { img.src = App.iconUrl(i); });
+    if (App.me) {
+      App.renderProfile?.();
+      App.renderFriends?.();
+      document.dispatchEvent(new CustomEvent('app:profile', { detail: App.profile }));
+    }
+  }).catch(() => { /* pas d'icônes officielles : on garde les dessins */ });
 
   /** Remplit une grille de choix d'icône (<label class="icon-option">…). */
   const FREE_ICONS = 10; // les 10 premières icônes sont offertes (les autres : boutique)

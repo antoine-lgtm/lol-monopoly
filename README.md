@@ -121,6 +121,12 @@ s'affiche, avec un bandeau qui explique pourquoi. `?3d=1` force la 3D, `?3d=0` l
 
 ## Images officielles (facultatif)
 
+- **Icônes d'invocateur** : `npm start` télécharge les icônes d'origine de League (Data Dragon de
+  Riot) dans `frontend/assets/icons/` (`npm run icons` pour relancer, `-- --force` pour tout
+  reprendre). Les 10 premières sont offertes à la création du compte. Pour en changer une, modifier
+  son numéro dans `ICON_IDS` (`tools/download-icons.js`) ou déposer un PNG carré `N.png`. Sans
+  réseau, le jeu garde ses icônes dessinées.
+
 Déposer ses images dans `frontend/assets/board/real/` (dragons, potions, coffre, ping, coins…) :
 la liste des noms est dans `LISEZMOI.txt`. Elles remplacent les dessins par défaut.
 
