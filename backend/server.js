@@ -17,6 +17,7 @@ const express = require('express');
 const { Server } = require('socket.io');
 const { Game, TEAM_NAMES } = require('./game');
 const { LEVELS: BOT_LEVELS, botStep, botAnswerTrade } = require('./bot');
+const Profile = require('./profile');
 const {
   SPELLS, ITEMS, QUESTS, PASSIVES, EVENTS, SKINS, skinUnlocked, DEFAULT_SPELLS, DEFAULT_RULES, sanitizeRules, sanitizeSpells,
 } = require('./features');
@@ -31,7 +32,7 @@ const MIN_PLAYERS_TO_START = Number(process.env.MIN_PLAYERS) || 2;
 const ROLES = ['TOP', 'JGL', 'MID', 'ADC', 'SUPP'];
 // Pions du plateau (images dans frontend/assets/pawns/) : un pion différent par joueur
 const PAWNS = ['poro', 'teemo', 'ward', 'minion', 'zhonya', 'blade', 'tibbers', 'egg', 'classic'];
-const ICON_COUNT = 30; // icônes d'invocateur disponibles côté client (0..29)
+const { ICON_COUNT } = Profile; // icônes d'invocateur disponibles côté client (0..29)
 const CHAT_MAX_LENGTH = 300;
 const CHAT_HISTORY_SIZE = 50;
 const CHAT_RATE_LIMIT = { max: 5, windowMs: 3000 };
@@ -252,6 +253,8 @@ function serializeLobby(lobby) {
           team: slot.team || null,
           bot: user.bot || null,
           stats: user.stats || { games: 0, wins: 0 },
+          banner: user.banner || 'default',
+          level: user.bot ? null : Profile.levelOf(user.xp || 0),
           isOwner: slot.key === lobby.ownerKey,
           connected: Boolean(user.socketId) || Boolean(user.bot),
         },
@@ -259,6 +262,10 @@ function serializeLobby(lobby) {
       };
     }),
   };
+}
+
+function sendProfile(user) {
+  if (user.socketId) io.to(userRoom(user.key)).emit('profile:update', Profile.profileOf(user));
 }
 
 function broadcastLobby(lobby) {
@@ -310,7 +317,12 @@ function addToLobby(user, lobby, preferredSlot = null) {
 
   const taken = new Set(lobby.slots.filter(Boolean).map((s) => s.pawn));
   const team = lobby.rules?.teams ? smallerTeam(lobby) : null; // avant d'occuper la place
-  lobby.slots[index] = { key: user.key, role: null, pawn: PAWNS.find((p) => !taken.has(p)), spells: [...DEFAULT_SPELLS], skin: 'base', team };
+  // un humain prend un pion qu'il possède ; un bot prend d'abord les pions payants (les gratuits restent aux humains)
+  const free = PAWNS.filter((p) => !taken.has(p));
+  const pawn = user.bot
+    ? free.find((p) => Profile.PAWN_PRICES[p] > 0) || free[0]
+    : free.find((p) => Profile.ownsPawn(user, p)) || free[0];
+  lobby.slots[index] = { key: user.key, role: null, pawn, spells: [...DEFAULT_SPELLS], skin: 'base', team };
   lobby.invites.delete(user.key);
   user.lobbyId = lobby.id;
 
@@ -320,6 +332,31 @@ function addToLobby(user, lobby, preferredSlot = null) {
     socket.emit('chat:history', lobby.chat);
   }
   return true;
+}
+
+/** Ajoute un bot (niveau easy | normal | hard) à une place libre du salon. */
+function addBot(lobby, level, index = lobby.slots.indexOf(null)) {
+  const usedNames = new Set(lobby.slots.filter(Boolean).map((s) => users.get(s.key)?.name));
+  const name = BOT_NAMES.find((n) => !usedNames.has(`${n} (bot)`)) || 'Bot';
+  const bot = {
+    key: `bot:${crypto.randomUUID().slice(0, 8)}`,
+    name: `${name} (bot)`,
+    icon: crypto.randomInt(ICON_COUNT),
+    bot: level,
+    socketId: null,
+    lobbyId: null,
+    friends: new Set(),
+    incomingRequests: new Set(),
+    disconnectTimer: null,
+    chatTimestamps: [],
+  };
+  users.set(bot.key, bot);
+  addToLobby(bot, lobby, index);
+  const s = lobby.slots[index];
+  const roles = new Set(lobby.slots.filter(Boolean).map((x) => x.role));
+  s.role = ROLES.find((r) => !roles.has(r)) || null;
+  s.spells = level === 'easy' ? [...DEFAULT_SPELLS] : ['heal', 'barrier'];
+  return bot;
 }
 
 /** Équipe qui a le moins de joueurs (bleue en cas d'égalité). */
@@ -524,13 +561,16 @@ function broadcastGame(lobby) {
     const winner = game.player(game.winner);
     systemMessage(lobby, winner ? `${winner.name} remporte la partie !` : 'Partie terminée.');
     saveReplay(game);
-    // profil : parties jouées et victoires (débloquent les skins)
-    for (const p of game.players) {
+    // profil : Essence bleue selon la place, expérience, parties jouées et victoires (skins)
+    const humans = game.players.filter((p) => !users.get(p.key)?.bot);
+    for (const p of humans) {
       const u = users.get(p.key);
-      if (!u || u.bot) continue;
-      u.stats ||= { games: 0, wins: 0 };
-      u.stats.games += 1;
-      if (p.key === game.winner || (game.winnerTeam && p.team === game.winnerTeam)) u.stats.wins += 1;
+      if (!u) continue;
+      const won = p.key === game.winner || Boolean(game.winnerTeam && p.team === game.winnerTeam);
+      const vsAi = humans.length === 1; // seul humain : partie contre l'IA (gains réduits)
+      const gain = Profile.reward(u, { place: game.stats[p.key]?.place, won, vsAi });
+      sendProfile(u);
+      notify(u.key, 'success', `Récompense : +${gain.essence} Essence bleue, +${gain.xp} XP${gain.levelUp ? ` — niveau ${gain.level} !` : ''}`);
     }
     broadcastLobby(lobby);
     broadcastLobbyPresence(lobby);
@@ -645,7 +685,10 @@ io.on('connection', (socket) => {
       };
       users.set(key, user);
     }
-    user.icon = icon;
+    Profile.ensureProfile(user);
+    // icône choisie à la connexion : seulement parmi celles que le joueur possède
+    if (Profile.ownsIcon(user, icon)) user.icon = icon;
+    else if (!Profile.ownsIcon(user, user.icon)) user.icon = 0;
     user.socketId = socket.id;
     clearTimeout(user.disconnectTimer);
     user.disconnectTimer = null;
@@ -665,7 +708,7 @@ io.on('connection', (socket) => {
       putInFreshLobby(user);
     }
 
-    reply(ack, { ok: true, user: { name: user.name, icon: user.icon }, roles: ROLES });
+    reply(ack, { ok: true, user: { name: user.name, icon: user.icon }, roles: ROLES, profile: Profile.profileOf(user), catalog: Profile.CATALOG });
     sendFriendList(key);
 
     // Partie en cours : l'état part après la confirmation, pour que le client sache déjà qui il est
@@ -678,6 +721,7 @@ io.on('connection', (socket) => {
 
   socket.on('session:setIcon', authed(({ icon }, ack) => {
     if (!Number.isInteger(icon) || icon < 0 || icon >= ICON_COUNT) return fail(ack, 'Icône inconnue.');
+    if (!Profile.ownsIcon(me, icon)) return fail(ack, 'Cette icône s’achète dans la boutique.');
     me.icon = icon;
     const lobby = currentLobby(me);
     if (lobby) broadcastLobby(lobby);
@@ -835,6 +879,7 @@ io.on('connection', (socket) => {
     if (!lobby) return fail(ack, 'Aucun salon.');
     if (lobby.status !== 'lobby') return fail(ack, 'La partie est déjà lancée.');
     if (!PAWNS.includes(pawn)) return fail(ack, 'Pion inconnu.');
+    if (!Profile.ownsPawn(me, pawn)) return fail(ack, 'Ce pion s’achète dans la boutique (Essence bleue).');
     const owner = lobby.slots.find((s) => s && s.pawn === pawn && s.key !== me.key);
     if (owner) return fail(ack, `${users.get(owner.key)?.name ?? 'Un joueur'} a déjà ce pion.`);
     lobby.slots.find((s) => s && s.key === me.key).pawn = pawn;
@@ -860,6 +905,39 @@ io.on('connection', (socket) => {
     if (lobby.status !== 'lobby') return fail(ack, 'La partie est déjà lancée.');
     lobby.rules = sanitizeRules({ ...lobby.rules, ...(rules || {}) });
     if (lobby.rules.teams) balanceTeams(lobby);
+    broadcastLobby(lobby);
+    reply(ack, { ok: true });
+  }));
+
+  // --- Profil, boutique, collection --------------------------------------------
+
+  socket.on('shop:buy', authed(({ kind, id }, ack) => {
+    const res = Profile.buy(me, kind, id);
+    if (!res.ok) return fail(ack, res.error);
+    sendProfile(me);
+    reply(ack, { ok: true, profile: Profile.profileOf(me) });
+  }));
+
+  socket.on('profile:setBanner', authed(({ banner }, ack) => {
+    if (!Profile.BANNERS[banner]) return fail(ack, 'Bannière inconnue.');
+    if (!Profile.ownsBanner(me, banner)) return fail(ack, 'Cette bannière s’achète dans la boutique.');
+    me.banner = banner;
+    sendProfile(me);
+    const lobby = currentLobby(me);
+    if (lobby) broadcastLobby(lobby);
+    reply(ack, { ok: true });
+  }));
+
+  // Contre l'IA (2 bots Normal) et Entraînement (1 bot Facile, sans chrono) : salon prêt à lancer
+  socket.on('lobby:quick', authed(({ mode }, ack) => {
+    if (mode !== 'ai' && mode !== 'practice') return fail(ack, 'Mode inconnu.');
+    const current = currentLobby(me);
+    if (current && current.status === 'in-game') return fail(ack, 'Termine d’abord ta partie en cours.');
+    const lobby = putInFreshLobby(me);
+    if (mode === 'practice') lobby.rules = sanitizeRules({ ...lobby.rules, turnTimer: 0 });
+    const levels = mode === 'ai' ? ['normal', 'normal'] : ['easy'];
+    for (const level of levels) addBot(lobby, level);
+    systemMessage(lobby, mode === 'ai' ? 'Partie contre l’IA : deux bots Normal t’attendent.' : 'Entraînement : un bot Facile, sans chrono. Prends ton temps !');
     broadcastLobby(lobby);
     reply(ack, { ok: true });
   }));
@@ -897,26 +975,7 @@ io.on('connection', (socket) => {
     if (!BOT_LEVELS[level]) return fail(ack, 'Niveau inconnu.');
     const index = Number.isInteger(slot) && lobby.slots[slot] === null ? slot : lobby.slots.indexOf(null);
     if (index === -1) return fail(ack, 'Le salon est complet.');
-    const usedNames = new Set(lobby.slots.filter(Boolean).map((s) => users.get(s.key)?.name));
-    const name = BOT_NAMES.find((n) => !usedNames.has(`${n} (bot)`)) || 'Bot';
-    const bot = {
-      key: `bot:${crypto.randomUUID().slice(0, 8)}`,
-      name: `${name} (bot)`,
-      icon: crypto.randomInt(ICON_COUNT),
-      bot: level,
-      socketId: null,
-      lobbyId: null,
-      friends: new Set(),
-      incomingRequests: new Set(),
-      disconnectTimer: null,
-      chatTimestamps: [],
-    };
-    users.set(bot.key, bot);
-    addToLobby(bot, lobby, index);
-    const s = lobby.slots[index];
-    const roles = new Set(lobby.slots.filter(Boolean).map((x) => x.role));
-    s.role = ROLES.find((r) => !roles.has(r)) || null;
-    s.spells = level === 'easy' ? [...DEFAULT_SPELLS] : ['heal', 'barrier'];
+    const bot = addBot(lobby, level, index);
     systemMessage(lobby, `${bot.name} (${BOT_LEVELS[level].name}) rejoint le salon.`);
     broadcastLobby(lobby);
     reply(ack, { ok: true });
@@ -1166,6 +1225,10 @@ function snapshot() {
       icon: u.icon,
       bot: u.bot || null,
       stats: u.stats || { games: 0, wins: 0 },
+      essence: u.essence || 0,
+      xp: u.xp || 0,
+      collection: u.collection || null,
+      banner: u.banner || 'default',
       replays: u.replays || [],
       lobbyId: u.lobbyId,
       friends: [...u.friends],
@@ -1225,6 +1288,10 @@ function loadSave() {
         icon: u.icon,
         bot: u.bot || null,
         stats: u.stats || { games: 0, wins: 0 },
+        essence: u.essence || 0,
+        xp: u.xp || 0,
+        collection: u.collection || undefined,
+        banner: u.banner || 'default',
         replays: u.replays || [],
         socketId: null,
         lobbyId: u.lobbyId && lobbies.has(u.lobbyId) ? u.lobbyId : null,

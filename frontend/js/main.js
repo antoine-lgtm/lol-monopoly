@@ -86,9 +86,10 @@
   };
 
   /** Remplit une grille de choix d'icône (<label class="icon-option">…). */
-  function fillIconPicker(grid, inputName, selected) {
+  const FREE_ICONS = 10; // les 10 premières icônes sont offertes (les autres : boutique)
+  function fillIconPicker(grid, inputName, selected, count = ICON_COUNT) {
     grid.replaceChildren();
-    for (let i = 0; i < ICON_COUNT; i++) {
+    for (let i = 0; i < count; i++) {
       const label = document.createElement('label');
       label.className = 'icon-option';
       label.title = `Icône ${i + 1}`;
@@ -237,7 +238,7 @@
   function showLogin(message) {
     const saved = store.get(STORAGE_SESSION, null);
     if (!$('#login-icons').children.length) {
-      fillIconPicker($('#login-icons'), 'icon', saved?.icon ?? 0);
+      fillIconPicker($('#login-icons'), 'icon', Math.min(saved?.icon ?? 0, FREE_ICONS - 1), FREE_ICONS);
     }
     if (saved && !loginForm.elements.name.value) loginForm.elements.name.value = saved.name;
     loginError.textContent = message || '';
@@ -259,9 +260,12 @@
         return;
       }
       App.me = res.user;
+      App.profile = res.profile || null;
+      App.catalog = res.catalog || null;
       store.set(STORAGE_SESSION, App.me);
       loginScreen.hidden = true;
       renderProfile();
+      renderWallet();
       document.dispatchEvent(new CustomEvent('app:login', { detail: App.me }));
     });
   }
@@ -307,6 +311,28 @@
   }
   App.renderProfile = renderProfile;
 
+  /** Porte-monnaie (Essence bleue), victoires et niveau, en haut de l'écran. */
+  const fmtNum = (n) => new Intl.NumberFormat('fr-FR').format(n);
+  function renderWallet() {
+    const p = App.profile;
+    if (!p) return;
+    $('#gold-balance').textContent = fmtNum(p.essence);
+    $('#wins-count').textContent = fmtNum(p.stats?.wins ?? 0);
+    $('#wins-count').closest('.wallet__row').title = `${p.stats?.wins ?? 0} victoire(s) en ${p.stats?.games ?? 0} partie(s)`;
+    const level = $('#profile-level');
+    level.textContent = p.level;
+    $('#profile-icon').title = `Niveau ${p.level} — ${p.levelXp}/${p.levelSize} XP`;
+    $('#shop-balance').textContent = fmtNum(p.essence);
+  }
+  App.renderWallet = renderWallet;
+  socket.on('profile:update', (profile) => {
+    App.profile = profile;
+    renderWallet();
+    if ($('#modal-shop').open) renderShop();
+    if ($('#modal-skin').open) renderCollection();
+    document.dispatchEvent(new CustomEvent('app:profile', { detail: profile }));
+  });
+
   // ---------------------------------------------------------------------------
   // Navigation Accueil ↔ Salon
   // ---------------------------------------------------------------------------
@@ -327,7 +353,20 @@
     if (!nav) return;
     event.preventDefault();
     if (nav.dataset.nav === 'home') App.showView('home');
+    else if (nav.dataset.nav === 'rules') App.openRules?.();
+    else if (nav.dataset.nav === 'collection') openSkin();
     else App.toast('Cette page arrive bientôt.', 'info');
+  });
+
+  // Contre l'IA (2 bots Normal) et Entraînement (1 bot Facile, sans chrono)
+  document.addEventListener('click', (event) => {
+    const quick = event.target.closest('[data-quick]');
+    if (!quick) return;
+    event.preventDefault();
+    socket.emit('lobby:quick', { mode: quick.dataset.quick }, (res) => {
+      if (!res?.ok) return App.toast(res?.error || 'Impossible de préparer la partie.', 'error');
+      App.showView('lobby');
+    });
   });
 
   // Boutons d'action présents à plusieurs endroits
@@ -337,6 +376,10 @@
     if (action === 'add-friend') openAddFriend();
     if (action === 'rules') App.openRules?.();
     if (action === 'history') App.openHistory?.();
+    if (action === 'shop') {
+      if ($('#modal-skin').open) App.closeModal('modal-skin');
+      openShop();
+    }
   });
 
   // ---------------------------------------------------------------------------
@@ -404,10 +447,21 @@
   function confirmMode() {
     if (!App.me) return;
     switch (currentMode) {
-      case 'create':
+      case 'create': {
         // Déjà dans un salon à plusieurs : on y retourne ; sinon on ouvre son salon (créé à la connexion).
+        // Variante choisie : appliquée aux règles si l'on est le chef du salon.
+        const variant = document.querySelector('input[name="variant"]:checked')?.value || 'classic';
+        const rules = {
+          classic: { board: 'rift', maxRounds: 0, startGold: 1500 },
+          aram: { board: 'aram', maxRounds: 0, startGold: 1500 },
+          quick: { board: 'rift', maxRounds: 20, startGold: 2000 },
+        }[variant];
+        if (App.lobby && App.lobby.owner === App.me.name && App.lobby.status === 'lobby' && !App.inGroup()) {
+          socket.emit('lobby:setRules', { rules }, () => {});
+        }
         App.showView('lobby');
         break;
+      }
       case 'join':
         joinByCode();
         break;
@@ -440,49 +494,185 @@
   // Skin & Boutique
   // ---------------------------------------------------------------------------
 
-  function openSkin() {
-    fillIconPicker($('#skin-icons'), 'skin-icon', App.me.icon);
-    const tokens = $('#skin-tokens');
-    if (!tokens.children.length) {
-      const note = document.createElement('p');
-      note.className = 'social__empty';
-      note.textContent = 'Les pions arriveront avec le plateau (étape 4).';
-      tokens.append(note);
+  const PAWN_NAMES = {
+    classic: 'Pion classique', poro: 'Poro', minion: 'Sbire', ward: 'Balise', egg: 'Œuf d’Anivia',
+    teemo: 'Champignon de Teemo', blade: 'Lame de Doran', zhonya: 'Sablier de Zhonya', tibbers: 'Tibbers',
+  };
+  const BANNER_NAMES = { default: 'Classique', hextech: 'Hextech', shurima: 'Shurima', noxus: 'Noxus', freljord: 'Freljord', targon: 'Targon', ionia: 'Ionia' };
+  const owned = (kind, id) => Boolean(App.profile?.collection?.[kind]?.includes(id));
+
+  function shopCard({ img, swatch, name, sub, owned: has, price, action, selected = false, locked = false, onClick }) {
+    const li = document.createElement('li');
+    li.className = `shop-item${has ? ' is-owned' : ''}${selected ? ' is-selected' : ''}${locked ? ' is-locked' : ''}`;
+    const art = document.createElement('div');
+    art.className = 'shop-item__art';
+    if (img) {
+      const im = document.createElement('img');
+      im.src = img;
+      im.alt = '';
+      art.append(im);
     }
-    App.openModal('modal-skin');
+    if (swatch) art.dataset.banner = swatch;
+    const title = document.createElement('b');
+    title.className = 'shop-item__name';
+    title.textContent = name;
+    const meta = document.createElement('span');
+    meta.className = 'shop-item__meta';
+    meta.textContent = sub || '';
+    li.append(art, title, meta);
+    if (action) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `btn btn--sm ${has || selected ? 'btn--secondary' : 'btn--primary'}`;
+      btn.textContent = action;
+      btn.disabled = Boolean(selected) || (price !== undefined && !has && (App.profile?.essence ?? 0) < price);
+      btn.addEventListener('click', onClick);
+      li.append(btn);
+    }
+    return li;
   }
 
-  $('#skin-form').addEventListener('submit', (event) => {
-    const checked = event.currentTarget.querySelector('input[name="skin-icon"]:checked');
-    if (!checked || Number(checked.value) === App.me.icon) return;
-    socket.emit('session:setIcon', { icon: Number(checked.value) }, (res) => {
-      if (!res?.ok) return App.toast(res?.error || 'Impossible de changer d’icône.', 'error');
-      App.me.icon = res.icon;
-      store.set(STORAGE_SESSION, App.me);
-      renderProfile();
-      App.toast('Nouvelle icône enregistrée.', 'success');
+  function buy(kind, id, label) {
+    socket.emit('shop:buy', { kind, id }, (res) => {
+      if (!res?.ok) return App.toast(res?.error || 'Achat impossible.', 'error');
+      App.profile = res.profile;
+      renderWallet();
+      renderShop();
+      App.toast(`${label} rejoint ta collection !`, 'success');
     });
-  });
+  }
 
-  function openShop() {
-    $('#shop-balance').textContent = $('#gold-balance').textContent;
+  // --- Boutique : pions, icônes, bannières à acheter avec l'Essence bleue ---
+  let shopTab = 'tokens';
+  function renderShop() {
     const grid = $('#shop-items');
-    if (!grid.children.length) {
-      const note = document.createElement('li');
-      note.className = 'social__empty';
-      note.style.gridColumn = '1 / -1';
-      note.textContent = 'La boutique ouvrira avec le plateau (étape 4) : les PO gagnées en partie serviront à acheter pions, icônes et bannières.';
-      grid.append(note);
+    const cat = App.catalog;
+    if (!cat || !App.profile) {
+      grid.replaceChildren();
+      return;
     }
+    $('#shop-balance').textContent = fmtNum(App.profile.essence);
+    const fmtEB = (n) => `${fmtNum(n)} EB`;
+    let cards = [];
+    if (shopTab === 'tokens') {
+      cards = Object.entries(cat.pawns).filter(([, price]) => price > 0).map(([id, price]) => shopCard({
+        img: `assets/pawns/${id}.svg`, name: PAWN_NAMES[id] || id, sub: owned('pawns', id) ? 'Possédé' : fmtEB(price),
+        owned: owned('pawns', id), price, action: owned('pawns', id) ? 'Possédé' : 'Acheter',
+        onClick: () => !owned('pawns', id) && buy('pawn', id, PAWN_NAMES[id]),
+      }));
+    } else if (shopTab === 'icons') {
+      for (let i = cat.icons.free; i < cat.icons.count; i++) {
+        const has = owned('icons', i);
+        cards.push(shopCard({
+          img: App.iconUrl(i), name: `Icône ${i + 1}`, sub: has ? 'Possédée' : fmtEB(cat.icons.price),
+          owned: has, price: cat.icons.price, action: has ? 'Possédée' : 'Acheter',
+          onClick: () => !has && buy('icon', i, `L’icône ${i + 1}`),
+        }));
+      }
+    } else {
+      cards = Object.entries(cat.banners).filter(([, b]) => b.price > 0).map(([id, b]) => shopCard({
+        swatch: id, name: b.name, sub: owned('banners', id) ? 'Possédée' : fmtEB(b.price),
+        owned: owned('banners', id), price: b.price, action: owned('banners', id) ? 'Possédée' : 'Acheter',
+        onClick: () => !owned('banners', id) && buy('banner', id, `La bannière ${b.name}`),
+      }));
+    }
+    grid.replaceChildren(...cards);
+  }
+  function openShop() {
+    renderShop();
     App.openModal('modal-shop');
   }
 
-  $$('.shop-tabs__tab').forEach((tab) => {
+  // --- Collection : ce que tu possèdes (et ce qui reste à débloquer) ---
+  let collectionTab = 'pawns';
+  function renderCollection() {
+    const grid = $('#collection-items');
+    const hint = $('#collection-hint');
+    const p = App.profile;
+    const cat = App.catalog;
+    if (!p || !cat) return;
+    let cards = [];
+    let have = 0;
+    let total = 0;
+    if (collectionTab === 'pawns') {
+      hint.textContent = 'Les pions possédés se choisissent sous ta bannière, dans le salon. Les autres s’achètent dans la boutique.';
+      for (const [id, price] of Object.entries(cat.pawns)) {
+        const has = owned('pawns', id);
+        total += 1;
+        have += has ? 1 : 0;
+        cards.push(shopCard({ img: `assets/pawns/${id}.svg`, name: PAWN_NAMES[id] || id, sub: has ? (price ? 'Acheté' : 'Offert') : `${fmtNum(price)} EB`, owned: has, locked: !has }));
+      }
+    } else if (collectionTab === 'skins') {
+      const skins = App.lobby?.skins || {};
+      const stats = p.stats || {};
+      hint.textContent = `Les skins se débloquent en jouant (${stats.games || 0} partie(s), ${stats.wins || 0} victoire(s)) et se choisissent dans le salon, sous ton pion.`;
+      for (const [id, sk] of Object.entries(skins)) {
+        const has = (stats.games || 0) >= sk.games && (stats.wins || 0) >= sk.wins;
+        const need = [sk.games ? `${sk.games} partie(s)` : '', sk.wins ? `${sk.wins} victoire(s)` : ''].filter(Boolean).join(' et ');
+        total += 1;
+        have += has ? 1 : 0;
+        const card = shopCard({ img: 'assets/pawns/poro.svg', name: sk.name, sub: has ? 'Débloqué' : `Après ${need}`, owned: has, locked: !has });
+        card.querySelector('img').dataset.skin = id;
+        cards.push(card);
+      }
+    } else if (collectionTab === 'icons') {
+      hint.textContent = 'Clique sur une de tes icônes pour l’utiliser.';
+      for (let i = 0; i < cat.icons.count; i++) {
+        const has = owned('icons', i);
+        total += 1;
+        have += has ? 1 : 0;
+        cards.push(shopCard({
+          img: App.iconUrl(i), name: `Icône ${i + 1}`, sub: has ? '' : `${fmtNum(cat.icons.price)} EB`, owned: has, locked: !has,
+          selected: i === App.me.icon, action: has ? (i === App.me.icon ? 'Utilisée' : 'Utiliser') : null,
+          onClick: () => socket.emit('session:setIcon', { icon: i }, (res) => {
+            if (!res?.ok) return App.toast(res?.error || 'Impossible de changer d’icône.', 'error');
+            App.me.icon = res.icon;
+            store.set(STORAGE_SESSION, App.me);
+            renderProfile();
+            renderCollection();
+          }),
+        }));
+      }
+    } else {
+      hint.textContent = 'La bannière colore le cadre de ta place dans le salon, visible par tout le monde.';
+      for (const [id, b] of Object.entries(cat.banners)) {
+        const has = owned('banners', id);
+        total += 1;
+        have += has ? 1 : 0;
+        cards.push(shopCard({
+          swatch: id, name: b.name, sub: has ? '' : `${fmtNum(b.price)} EB`, owned: has, locked: !has,
+          selected: p.banner === id, action: has ? (p.banner === id ? 'Utilisée' : 'Utiliser') : null,
+          onClick: () => socket.emit('profile:setBanner', { banner: id }, (res) => {
+            if (!res?.ok) App.toast(res?.error || 'Impossible.', 'error');
+          }),
+        }));
+      }
+    }
+    $('#collection-count').textContent = `${have}/${total}`;
+    grid.replaceChildren(...cards);
+  }
+  function openSkin() {
+    renderCollection();
+    App.openModal('modal-skin');
+  }
+  App.openCollection = openSkin;
+  $$('[data-collection-tab]').forEach((tab) => tab.addEventListener('click', () => {
+    collectionTab = tab.dataset.collectionTab;
+    $$('[data-collection-tab]').forEach((t) => {
+      t.classList.toggle('is-active', t === tab);
+      t.setAttribute('aria-selected', String(t === tab));
+    });
+    renderCollection();
+  }));
+
+  $$('[data-shop-tab]').forEach((tab) => {
     tab.addEventListener('click', () => {
-      $$('.shop-tabs__tab').forEach((t) => {
+      shopTab = tab.dataset.shopTab;
+      $$('[data-shop-tab]').forEach((t) => {
         t.classList.toggle('is-active', t === tab);
         t.setAttribute('aria-selected', String(t === tab));
       });
+      renderShop();
     });
   });
 

@@ -3936,3 +3936,49 @@ img[data-skin="infernal"] { filter: sepia(1) saturate(5) hue-rotate(-25deg) drop
   background: #9fd8f0;
   --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1 1h5v5H1zM10 1h5v5h-5zM1 10h5v5H1zM10 10h5v5h-5z' opacity='.85'/%3E%3Cpath d='M6 3h4v1H6zM6 12h4v1H6zM3 6h1v4H3zM12 6h1v4h-1z'/%3E%3C/svg%3E");
 }
+
+/* ----- Essence bleue, boutique et collection ----- */
+.wallet__icon--be {
+  background: linear-gradient(160deg, #c8f8ff, #3fb6e8 45%, #0b4f8a);
+  clip-path: polygon(50% 0, 88% 30%, 74% 100%, 26% 100%, 12% 30%);
+  filter: drop-shadow(0 0 3px rgba(63, 182, 232, 0.6));
+}
+.wallet__row[data-action] { cursor: pointer; }
+.shop-balance .wallet__icon { width: 15px; height: 15px; display: inline-block; vertical-align: -2px; margin-right: 4px; }
+.collection-hint { margin: 0 0 10px; font-size: 12px; color: var(--grey-1, #a09b8c); }
+.collection-count { font-size: 13px; font-weight: 700; color: var(--gold-2, #c8aa6e); }
+.shop-item__art {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 6px;
+  background: radial-gradient(circle at 50% 35%, rgba(200, 170, 110, 0.16), rgba(1, 10, 19, 0.6));
+}
+.shop-item__art img { max-width: 56px; max-height: 56px; object-fit: contain; }
+.shop-item__meta { font-size: 12px; font-weight: 600; color: var(--gold-2, #c8aa6e); min-height: 15px; }
+.shop-item.is-owned .shop-item__meta { color: #6fd16a; }
+.shop-item.is-locked .shop-item__art { filter: grayscale(0.9) brightness(0.55); }
+.shop-item.is-locked .shop-item__name { color: #7e7b72; }
+.shop-item.is-selected { border-color: #0ac8b9; box-shadow: inset 0 0 0 1px #0ac8b9; }
+.shop-item .btn { margin-top: auto; }
+/* aperçu des bannières (boutique, collection) */
+.shop-item__art[data-banner] { width: 44px; height: 64px; border-radius: 3px 3px 22px 22px; background: var(--swatch, linear-gradient(180deg, #c8aa6e, #3a2a12)); box-shadow: inset 0 0 0 2px rgba(1, 10, 19, 0.6); }
+.shop-item__art[data-banner="default"] { --swatch: linear-gradient(180deg, #c8aa6e, #3a2a12); }
+.shop-item__art[data-banner="hextech"] { --swatch: linear-gradient(180deg, #7ff3ec, #0a7a8a); }
+.shop-item__art[data-banner="shurima"] { --swatch: linear-gradient(180deg, #ffd56a, #8a5a10); }
+.shop-item__art[data-banner="noxus"] { --swatch: linear-gradient(180deg, #ff6a7a, #5a0a14); }
+.shop-item__art[data-banner="freljord"] { --swatch: linear-gradient(180deg, #e8f8ff, #4a7aa0); }
+.shop-item__art[data-banner="targon"] { --swatch: linear-gradient(180deg, #cdb0ff, #3a1a6a); }
+.shop-item__art[data-banner="ionia"] { --swatch: linear-gradient(180deg, #ffb0dc, #6a1a4a); }
+/* bannière choisie : cadre de la place du joueur dans le salon */
+.banner--filled[data-banner="hextech"] { --frame: #2ad8d0; }
+.banner--filled[data-banner="shurima"] { --frame: #f0c040; }
+.banner--filled[data-banner="noxus"] { --frame: #e84057; }
+.banner--filled[data-banner="freljord"] { --frame: #bfe6ff; }
+.banner--filled[data-banner="targon"] { --frame: #b78cff; }
+.banner--filled[data-banner="ionia"] { --frame: #ff8ac8; }
+.banner--filled:not([data-banner="default"]) .banner__panel { box-shadow: inset 0 0 40px color-mix(in srgb, var(--frame) 18%, transparent), 0 12px 30px rgba(0, 0, 0, 0.5); }
+.pawn-picker__option.is-locked img { filter: grayscale(0.9) brightness(0.55); }
+.pawn-picker__price { display: block; font-size: 10px; color: #c8aa6e; margin-top: 2px; }
+@media (max-width: 760px) { .shop-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

@@ -37,6 +37,19 @@ TEST_3D=1 npm run test:browser    # + chargement du plateau 3D (plus lent)
 
 `CHROMIUM_PATH=/chemin/vers/chromium` permet d'utiliser un Chromium déjà installé.
 
+## Profil, Essence bleue et boutique
+
+- **Essence bleue (EB)** gagnée en fin de partie selon la place : 1 000 pour le vainqueur, 500 pour
+  le 2ᵉ, 300 pour le 3ᵉ, 150 ensuite (moitié contre l'IA). Expérience et niveau (toutes les 600 XP).
+- **Boutique** (porte-monnaie en haut, ou carte « Boutique ») : pions à débloquer (« champions »,
+  3 150 à 6 300 EB, ~4 800 en moyenne), icônes d'invocateur (450 EB), bannières de salon (1 350 EB).
+  Cinq pions sont offerts (classique, Poro, Sbire, Balise, Œuf d'Anivia).
+- **Collection** (onglet du haut ou carte « Collection ») : pions, skins débloqués en jouant,
+  icônes et bannières ; on y choisit son icône et sa bannière.
+- **Contre l'IA** (deux bots Normal) et **Entraînement** (un bot Facile, sans chrono) : un clic
+  dans la barre de l'accueil prépare le salon.
+- Valeurs dans `backend/profile.js`.
+
 ## Bots, chrono, pouvoirs et événements
 
 - **Bots** : dans le salon, le chef remplit une place libre avec un bot **Facile**, **Normal** ou
@@ -103,6 +116,7 @@ la liste des noms est dans `LISEZMOI.txt`. Elles remplacent les dessins par déf
 | `backend/game.js` | règles : plateau, cartes, loyers, constructions et réserve de la banque, hypothèques, échanges, faillite, statistiques |
 | `backend/features.js` | sorts, objets, quêtes, pouvoirs des pions, événements, skins, règles maison |
 | `backend/bot.js` | bots (Facile, Normal, Difficile) |
+| `backend/profile.js` | profil : Essence bleue, niveau, boutique, collection |
 | `backend/server.js` | serveur Express + Socket.io : comptes, amis, salons, bots, chrono, parties, sauvegarde |
 | `frontend/js/main.js`, `lobby.js` | client : connexion, accueil, salon |
 | `frontend/js/game.js` | écran de jeu (actions, journal, échanges, fin de partie, sons) |

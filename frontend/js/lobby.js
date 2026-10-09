@@ -71,6 +71,7 @@
   }
   // L'icône ou le pseudo peuvent arriver après le premier état du salon
   document.addEventListener('app:login', renderLobby);
+  document.addEventListener('app:profile', renderLobby); // pion acheté : il devient disponible
 
   let shownPlayers = new Set(); // pour n'animer que les nouveaux arrivants
 
@@ -102,13 +103,14 @@
     el.classList.toggle('is-owner', player.isOwner);
     el.classList.toggle('is-disconnected', !player.connected);
     el.classList.toggle('is-bot', Boolean(player.bot));
+    el.dataset.banner = player.banner || 'default';
 
     $('.banner__name-text', el).textContent = player.name;
     $('.banner__crown', el).hidden = !player.isOwner;
     const status = $('.banner__status', el);
     status.textContent = player.bot
       ? `Bot · ${lobby.botLevels?.[player.bot] || player.bot}`
-      : !player.connected ? 'Reconnexion…' : titleFor(player.name);
+      : !player.connected ? 'Reconnexion…' : `${player.level ? `Niv. ${player.level} · ` : ''}${titleFor(player.name)}`;
     status.title = player.isOwner ? 'Chef du salon' : '';
     const removeBot = $('.banner__remove-bot', el);
     removeBot.hidden = !player.bot || !isOwner() || lobby.status !== 'lobby';
@@ -463,15 +465,26 @@
       li.tabIndex = 0;
       li.setAttribute('aria-selected', String(id === pawn));
       const owner = takenBy.get(id);
-      if (owner) li.setAttribute('aria-disabled', 'true');
+      const locked = App.profile && !App.profile.collection?.pawns?.includes(id);
+      if (owner || locked) li.setAttribute('aria-disabled', 'true');
+      if (locked) {
+        li.classList.add('is-locked');
+        li.dataset.price = App.catalog?.pawns?.[id] ?? '';
+      }
       const pv = lobby.rules?.passives !== false ? lobby.passives?.[id] : null;
-      li.title = owner ? `${PAWN_LABELS[id]} — pris par ${owner}` : `${PAWN_LABELS[id]}${pv ? ` — ${pv.name} : ${pv.text}` : ''}`;
+      li.title = locked ? `${PAWN_LABELS[id]} — à débloquer dans la boutique (${new Intl.NumberFormat('fr-FR').format(App.catalog?.pawns?.[id] ?? 0)} Essence bleue)`
+        : owner ? `${PAWN_LABELS[id]} — pris par ${owner}` : `${PAWN_LABELS[id]}${pv ? ` — ${pv.name} : ${pv.text}` : ''}`;
       const img = document.createElement('img');
       img.src = pawnImage(id);
       img.alt = '';
       const label = document.createElement('span');
       label.textContent = PAWN_LABELS[id];
-      if (pv) {
+      if (locked) {
+        const small = document.createElement('small');
+        small.className = 'pawn-picker__price';
+        small.textContent = `🔒 ${new Intl.NumberFormat('fr-FR').format(App.catalog?.pawns?.[id] ?? 0)} EB`;
+        label.append(small);
+      } else if (pv) {
         const small = document.createElement('small');
         small.className = 'pawn-picker__passive';
         small.textContent = pv.text;
@@ -768,6 +781,12 @@
   }
 
   function choosePawn(option) {
+    if (option.classList.contains('is-locked')) {
+      closePawnPickers();
+      App.toast(option.title, 'info');
+      document.querySelector('[data-action="shop"]')?.click(); // ouvre la boutique
+      return;
+    }
     if (option.getAttribute('aria-disabled') === 'true') {
       App.toast(option.title, 'info');
       return;

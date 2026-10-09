@@ -115,10 +115,10 @@
         </div>
 
         <div class="wallet">
-          <span class="wallet__row" title="PO (pièces d’or)">
-            <span class="wallet__icon wallet__icon--gold" aria-hidden="true"></span>
-            <span class="wallet__value" id="gold-balance">1500</span>
-            <span class="wallet__label">PO</span>
+          <span class="wallet__row" title="Essence bleue : se gagne en fin de partie, achète des pions, icônes et bannières" data-action="shop">
+            <span class="wallet__icon wallet__icon--be" aria-hidden="true"></span>
+            <span class="wallet__value" id="gold-balance">0</span>
+            <span class="wallet__label">EB</span>
           </span>
           <span class="wallet__row" title="Victoires">
             <span class="wallet__icon wallet__icon--wins" aria-hidden="true"></span>
@@ -160,8 +160,8 @@
 
           <nav class="subnav" aria-label="Type de partie">
             <a class="subnav__tab is-active" href="#" aria-current="page">Privée</a>
-            <a class="subnav__tab" href="#" aria-disabled="true">Contre l'IA</a>
-            <a class="subnav__tab" href="#" aria-disabled="true">Entraînement</a>
+            <a class="subnav__tab" href="#" data-quick="ai" title="Un salon avec deux bots Normal, prêt à lancer">Contre l'IA</a>
+            <a class="subnav__tab" href="#" data-quick="practice" title="Toi contre un bot Facile, sans chrono">Entraînement</a>
             <span class="subnav__sep" aria-hidden="true"></span>
             <a class="subnav__tab" href="#" data-mode-shortcut="create">Créer une partie perso.</a>
             <a class="subnav__tab" href="#" data-mode-shortcut="join">Rejoindre une partie perso.</a>
@@ -227,8 +227,8 @@
                 <!-- haut-de-forme, le pion le plus célèbre du Monopoly -->
                 <path class="emblem__glyph" fill-rule="evenodd" d="M29.5 24.5c0-2.2 4.9-3.8 10.5-3.8s10.5 1.6 10.5 3.8V46h-21zM29.5 38h21v4.5h-21zM19 50.5c0-3.4 9.4-5.8 21-5.8s21 2.4 21 5.8-9.4 6-21 6-21-2.6-21-6z"/>
               </svg>
-              <span class="mode-card__tag">Collection</span>
-              <span class="mode-card__title">Skin</span>
+              <span class="mode-card__tag">Skins et icônes</span>
+              <span class="mode-card__title">Collection</span>
             </button>
 
             <button class="mode-card mode-card--separated" type="button" role="radio" aria-checked="false" data-mode="shop">
@@ -236,7 +236,7 @@
                 <path class="emblem__solid" fill-rule="evenodd" d="M8 34C8 21 20 13 40 13s32 8 32 21zM6 38h68v32H6zM20 38h5v32h-5zM55 38h5v32h-5zM20 17.6l5-1.6V34h-5zM55 16l5 1.6V34h-5zM34 44h12v12H34z"/>
                 <path class="emblem__bevel" fill-rule="evenodd" d="M8 34C8 21 20 13 40 13s32 8 32 21zM6 38h68v32H6zM20 38h5v32h-5zM55 38h5v32h-5zM20 17.6l5-1.6V34h-5zM55 16l5 1.6V34h-5zM34 44h12v12H34z"/>
               </svg>
-              <span class="mode-card__tag">PO</span>
+              <span class="mode-card__tag">Essence bleue</span>
               <span class="mode-card__title">Boutique</span>
             </button>
 
@@ -264,9 +264,14 @@
                   <span class="variant__text">Règles complètes, Baron Nashor au 3ᵉ tour</span>
                 </label>
                 <label class="variant">
+                  <input type="radio" name="variant" value="aram">
+                  <span class="variant__title">Abîme Hurlant</span>
+                  <span class="variant__text">Plateau ARAM de 28 cases, enneigé et plus rapide</span>
+                </label>
+                <label class="variant">
                   <input type="radio" name="variant" value="quick">
                   <span class="variant__title">Partie rapide</span>
-                  <span class="variant__text">PO de départ doublées, parties plus courtes</span>
+                  <span class="variant__text">2 000 PO au départ, 20 tours : le plus riche gagne</span>
                 </label>
               </div>
             </div>
@@ -285,7 +290,8 @@
 
             <div class="mode-details__panel" data-panel="skin" hidden>
               <p class="mode-details__text">
-                Choisis ton icône d'invocateur et le pion qui te représentera sur le plateau.
+                Ta collection : pions, skins débloqués en jouant, icônes d'invocateur et bannières.
+                Choisis ton icône et ta bannière ici ; ton pion et son skin se choisissent dans le salon.
               </p>
             </div>
 
@@ -297,12 +303,13 @@
 
             <div class="mode-details__panel" data-panel="shop" hidden>
               <p class="mode-details__text">
-                Dépense les PO gagnées en partie pour débloquer de nouveaux pions, icônes et bannières.
+                Dépense l’Essence bleue gagnée en partie pour débloquer de nouveaux pions (« champions »),
+                des icônes et des bannières.
               </p>
               <ul class="shop-categories">
-                <li class="shop-category"><span class="shop-category__title">Pions</span><span class="shop-category__text">Ton champion sur le plateau</span></li>
-                <li class="shop-category"><span class="shop-category__title">Icônes</span><span class="shop-category__text">Ton avatar d'invocateur</span></li>
-                <li class="shop-category"><span class="shop-category__title">Bannières</span><span class="shop-category__text">La couleur de ta place au salon</span></li>
+                <li class="shop-category"><span class="shop-category__title">Pions</span><span class="shop-category__text">Ton champion sur le plateau, 3 150 à 6 300 EB</span></li>
+                <li class="shop-category"><span class="shop-category__title">Icônes</span><span class="shop-category__text">Ton avatar d'invocateur, 450 EB</span></li>
+                <li class="shop-category"><span class="shop-category__title">Bannières</span><span class="shop-category__text">Le cadre de ta place au salon, 1 350 EB</span></li>
               </ul>
             </div>
           </div>
@@ -584,22 +591,24 @@
 
   <!-- Skin (icône d'invocateur + pion) -->
   <dialog class="modal modal--wide hextech-frame" id="modal-skin" aria-labelledby="modal-skin-title">
-    <form method="dialog" class="modal__body" id="skin-form">
-      <h2 class="modal__title" id="modal-skin-title">Skin</h2>
-      <fieldset class="icon-picker">
-        <legend class="field__label">Icône d'invocateur</legend>
-        <div class="icon-picker__grid icon-picker__grid--tall" id="skin-icons"></div>
-      </fieldset>
-      <fieldset class="icon-picker">
-        <legend class="field__label">Pion sur le plateau</legend>
-        <!-- Rempli à l'Étape 4 -->
-        <div class="icon-picker__grid" id="skin-tokens"></div>
-      </fieldset>
-      <div class="modal__actions">
-        <button class="btn btn--secondary" type="button" data-close-modal>Annuler</button>
-        <button class="btn btn--primary" type="submit" value="confirm">Enregistrer</button>
+    <div class="modal__body">
+      <h2 class="modal__title" id="modal-skin-title">Collection</h2>
+      <div class="shop-head">
+        <div class="shop-tabs" role="tablist" id="collection-tabs">
+          <button class="shop-tabs__tab is-active" type="button" role="tab" aria-selected="true" data-collection-tab="pawns">Pions</button>
+          <button class="shop-tabs__tab" type="button" role="tab" aria-selected="false" data-collection-tab="skins">Skins</button>
+          <button class="shop-tabs__tab" type="button" role="tab" aria-selected="false" data-collection-tab="icons">Icônes</button>
+          <button class="shop-tabs__tab" type="button" role="tab" aria-selected="false" data-collection-tab="banners">Bannières</button>
+        </div>
+        <span class="collection-count" id="collection-count"></span>
       </div>
-    </form>
+      <p class="collection-hint" id="collection-hint"></p>
+      <ul class="shop-grid" id="collection-items"></ul>
+      <div class="modal__actions">
+        <button class="btn btn--secondary" type="button" data-action="shop">Boutique</button>
+        <button class="btn btn--primary" type="button" data-close-modal>Fermer</button>
+      </div>
+    </div>
   </dialog>
 
   <!-- Boutique -->
@@ -612,9 +621,9 @@
           <button class="shop-tabs__tab" type="button" role="tab" aria-selected="false" data-shop-tab="icons">Icônes</button>
           <button class="shop-tabs__tab" type="button" role="tab" aria-selected="false" data-shop-tab="banners">Bannières</button>
         </div>
-        <span class="shop-balance"><span class="wallet__icon wallet__icon--gold" aria-hidden="true"></span><span id="shop-balance">1500</span></span>
+        <span class="shop-balance" title="Essence bleue"><span class="wallet__icon wallet__icon--be" aria-hidden="true"></span><span id="shop-balance">0</span> EB</span>
       </div>
-      <!-- Rempli à l'Étape 4 : <li class="shop-item"> (image, nom, prix, bouton Acheter) -->
+      <p class="collection-hint">L’Essence bleue se gagne en fin de partie : 1 000 pour le vainqueur, 500 pour le 2ᵉ, 300 pour le 3ᵉ, 150 ensuite (moitié contre l’IA).</p>
       <ul class="shop-grid" id="shop-items"></ul>
       <div class="modal__actions">
         <button class="btn btn--secondary" type="button" data-close-modal>Fermer</button>
