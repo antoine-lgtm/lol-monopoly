@@ -486,17 +486,20 @@
             <button class="icon-btn icon-btn--add-friend" type="button" data-action="add-friend" title="Ajouter des amis">
               <span class="visually-hidden">Ajouter des amis</span>
             </button>
-            <button class="icon-btn icon-btn--folder" type="button" title="Nouveau dossier" disabled>
+            <button class="icon-btn icon-btn--folder" type="button" id="friend-folder-btn" title="Nouveau dossier">
               <span class="visually-hidden">Nouveau dossier</span>
             </button>
-            <button class="icon-btn icon-btn--sort" type="button" title="Trier" disabled>
+            <button class="icon-btn icon-btn--sort" type="button" id="friend-sort-btn" title="Trier : par statut">
               <span class="visually-hidden">Trier</span>
             </button>
-            <button class="icon-btn icon-btn--search" type="button" title="Rechercher" disabled>
+            <button class="icon-btn icon-btn--search" type="button" id="friend-search-btn" title="Rechercher" aria-expanded="false" aria-controls="friend-search-bar">
               <span class="visually-hidden">Rechercher</span>
             </button>
           </div>
         </header>
+        <div class="social__search" id="friend-search-bar" hidden>
+          <input class="social__search-input" id="friend-search" type="search" placeholder="Rechercher un ami" autocomplete="off" aria-label="Rechercher un ami">
+        </div>
 
         <div class="social__scroll">
           <!-- Demandes d'ami entrantes -->
@@ -508,7 +511,10 @@
             <ul class="friend-list" id="friend-requests"></ul>
           </details>
 
-          <details class="friend-group" open>
+          <!-- Dossiers créés par le joueur (remplis par social.js) -->
+          <div id="friend-folders"></div>
+
+          <details class="friend-group" id="friend-group-general" open>
             <summary class="friend-group__title">
               <span>Général (<span id="friends-online-count">0</span>/<span id="friends-total-count">0</span>)</span>
             </summary>
@@ -523,7 +529,7 @@
         </div>
 
         <footer class="social__footer">
-          <button class="social__footer-btn social__footer-btn--chat" type="button" title="Discussions" disabled></button>
+          <button class="social__footer-btn social__footer-btn--chat" type="button" id="dm-open" title="Discussions" aria-expanded="false" aria-controls="dm-panel"><span class="count-badge dm-badge" id="dm-unread" hidden>0</span></button>
           <button class="social__footer-btn social__footer-btn--missions" type="button" title="Missions" disabled></button>
           <button class="social__footer-btn social__footer-btn--voice" type="button" title="Vocal" disabled></button>
           <span class="social__version">v0.1</span>
@@ -538,13 +544,89 @@
        ===================================================================== -->
   <ul class="context-menu" id="context-menu" role="menu" hidden>
     <li role="none"><button class="context-menu__item" type="button" role="menuitem" data-ctx="invite">Inviter</button></li>
+    <li role="none"><button class="context-menu__item" type="button" role="menuitem" data-ctx="message">Envoyer un message</button></li>
+    <li role="none"><button class="context-menu__item" type="button" role="menuitem" data-ctx="profile">Voir le profil</button></li>
+    <li role="none"><button class="context-menu__item" type="button" role="menuitem" data-ctx="folder">Ranger dans un dossier</button></li>
+    <li role="none"><button class="context-menu__item" type="button" role="menuitem" data-ctx="promote">Donner la couronne</button></li>
     <li role="none"><button class="context-menu__item" type="button" role="menuitem" data-ctx="kick">Exclure du salon</button></li>
     <li role="none"><button class="context-menu__item context-menu__item--danger" type="button" role="menuitem" data-ctx="remove-friend">Retirer des amis</button></li>
   </ul>
 
   <!-- =====================================================================
+       DISCUSSIONS (messages privés entre amis)
+       ===================================================================== -->
+  <section class="dm-panel" id="dm-panel" hidden aria-label="Discussions">
+    <header class="dm-panel__header">
+      <button class="dm-panel__back" type="button" id="dm-back" title="Toutes les discussions" aria-label="Toutes les discussions" hidden>‹</button>
+      <img class="dm-panel__icon" id="dm-icon" src="" alt="" hidden>
+      <span class="dm-panel__title" id="dm-title">Discussions</span>
+      <button class="dm-panel__close" type="button" id="dm-close" title="Fermer" aria-label="Fermer">×</button>
+    </header>
+    <ul class="dm-panel__threads" id="dm-threads"></ul>
+    <p class="social__empty" id="dm-threads-empty" hidden>Ajoute des amis pour discuter avec eux.</p>
+    <ol class="dm-panel__messages" id="dm-messages" hidden></ol>
+    <form class="dm-panel__form" id="dm-form" hidden>
+      <input class="dm-panel__input" id="dm-input" type="text" maxlength="300" placeholder="Écris un message…" autocomplete="off" aria-label="Message privé">
+      <button class="dm-panel__send" type="submit" aria-label="Envoyer">➤</button>
+    </form>
+  </section>
+
+  <!-- =====================================================================
        MODALES
        ===================================================================== -->
+
+  <!-- Profil détaillé (le sien ou celui d'un ami) -->
+  <dialog class="modal modal--wide hextech-frame" id="modal-profile" aria-labelledby="profile-card-name">
+    <form method="dialog" class="modal__body profile-card" id="profile-card">
+      <header class="profile-card__head">
+        <div class="summoner-icon summoner-icon--profile profile-card__icon">
+          <img class="summoner-icon__img" id="profile-card-icon" src="" alt="">
+          <span class="summoner-icon__level" id="profile-card-level">1</span>
+        </div>
+        <div>
+          <h2 class="modal__title profile-card__name" id="profile-card-name"></h2>
+          <p class="profile-card__presence" id="profile-card-presence"></p>
+        </div>
+      </header>
+      <div class="profile-card__stats" id="profile-card-stats"></div>
+      <div class="profile-card__cols">
+        <section>
+          <h3 class="profile-card__h">Plateaux</h3>
+          <ul class="profile-card__boards" id="profile-card-boards"></ul>
+          <h3 class="profile-card__h">Pion préféré</h3>
+          <div class="profile-card__pawn" id="profile-card-pawn"></div>
+        </section>
+        <section>
+          <h3 class="profile-card__h">Dernières parties</h3>
+          <ol class="profile-card__history" id="profile-card-history"></ol>
+        </section>
+      </div>
+      <h3 class="profile-card__h">Succès <span id="profile-card-ach-count"></span></h3>
+      <ul class="profile-card__achievements" id="profile-card-achievements"></ul>
+      <div class="modal__actions">
+        <button class="btn btn--primary" type="submit" value="close">Fermer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Dossier d'amis : nom + amis rangés dedans -->
+  <dialog class="modal hextech-frame" id="modal-folder" aria-labelledby="modal-folder-title">
+    <form method="dialog" class="modal__body" id="folder-form">
+      <h2 class="modal__title" id="modal-folder-title">Dossier d'amis</h2>
+      <label class="field">
+        <span class="field__label">Nom du dossier</span>
+        <input class="field__input" name="folder" type="text" maxlength="16" list="folder-names" required placeholder="Ex. : Les Frères">
+        <datalist id="folder-names"></datalist>
+      </label>
+      <p class="field__label">Amis dans ce dossier</p>
+      <ul class="folder-friends" id="folder-friends"></ul>
+      <p class="form-error" role="alert" hidden></p>
+      <div class="modal__actions">
+        <button class="btn btn--ghost" type="button" data-close-modal>Annuler</button>
+        <button class="btn btn--primary" type="submit" value="save">Enregistrer</button>
+      </div>
+    </form>
+  </dialog>
 
   <!-- Ajouter des amis -->
   <dialog class="modal hextech-frame" id="modal-add-friend" aria-labelledby="modal-friend-title">
@@ -636,6 +718,14 @@
     <form method="dialog" class="modal__body" id="rules-form">
       <h2 class="modal__title" id="modal-rules-title">Règles de la partie</h2>
       <p class="rules__who" id="rules-who"></p>
+      <div class="presets" id="rules-presets">
+        <span class="presets__label">Préréglages</span>
+        <div class="presets__list" id="presets-list"></div>
+        <div class="presets__save">
+          <input class="field__input presets__name" id="preset-name" type="text" maxlength="20" placeholder="Nom du préréglage" aria-label="Nom du préréglage">
+          <button class="btn btn--ghost presets__save-btn" type="button" id="preset-save">Enregistrer ces règles</button>
+        </div>
+      </div>
       <div class="rules__grid">
         <label class="field field--checkbox"><input type="checkbox" name="spells"><span>Sorts d'invocateur</span></label>
         <label class="field field--checkbox"><input type="checkbox" name="quests"><span>Quêtes de rôle</span></label>
@@ -721,10 +811,21 @@
        ===================================================================== -->
   <div class="notifications" id="notifications" aria-live="assertive"></div>
 
-  <div class="match-found" id="match-found" hidden>
-    <div class="match-found__ring" aria-hidden="true"></div>
-    <p class="match-found__title">PARTIE TROUVÉE</p>
-    <p class="match-found__subtitle">Chargement du plateau…</p>
+  <div class="match-found" id="match-found" data-state="loading" hidden role="dialog" aria-modal="true" aria-labelledby="match-found-title">
+    <div class="match-found__ring" aria-hidden="true">
+      <svg class="match-found__timer" viewBox="0 0 120 120">
+        <circle class="match-found__timer-track" cx="60" cy="60" r="54"/>
+        <circle class="match-found__timer-bar" id="match-found-bar" cx="60" cy="60" r="54" pathLength="100"/>
+      </svg>
+      <span class="match-found__count" id="match-found-count"></span>
+    </div>
+    <p class="match-found__title" id="match-found-title">PARTIE TROUVÉE</p>
+    <p class="match-found__subtitle" id="match-found-subtitle">Chargement du plateau…</p>
+    <ul class="match-found__players" id="match-found-players" aria-label="Joueurs prêts"></ul>
+    <div class="match-found__actions" id="match-found-actions">
+      <button class="match-found__accept" type="button" id="match-accept">Accepter !</button>
+      <button class="match-found__decline" type="button" id="match-decline">Refuser</button>
+    </div>
   </div>
 
   <!-- Conteneur du plateau (Étape 4) -->
@@ -934,6 +1035,7 @@
         <span class="friend__name"></span>
         <span class="friend__status"></span>
       </div>
+      <span class="count-badge friend__unread" hidden></span>
     </li>
   </template>
 
@@ -989,5 +1091,6 @@
   <script src="js/lobby.js" defer></script>
   <script src="js/music.js" defer></script>
   <script src="js/game.js" defer></script>
+  <script src="js/social.js" defer></script>
 </body>
 </html>

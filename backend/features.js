@@ -122,6 +122,13 @@ const DEFAULT_RULES = {
   fountainDouble: false, // double gain en s'arrêtant pile sur la Fontaine
 };
 
+/** Préréglages tout faits, proposés à tous (le chef peut aussi enregistrer les siens). */
+const BUILTIN_PRESETS = [
+  { id: 'classic', name: 'Classique', rules: { ...DEFAULT_RULES } },
+  { id: 'aram', name: 'ARAM rapide', rules: { ...DEFAULT_RULES, board: 'aram', maxRounds: 20, turnTimer: 30 } },
+  { id: 'teams', name: 'Équipes 2v2', rules: { ...DEFAULT_RULES, teams: true, objective: true } },
+];
+
 /** Règles maison reçues du salon : on ne garde que des valeurs valides. */
 function sanitizeRules(raw = {}) {
   const rules = { ...DEFAULT_RULES };
@@ -144,5 +151,5 @@ function sanitizeSpells(list) {
 module.exports = {
   SPELLS, DEFAULT_SPELLS, ITEMS, MAX_ITEMS, QUESTS, PASSIVES, EVENTS, EVENT_EVERY, SKINS, skinUnlocked,
   SOUL_BONUS, ELDER_BONUS, BUFF_ROUNDS, HERALD_ROUND, ELDER_ROUND,
-  JUNGLE_GOLD, RECALL_GOLD, TOP_GOLD, ADC_BONUS, SUPPORT_CUT, MID_BUILD_DISCOUNT, DEFAULT_RULES, sanitizeRules, sanitizeSpells,
+  JUNGLE_GOLD, RECALL_GOLD, TOP_GOLD, ADC_BONUS, SUPPORT_CUT, MID_BUILD_DISCOUNT, DEFAULT_RULES, BUILTIN_PRESETS, sanitizeRules, sanitizeSpells,
 };

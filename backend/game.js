@@ -287,7 +287,7 @@ class Game {
     this.supply = { towers: TOWER_SUPPLY, inhibs: INHIB_SUPPLY };
     /** Statistiques de fin de partie, par joueur. */
     this.stats = Object.fromEntries(this.players.map((p) => [p.key, {
-      bought: 0, built: 0, rentEarned: 0, rentPaid: 0, trades: 0, peakWorth: this.rules.startGold, eliminatedRound: null, place: null,
+      bought: 0, built: 0, rentEarned: 0, rentPaid: 0, trades: 0, bestRent: 0, peakWorth: this.rules.startGold, eliminatedRound: null, place: null,
     }]));
     this.eliminated = 0;
     /** Échange proposé par le joueur dont c'est le tour, en attente de réponse. */
@@ -540,6 +540,7 @@ class Game {
     this.effect({ type: 'rent', key: p.key, owner: owner.key, index, amount: rent });
     this.stats[p.key].rentPaid += rent;
     this.stats[owner.key].rentEarned += rent;
+    this.stats[owner.key].bestRent = Math.max(this.stats[owner.key].bestRent || 0, rent);
     if (p.quest && p.quest.id === 'SUPP') p.quest.paid += 1;
     this.checkQuest(p);
     this.checkQuest(owner);

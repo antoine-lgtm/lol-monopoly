@@ -2597,6 +2597,7 @@
   function openBoard() {
     view.hidden = false;
     b3?.resume();
+    window.LolMusic?.setTheme?.('game');
     window.LolMusic?.setVolume((App.settings?.music ?? 35) / 100);
     window.LolMusic?.start();
     syncMusicButton();
@@ -2605,12 +2606,12 @@
   }
 
   function closeBoard() {
-    window.LolMusic?.stop();
     view.hidden = true;
     b3?.pause();
     document.body.classList.remove('in-game');
     closeInspect();
     App.showView('lobby');
+    App.lobbyMusic?.(); // retour au thème calme du client
   }
 
   let queue = Promise.resolve();

@@ -72,6 +72,12 @@ async function login(page, name, icon = 0) {
   await page.waitForFunction((n) => document.querySelector('#profile-name').textContent === n, name);
 }
 
+/** « Partie trouvée » : le joueur accepte (le chef qui lance a déjà accepté). */
+async function acceptMatch(page) {
+  await page.waitForSelector('#match-found[data-state="ready"]:not([hidden])');
+  await page.click('#match-accept');
+}
+
 /** Deux joueurs, un salon, la partie lancée par le chef. */
 async function startGame(port, [nameA, nameB], options) {
   const a = await openPlayer(port, nameA, options);
@@ -86,6 +92,7 @@ async function startGame(port, [nameA, nameB], options) {
   await b.click('#home-confirm');
   await a.waitForSelector(`.banner--filled[data-name="${nameB}"]`);
   await a.click('#find-match');
+  await acceptMatch(b);
   await a.waitForSelector('#board-view:not([hidden])');
   await b.waitForSelector('#board-view:not([hidden])');
   return { a, b, code };
@@ -119,6 +126,7 @@ test.describe('dans le navigateur', { skip }, () => {
     await b.waitForFunction(() => [...document.querySelectorAll('.chat__text')].some((t) => t.textContent === 'gl <b>hf</b>'));
     assert.equal(await b.isDisabled('#find-match'), true, 'seul le chef lance la partie');
     await a.click('#find-match');
+    await acceptMatch(b);
     await b.waitForSelector('#board-view:not([hidden])');
     noErrors(a, b);
   });
@@ -207,6 +215,7 @@ test.describe('dans le navigateur', { skip }, () => {
     await b.click('#home-confirm');
     await a.waitForSelector('.banner--filled[data-name="Olaf"]');
     await a.click('#find-match');
+    await acceptMatch(b);
     await a.waitForSelector('#board-view:not([hidden])');
     assert.equal(await a.$$eval('.gv-sq', (els) => els.length), 28, 'plateau de 28 cases');
     // Espace : lancer les dés
@@ -220,6 +229,93 @@ test.describe('dans le navigateur', { skip }, () => {
     assert.equal(res.ok, false);
     await a.click('.gv-pause .gv-btn--primary');
     await b.waitForSelector('#gv-pause', { state: 'hidden' });
+    noErrors(a, b);
+  });
+
+  test('salon : refuser la partie, couronne, messages privés hors ligne, profil, préréglages, dossiers', async () => {
+    const a = await openPlayer(PORT, 'Lulu');
+    let b = await openPlayer(PORT, 'Malzahar');
+    await login(a, 'Lulu', 0);
+    await login(b, 'Malzahar', 2);
+    const emit = (page, event, payload) => page.evaluate(([e, p]) => new Promise((r) => App.socket.emit(e, p, r)), [event, payload]);
+    await emit(a, 'friends:add', { name: 'Malzahar' });
+    assert.equal((await emit(b, 'friends:add', { name: 'Lulu' })).accepted, true);
+    await a.waitForSelector('.friend[data-name="Malzahar"]');
+
+    // message privé hors ligne : livré à la connexion, avec le compteur de non-lus
+    await b.context().close();
+    await a.waitForSelector('.friend[data-name="Malzahar"][data-status="offline"]');
+    await a.click('.friend[data-name="Malzahar"]', { button: 'right' });
+    await a.click('[data-ctx="message"]');
+    await a.fill('#dm-input', 'tu joues ce soir ?');
+    await a.press('#dm-input', 'Enter');
+    await a.waitForFunction(() => [...document.querySelectorAll('.dm-msg--self .dm-msg__text')].some((t) => t.textContent === 'tu joues ce soir ?'));
+    b = await openPlayer(PORT, 'Malzahar');
+    await login(b, 'Malzahar', 2);
+    await b.waitForSelector('#dm-unread:not([hidden])');
+    assert.equal(await b.textContent('#dm-unread'), '1');
+    await b.click('#dm-open');
+    await b.click('.dm-thread');
+    await b.waitForFunction(() => [...document.querySelectorAll('.dm-msg__text')].some((t) => t.textContent === 'tu joues ce soir ?'));
+    await b.waitForSelector('#dm-unread', { state: 'hidden' });
+    await b.fill('#dm-input', 'oui !');
+    await b.press('#dm-input', 'Enter');
+    await a.waitForFunction(() => [...document.querySelectorAll('.dm-msg:not(.dm-msg--self) .dm-msg__text')].some((t) => t.textContent === 'oui !'));
+    await b.click('#dm-close');
+    await a.click('#dm-close');
+
+    // salon à deux : Malzahar refuse la partie, tout le monde revient au salon
+    await a.click('#home-confirm');
+    await a.waitForFunction(() => /^[A-Z0-9]{6}$/.test(document.querySelector('#tab-room-code').textContent));
+    const code = await a.textContent('#tab-room-code');
+    await b.click('.mode-card[data-mode="join"]');
+    await b.fill('#join-lobby-code', code);
+    await b.click('#home-confirm');
+    await a.waitForSelector('.banner--filled[data-name="Malzahar"]');
+    await a.click('#find-match');
+    await a.waitForSelector('#match-found[data-state="accepted"]:not([hidden])');
+    await b.waitForSelector('#match-found[data-state="ready"]:not([hidden])');
+    await b.click('#match-decline');
+    await a.waitForSelector('#match-found', { state: 'hidden' });
+    await a.waitForFunction(() => [...document.querySelectorAll('.chat__text')].some((t) => /Malzahar a refusé la partie/.test(t.textContent)));
+    assert.equal(await a.isHidden('#board-view'), true, 'pas de partie lancée');
+    await a.waitForSelector('#find-match:not([disabled])');
+
+    // couronne : Lulu la donne à Malzahar (clic droit sur sa bannière)
+    await a.click('.banner--filled[data-name="Malzahar"]', { button: 'right' });
+    await a.click('[data-ctx="promote"]');
+    await b.waitForSelector('#find-match:not([disabled])');
+    assert.equal(await a.isDisabled('#find-match'), true);
+
+    // préréglages : le nouveau chef applique « ARAM rapide », puis enregistre ses règles
+    await b.evaluate(() => App.openRules());
+    await b.click('.preset__apply >> text=ARAM rapide');
+    await b.waitForFunction(() => App.lobby.rules.board === 'aram' && App.lobby.rules.maxRounds === 20);
+    await b.fill('#preset-name', 'Soirée');
+    await b.click('#preset-save');
+    await b.waitForSelector('.preset--mine .preset__apply >> text=Soirée');
+    assert.equal((await b.evaluate(() => App.profile.presets.length)), 1);
+    await b.click('#modal-rules .modal__actions .btn--primary');
+
+    // profil d'un ami (clic droit sur la bannière)
+    await a.click('.banner--filled[data-name="Malzahar"]', { button: 'right' });
+    await a.click('[data-ctx="profile"]');
+    await a.waitForSelector('#modal-profile[open]');
+    assert.equal(await a.textContent('#profile-card-name'), 'Malzahar');
+    assert.ok(await a.$$eval('.achievement', (els) => els.length) >= 5);
+    await a.click('#modal-profile .modal__actions .btn--primary');
+
+    // dossier d'amis et recherche
+    await a.click('.friend[data-name="Malzahar"]', { button: 'right' });
+    await a.click('[data-ctx="folder"]');
+    await a.fill('#folder-form input[name="folder"]', 'Duo');
+    await a.click('#folder-form button[value="save"]');
+    await a.waitForSelector('#friend-folders [data-folder="Duo"] .friend[data-name="Malzahar"]');
+    await a.click('#friend-search-btn');
+    await a.fill('#friend-search', 'zzz');
+    await a.waitForSelector('#friends-empty:not([hidden])');
+    await a.fill('#friend-search', 'malz');
+    await a.waitForSelector('#friends-empty', { state: 'hidden' });
     noErrors(a, b);
   });
 

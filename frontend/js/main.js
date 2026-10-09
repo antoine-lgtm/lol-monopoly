@@ -151,6 +151,85 @@
     } catch { /* audio indisponible : tant pis */ }
   };
 
+  /**
+   * Sons du client (générés, sans fichier), au volume des paramètres :
+   * click, join (quelqu'un arrive), found (partie trouvée), accept, cancel, message, friend.
+   */
+  App.sound = (kind) => {
+    const volume = App.settings.volume / 100;
+    if (!volume) return;
+    try {
+      const ctx = App.audio ?? (App.audio = new AudioContext());
+      if (ctx.state === 'suspended') ctx.resume();
+      const now = ctx.currentTime;
+      const tone = (freq, start, dur, gainValue, type = 'sine', slideTo = null) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, now + start);
+        if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, now + start + dur);
+        gain.gain.setValueAtTime(0, now + start);
+        gain.gain.linearRampToValueAtTime(gainValue * volume, now + start + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + start + dur);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now + start);
+        osc.stop(now + start + dur + 0.02);
+      };
+      const bell = (freq, start, dur, g) => {
+        tone(freq, start, dur, g);
+        tone(freq * 2.76, start, dur * 0.5, g * 0.3);
+      };
+      switch (kind) {
+        case 'click': // petit clic hextech
+          tone(1800, 0, 0.05, 0.04, 'triangle', 1200);
+          break;
+        case 'join': // un invocateur rejoint le salon
+          bell(660, 0, 0.5, 0.07);
+          bell(990, 0.1, 0.6, 0.06);
+          break;
+        case 'found': // « Partie trouvée » : gong grave puis accord qui monte
+          tone(98, 0, 1.6, 0.16, 'sine');
+          tone(147, 0, 1.4, 0.08, 'triangle');
+          [587, 740, 880, 1175].forEach((f, i) => bell(f, 0.15 + i * 0.09, 1.2, 0.05));
+          break;
+        case 'accept':
+          bell(880, 0, 0.4, 0.07);
+          bell(1320, 0.08, 0.5, 0.06);
+          bell(1760, 0.16, 0.6, 0.05);
+          break;
+        case 'cancel':
+          tone(440, 0, 0.25, 0.07, 'triangle', 300);
+          tone(330, 0.15, 0.35, 0.06, 'triangle', 220);
+          break;
+        case 'message': // message privé reçu
+          bell(1175, 0, 0.35, 0.06);
+          bell(1568, 0.07, 0.45, 0.05);
+          break;
+        case 'friend': // un ami se connecte
+          bell(784, 0, 0.45, 0.05);
+          bell(1047, 0.12, 0.55, 0.05);
+          break;
+        default:
+          break;
+      }
+    } catch { /* audio indisponible : tant pis */ }
+  };
+  // Clic discret sur les boutons du client (pas sur le plateau, qui a ses propres sons)
+  document.addEventListener('click', (event) => {
+    if (!App.me || document.body.classList.contains('in-game')) return;
+    if (event.target.closest('button, .mode-card, .subnav__tab, .topbar__tab, [role="tab"]')) App.sound('click');
+  }, true);
+
+  /** Musique du client (thème calme du salon), relancée après chaque partie. */
+  App.lobbyMusic = () => {
+    const music = window.LolMusic;
+    if (!music || document.body.classList.contains('in-game')) return;
+    music.setTheme?.('lobby');
+    music.setIntensity(0);
+    music.setVolume((App.settings.music ?? 35) / 100);
+    music.start();
+  };
+
   socket.on('notify', ({ level, message }) => App.toast(message, level));
 
   // ---------------------------------------------------------------------------
@@ -216,6 +295,7 @@
     store.set(STORAGE_SETTINGS, App.settings);
     applySettings();
     document.dispatchEvent(new CustomEvent('lolm:settings', { detail: App.settings }));
+    App.lobbyMusic();
     App.toast('Paramètres enregistrés.', 'success');
   });
 
@@ -267,6 +347,7 @@
       renderProfile();
       renderWallet();
       document.dispatchEvent(new CustomEvent('app:login', { detail: App.me }));
+      App.lobbyMusic();
     });
   }
 
@@ -498,6 +579,7 @@
     classic: 'Pion classique', poro: 'Poro', minion: 'Sbire', ward: 'Balise', egg: 'Œuf d’Anivia',
     teemo: 'Champignon de Teemo', blade: 'Lame de Doran', zhonya: 'Sablier de Zhonya', tibbers: 'Tibbers',
   };
+  App.PAWN_NAMES = PAWN_NAMES;
   const BANNER_NAMES = { default: 'Classique', hextech: 'Hextech', shurima: 'Shurima', noxus: 'Noxus', freljord: 'Freljord', targon: 'Targon', ionia: 'Ionia' };
   const owned = (kind, id) => Boolean(App.profile?.collection?.[kind]?.includes(id));
 
@@ -683,10 +765,29 @@
   const tplFriend = $('#tpl-friend');
   const tplRequest = $('#tpl-friend-request');
 
-  function renderFriends({ friends, requests }) {
+  // Recherche, tri et dossiers (rangement personnel) : réglés par social.js
+  const FRIEND_SORTS = { status: 'par statut', name: 'par nom', level: 'par niveau' };
+  App.friendView = { query: '', sort: FRIEND_SORTS[store.get('lolm.friendSort', 'status')] ? store.get('lolm.friendSort', 'status') : 'status' };
+  App.FRIEND_SORTS = FRIEND_SORTS;
+  App.setFriendSort = (sort) => {
+    App.friendView.sort = sort;
+    store.set('lolm.friendSort', sort);
+    renderFriends();
+  };
+  const closedFolders = new Set(store.get('lolm.closedFolders', []));
+  let lastFriends = { friends: [], requests: [] };
+
+  function renderFriends(data = lastFriends) {
+    lastFriends = data;
+    const { friends, requests } = data;
     App.friends = friends;
-    const online = friends.filter((f) => f.status !== 'offline').sort((a, b) => a.name.localeCompare(b.name));
-    const offline = friends.filter((f) => f.status === 'offline').sort((a, b) => a.name.localeCompare(b.name));
+    const { query, sort } = App.friendView;
+    const q = query.trim().toLowerCase();
+    const shown = friends.filter((f) => !q || f.name.toLowerCase().includes(q));
+    const byName = (a, b) => a.name.localeCompare(b.name);
+    const compare = sort === 'name' ? byName
+      : sort === 'level' ? (a, b) => (b.level || 1) - (a.level || 1) || byName(a, b)
+        : (a, b) => (a.status === 'offline') - (b.status === 'offline') || byName(a, b);
 
     const build = (friend) => {
       const li = tplFriend.content.firstElementChild.cloneNode(true);
@@ -694,17 +795,57 @@
       li.dataset.status = friend.status;
       li.draggable = friend.status !== 'offline';
       $('.friend__name', li).textContent = friend.name;
-      $('.friend__status', li).textContent = friend.label;
+      $('.friend__status', li).textContent = friend.level ? `${friend.label} · Niv. ${friend.level}` : friend.label;
       const img = $('.summoner-icon__img', li);
       img.src = App.iconUrl(friend.icon);
       img.alt = '';
+      const unread = $('.friend__unread', li);
+      unread.hidden = !friend.unread;
+      unread.textContent = friend.unread || '';
+      unread.title = friend.unread ? `${friend.unread} message${friend.unread > 1 ? 's' : ''} non lu${friend.unread > 1 ? 's' : ''}` : '';
       return li;
     };
-    $('#friends-online').replaceChildren(...online.map(build));
-    $('#friends-offline').replaceChildren(...offline.map(build));
-    $('#friends-online-count').textContent = online.length;
-    $('#friends-total-count').textContent = friends.length;
-    $('#friends-empty').hidden = friends.length > 0;
+
+    // Dossiers du joueur, puis « Général » (les amis sans dossier)
+    const folderNames = [...new Set(friends.map((f) => f.folder).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    App.friendFolders = folderNames;
+    const folderNodes = folderNames.map((folder) => {
+      const members = shown.filter((f) => f.folder === folder).sort(compare);
+      const all = friends.filter((f) => f.folder === folder);
+      const details = document.createElement('details');
+      details.className = 'friend-group friend-group--folder';
+      details.dataset.folder = folder;
+      details.open = !closedFolders.has(folder);
+      details.hidden = Boolean(q) && !members.length;
+      details.addEventListener('toggle', () => {
+        if (details.open) closedFolders.delete(folder);
+        else closedFolders.add(folder);
+        store.set('lolm.closedFolders', [...closedFolders]);
+      });
+      const summary = document.createElement('summary');
+      summary.className = 'friend-group__title';
+      const label = document.createElement('span');
+      label.textContent = `${folder} (${all.filter((f) => f.status !== 'offline').length}/${all.length})`;
+      summary.append(label);
+      const ul = document.createElement('ul');
+      ul.className = 'friend-list';
+      ul.append(...members.map(build));
+      details.append(summary, ul);
+      return details;
+    });
+    $('#friend-folders').replaceChildren(...folderNodes);
+
+    const general = shown.filter((f) => !f.folder).sort(compare);
+    const generalAll = friends.filter((f) => !f.folder);
+    const split = sort === 'status';
+    $('#friends-online').replaceChildren(...(split ? general.filter((f) => f.status !== 'offline') : general).map(build));
+    $('#friends-offline').replaceChildren(...(split ? general.filter((f) => f.status === 'offline') : []).map(build));
+    $('#friends-online-count').textContent = generalAll.filter((f) => f.status !== 'offline').length;
+    $('#friends-total-count').textContent = generalAll.length;
+    const empty = $('#friends-empty');
+    empty.hidden = friends.length > 0 && (!q || shown.length > 0);
+    if (!friends.length) empty.innerHTML = 'Aucun ami pour l\'instant.<br>Clique sur <strong>+</strong> pour en ajouter.';
+    else empty.textContent = `Aucun ami ne correspond à « ${query.trim()} ».`;
 
     const requestItems = requests.map((req) => {
       const li = tplRequest.content.firstElementChild.cloneNode(true);
@@ -719,6 +860,7 @@
 
     document.dispatchEvent(new CustomEvent('app:friends', { detail: friends }));
   }
+  App.renderFriends = () => renderFriends();
 
   socket.on('friends:update', renderFriends);
 
@@ -819,6 +961,9 @@
     const inMyLobby = App.lobby?.slots.some((s) => s.player?.name === name);
     App.openContextMenu(event.clientX, event.clientY, {
       invite: friend.dataset.status !== 'offline' && !inMyLobby ? () => App.invite?.(name) : null,
+      message: () => App.openDm?.(name),
+      profile: () => App.openProfile?.(name),
+      folder: () => App.openFolder?.(name),
       'remove-friend': () => {
         socket.emit('friends:remove', { name }, (res) => {
           if (res?.ok) App.toast(`${name} a été retiré de tes amis.`, 'info');

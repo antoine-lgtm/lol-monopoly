@@ -51,6 +51,7 @@
     const joinedAnother = previousLobbyId && lobby.id !== previousLobbyId && count > 1;
     const someoneArrived = lobby.id === previousLobbyId && count > previousPlayers && previousPlayers > 0;
     if ((joinedAnother || someoneArrived) && App.view !== 'lobby') App.showView('lobby');
+    if (someoneArrived) App.sound?.('join');
     previousLobbyId = lobby.id;
     previousPlayers = count;
 
@@ -66,6 +67,7 @@
     renderMyRoleButton(lobby);
     renderInvites(lobby);
     renderPartyCard(lobby);
+    if (!lobby.readyCheck && readyShown) hideReady();
     App.renderProfile();
     if (document.getElementById('modal-rules')?.open) fillRules();
   }
@@ -211,6 +213,10 @@
     if (lobby.status !== 'lobby') {
       button.disabled = true;
       hint.textContent = 'Partie en cours.';
+    } else if (lobby.readyCheck) {
+      button.disabled = true;
+      button.classList.add('is-searching');
+      hint.textContent = 'En attente : chacun doit accepter la partie.';
     } else if (!isOwner()) {
       button.disabled = true;
       hint.textContent = `Seul le chef du salon (${lobby.owner}) peut lancer la partie.`;
@@ -369,16 +375,25 @@
     if (name) App.invite(name, Number(banner.dataset.slot));
   });
 
-  // Clic droit sur un joueur du salon : le chef peut l'exclure
+  // Clic droit sur un joueur du salon : profil (soi et ses amis) ; le chef peut donner la couronne ou exclure
   banners.addEventListener('contextmenu', (event) => {
     const banner = event.target.closest('.banner--filled');
     if (!banner) return;
     event.preventDefault();
     const name = banner.dataset.name;
-    if (!isOwner() || name === App.me.name) return;
     const bot = banner.classList.contains('is-bot');
+    const self = name === App.me.name;
+    const friend = App.friends.some((f) => f.name === name);
+    const chief = isOwner() && !self && App.lobby?.status === 'lobby';
     App.openContextMenu(event.clientX, event.clientY, {
-      kick: () => {
+      profile: !bot && (self || friend) ? () => App.openProfile?.(name) : null,
+      message: !bot && friend ? () => App.openDm?.(name) : null,
+      promote: chief && !bot ? () => {
+        socket.emit('lobby:promote', { name }, (res) => {
+          if (!res?.ok) App.toast(res?.error, 'error');
+        });
+      } : null,
+      kick: chief ? () => {
         if (bot) {
           socket.emit('lobby:removeBot', { slot: Number(banner.dataset.slot) }, (res) => {
             if (!res?.ok) App.toast(res?.error, 'error');
@@ -388,7 +403,7 @@
         socket.emit('lobby:kick', { name }, (res) => {
           if (!res?.ok) App.toast(res?.error, 'error');
         });
-      },
+      } : null,
     });
   });
 
@@ -705,6 +720,7 @@
       el.disabled = !owner;
     }
     rulesForm.elements.fountainDouble.checked = Boolean(rules.fountainDouble);
+    renderPresets(owner);
     document.getElementById('rules-who').textContent = owner
       ? 'Tu es le chef du salon : tes réglages s’appliquent à toute la partie.'
       : `Réglées par le chef du salon (${lobby.owner}).`;
@@ -745,12 +761,73 @@
       ]),
     );
   }
+  /** Préréglages : 3 tout faits + ceux du joueur (5 au maximum) ; le chef les applique d'un clic. */
+  function renderPresets(owner) {
+    const list = document.getElementById('presets-list');
+    const builtins = App.catalog?.presets || [];
+    const mine = App.profile?.presets || [];
+    const chip = (preset, removable) => {
+      const wrap = document.createElement('span');
+      wrap.className = `preset${removable ? ' preset--mine' : ''}`;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'preset__apply';
+      btn.textContent = preset.name;
+      btn.disabled = !owner;
+      btn.title = owner ? 'Appliquer ces règles au salon' : 'Seul le chef du salon peut appliquer un préréglage';
+      btn.addEventListener('click', () => {
+        socket.emit('lobby:setRules', { rules: preset.rules }, (res) => {
+          if (!res?.ok) return App.toast(res?.error || 'Réglage impossible.', 'error');
+          App.toast(`Préréglage « ${preset.name} » appliqué.`, 'success', 2500);
+        });
+      });
+      wrap.append(btn);
+      if (removable) {
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'preset__delete';
+        del.textContent = '×';
+        del.title = `Supprimer « ${preset.name} »`;
+        del.setAttribute('aria-label', del.title);
+        del.addEventListener('click', () => {
+          socket.emit('presets:delete', { name: preset.name }, (res) => {
+            if (!res?.ok) App.toast(res?.error, 'error');
+          });
+        });
+        wrap.append(del);
+      }
+      return wrap;
+    };
+    list.replaceChildren(...builtins.map((p) => chip(p, false)), ...mine.map((p) => chip(p, true)));
+    const full = mine.length >= (App.catalog?.maxPresets ?? 5);
+    document.getElementById('preset-name').placeholder = full ? 'Même nom = remplacer' : 'Nom du préréglage';
+  }
+  document.addEventListener('app:profile', () => {
+    if (document.getElementById('modal-rules')?.open) renderPresets(isOwner() && App.lobby?.status === 'lobby');
+  });
+  document.getElementById('preset-save').addEventListener('click', () => {
+    const input = document.getElementById('preset-name');
+    const name = input.value.trim();
+    if (!name) return input.focus();
+    socket.emit('presets:save', { name, rules: App.lobby?.rules || {} }, (res) => {
+      if (!res?.ok) return App.toast(res?.error || 'Enregistrement impossible.', 'error');
+      input.value = '';
+      App.toast(`Préréglage « ${res.preset.name} » enregistré dans ton profil.`, 'success', 2500);
+    });
+  });
+  document.getElementById('preset-name').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      document.getElementById('preset-save').click();
+    }
+  });
+
   App.openRules = () => {
     fillRules();
     App.openModal('modal-rules');
   };
-  rulesForm.addEventListener('change', () => {
-    if (!isOwner()) return;
+  rulesForm.addEventListener('change', (event) => {
+    if (!isOwner() || event.target.closest('.presets')) return;
     const el = rulesForm.elements;
     const rules = {
       spells: el.spells.checked,
@@ -948,11 +1025,88 @@
     });
   });
 
-  socket.on('lobby:matchFound', () => {
-    const overlay = $('#match-found');
+  // « Partie trouvée » : 10 s pour accepter (le chef qui lance a déjà accepté)
+  const overlay = $('#match-found');
+  let readyShown = false;
+  let readyTimer = 0;
+  let readyEnd = 0;
+  let readyTotal = 10000;
+
+  function hideReady() {
+    readyShown = false;
+    clearInterval(readyTimer);
+    overlay.hidden = true;
+  }
+
+  function tickReady() {
+    const left = Math.max(0, readyEnd - Date.now());
+    $('#match-found-count').textContent = Math.ceil(left / 1000);
+    $('#match-found-bar').style.strokeDashoffset = String(100 - (left / readyTotal) * 100);
+  }
+
+  function showReady(rc) {
+    const mine = rc.players.find((p) => p.name === App.me?.name);
+    const accepted = Boolean(mine?.accepted);
+    if (!readyShown) {
+      App.sound?.('found');
+      readyShown = true;
+    }
     overlay.hidden = false;
-    // Le plateau (game.js) s'ouvre derrière cet écran ; on le révèle après l'animation.
-    setTimeout(() => { overlay.hidden = true; }, 2600);
+    overlay.dataset.state = accepted ? 'accepted' : 'ready';
+    readyEnd = Date.now() + rc.left;
+    readyTotal = rc.total;
+    clearInterval(readyTimer);
+    tickReady();
+    readyTimer = setInterval(tickReady, 200);
+    $('#match-found-title').textContent = 'PARTIE TROUVÉE';
+    const waiting = rc.players.filter((p) => !p.accepted).length;
+    $('#match-found-subtitle').textContent = accepted
+      ? `Acceptée ! En attente de ${waiting} joueur${waiting > 1 ? 's' : ''}…`
+      : 'Accepte la partie avant la fin du compte à rebours.';
+    $('#match-found-players').replaceChildren(...rc.players.map((p) => {
+      const li = document.createElement('li');
+      li.className = `match-found__player${p.accepted ? ' is-accepted' : ''}`;
+      li.title = `${p.name}${p.accepted ? ' : prêt' : ' : en attente'}`;
+      const img = document.createElement('img');
+      img.src = App.iconUrl(p.icon);
+      img.alt = '';
+      li.append(img);
+      return li;
+    }));
+    $('#match-accept').disabled = accepted;
+    $('#match-decline').disabled = accepted;
+    if (!accepted) $('#match-accept').focus();
+  }
+
+  socket.on('lobby:readyCheck', showReady);
+  socket.on('lobby:readyCancel', ({ reason }) => {
+    if (!readyShown) return;
+    hideReady();
+    App.sound?.('cancel');
+    if (reason) App.toast(reason, 'info', 5000);
+  });
+
+  $('#match-accept').addEventListener('click', () => {
+    App.sound?.('accept');
+    socket.emit('lobby:ready', { accept: true }, (res) => {
+      if (!res?.ok) App.toast(res?.error, 'error');
+    });
+  });
+  $('#match-decline').addEventListener('click', () => {
+    socket.emit('lobby:ready', { accept: false }, (res) => {
+      if (!res?.ok) App.toast(res?.error, 'error');
+    });
+  });
+
+  socket.on('lobby:matchFound', () => {
+    // tout le monde a accepté : le plateau (game.js) s'ouvre derrière cet écran
+    clearInterval(readyTimer);
+    readyShown = false;
+    overlay.hidden = false;
+    overlay.dataset.state = 'loading';
+    $('#match-found-title').textContent = 'PARTIE TROUVÉE';
+    $('#match-found-subtitle').textContent = 'Chargement du plateau…';
+    setTimeout(() => { if (!readyShown) overlay.hidden = true; }, 2600);
   });
 
   // ---------------------------------------------------------------------------

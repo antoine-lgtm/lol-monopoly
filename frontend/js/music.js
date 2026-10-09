@@ -9,7 +9,10 @@
  * tambours, harmonie plus sombre ; 2 climax (fin de partie, joueur en danger) : basse martelée,
  * caisse claire et accents de cuivres.
  *
- * window.LolMusic.start() / stop() / setVolume(0..1) / setEnabled(bool) / setIntensity(0..2) / enabled
+ * Thème « lobby » (setTheme) : le client entre deux parties, plus lumineux et posé (Fa majeur,
+ * Fa – Do – Rém – Si♭), sans tambours de tension, harpe plus aérée.
+ *
+ * window.LolMusic.start() / stop() / setVolume(0..1) / setEnabled(bool) / setIntensity(0..2) / setTheme('game'|'lobby') / enabled
  */
 (() => {
   const STORAGE = 'lolm.music';
@@ -29,8 +32,17 @@
     { root: 46, notes: [58, 62, 65, 70] },
     { root: 45, notes: [57, 61, 64, 69] },
   ];
+  // salon : Fa – Do – Rém – Si♭ (I – V – vi – IV), lumineux et calme
+  const LOBBY = [
+    { root: 53, notes: [65, 69, 72, 77] }, // Fa
+    { root: 48, notes: [64, 67, 72, 76] }, // Do
+    { root: 50, notes: [62, 65, 69, 74] }, // Rém
+    { root: 46, notes: [62, 65, 70, 74] }, // Si♭
+  ];
+  const LOBBY_BAR = 4.8;
   const hz = (midi) => 440 * 2 ** ((midi - 69) / 12);
   let intensity = 0;
+  let theme = 'game';
 
   let ctx = null;
   let master = null;
@@ -205,7 +217,29 @@
   }
 
   /** Programme une mesure : nappe et basse au début de chaque accord, harpe et tambour. */
+  const barLength = () => (theme === 'lobby' ? LOBBY_BAR : BARS[intensity]);
+
+  /** Salon : nappe et basse douces, harpe aérée qui monte, cloche tous les 4 temps. */
+  function scheduleLobbyBar(t) {
+    const BAR = LOBBY_BAR;
+    const chord = LOBBY[Math.floor(barIndex / BARS_PER_CHORD) % LOBBY.length];
+    if (barIndex % BARS_PER_CHORD === 0) {
+      pad(chord, t, BAR * BARS_PER_CHORD);
+      bass(chord, t, BAR * BARS_PER_CHORD);
+    }
+    const steps = 6;
+    for (let k = 0; k < steps; k++) {
+      if (Math.random() < (k % 2 ? 0.25 : 0.5)) {
+        const n = chord.notes[(k + barIndex) % chord.notes.length] + (Math.random() < 0.4 ? 12 : 0);
+        harp(n, t + (k * BAR) / steps + Math.random() * 0.05, 0.03 + Math.random() * 0.02);
+      }
+    }
+    if (barIndex % 2 === 0) drum(t, 0.1);
+    barIndex += 1;
+  }
+
   function scheduleBar(t) {
+    if (theme === 'lobby') return scheduleLobbyBar(t);
     const BAR = BARS[intensity];
     const chords = intensity ? TENSE : CHORDS;
     const chord = chords[Math.floor(barIndex / BARS_PER_CHORD) % chords.length];
@@ -238,7 +272,7 @@
 
   function tick() {
     while (nextBar < ctx.currentTime + 1.5) {
-      const bar = BARS[intensity];
+      const bar = barLength();
       scheduleBar(nextBar);
       nextBar += bar;
     }
@@ -285,6 +319,13 @@
       intensity = Math.max(0, Math.min(2, Math.round(Number(level) || 0)));
     },
     get intensity() { return intensity; },
+    /** 'game' (plateau) ou 'lobby' (client) : prend effet à la mesure suivante. */
+    setTheme(name) {
+      const next = name === 'lobby' ? 'lobby' : 'game';
+      if (next !== theme) barIndex = 0;
+      theme = next;
+    },
+    get theme() { return theme; },
     setEnabled(on) {
       enabled = Boolean(on);
       try { localStorage.setItem(STORAGE, enabled ? 'on' : 'off'); } catch { /* rien */ }

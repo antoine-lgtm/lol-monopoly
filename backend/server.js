@@ -49,6 +49,9 @@ const EMOTE_COOLDOWN_MS = 1_200;
 const REPLAYS_PER_USER = 10; // parties gardées pour « Revoir »
 const REPLAY_CHUNK = 120; // états envoyés par paquet au lecteur
 const REPLAY_CACHE_MS = 10 * 60_000;
+const READY_CHECK_MS = 10_000; // « Partie trouvée » : 10 s pour accepter
+const DM_HISTORY_SIZE = 50; // messages privés gardés par conversation
+const FOLDER_NAME = /^[\p{L}\p{N} '’_.!-]{1,16}$/u;
 
 const NAME_PATTERN = /^[\p{L}\p{N} _.-]{3,16}$/u;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -138,6 +141,8 @@ const lobbyCodes = new Map();
 const replays = new Map();
 /** États rejoués, gardés un moment en mémoire : id -> { frames, at } */
 const replayCache = new Map();
+/** Messages privés : « a|b » (clés triées) -> [{ id, from, text, ts }] */
+const dms = new Map();
 
 // ---------------------------------------------------------------------------
 // Utilitaires
@@ -184,14 +189,21 @@ function presenceOf(user) {
 // Amis & présences
 // ---------------------------------------------------------------------------
 
-function serializeFriend(user) {
-  return { name: user.name, icon: user.icon, ...presenceOf(user) };
+function serializeFriend(user, viewer) {
+  return {
+    name: user.name,
+    icon: user.icon,
+    level: Profile.levelOf(user.xp || 0),
+    folder: viewer?.folders?.[user.key] || null,
+    unread: viewer?.unread?.[user.key] || 0,
+    ...presenceOf(user),
+  };
 }
 
 function sendFriendList(key) {
   const user = users.get(key);
   if (!user || !user.socketId) return;
-  const friends = [...user.friends].map((k) => users.get(k)).filter(Boolean).map(serializeFriend);
+  const friends = [...user.friends].map((k) => users.get(k)).filter(Boolean).map((f) => serializeFriend(f, user));
   const requests = [...user.incomingRequests]
     .map((k) => users.get(k))
     .filter(Boolean)
@@ -210,6 +222,25 @@ function broadcastLobbyPresence(lobby) {
   for (const slot of lobby.slots) if (slot) broadcastPresence(slot.key);
 }
 
+/** Notification d'ami (connexion, fin de partie) envoyée aux amis connectés. */
+function tellFriends(user, event, skip = new Set()) {
+  for (const friendKey of user.friends) {
+    if (skip.has(friendKey)) continue;
+    const friend = users.get(friendKey);
+    if (friend?.socketId) io.to(userRoom(friendKey)).emit('friends:event', { ...event, name: user.name, icon: user.icon });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Messages privés entre amis
+// ---------------------------------------------------------------------------
+
+const dmKey = (a, b) => [a, b].sort().join('|');
+
+function serializeDm(entry) {
+  return { id: entry.id, from: users.get(entry.from)?.name ?? entry.from, text: entry.text, ts: entry.ts };
+}
+
 // ---------------------------------------------------------------------------
 // Lobbies
 // ---------------------------------------------------------------------------
@@ -226,6 +257,7 @@ function serializeLobby(lobby) {
     status: lobby.status,
     open: lobby.open,
     owner: users.get(lobby.ownerKey)?.name ?? null,
+    readyCheck: lobby.readyCheck ? serializeReadyCheck(lobby) : null,
     maxPlayers: MAX_PLAYERS,
     minPlayers: MIN_PLAYERS_TO_START,
     roles: ROLES,
@@ -281,6 +313,97 @@ function pushChat(lobby, message) {
 
 function systemMessage(lobby, text) {
   pushChat(lobby, { type: 'system', from: null, text });
+}
+
+// ---------------------------------------------------------------------------
+// « Partie trouvée » : chaque humain accepte en 10 s (les bots acceptent toujours)
+// ---------------------------------------------------------------------------
+
+function serializeReadyCheck(lobby) {
+  const rc = lobby.readyCheck;
+  return {
+    left: Math.max(0, rc.deadline - Date.now()),
+    total: READY_CHECK_MS,
+    players: lobby.slots.filter(Boolean).map((s) => {
+      const u = users.get(s.key);
+      return { name: u.name, icon: u.icon, bot: Boolean(u.bot), accepted: rc.accepted.has(s.key) };
+    }),
+  };
+}
+
+/** Annule l'acceptation en cours : tout le monde revient au salon. */
+function cancelReadyCheck(lobby, reason) {
+  const rc = lobby.readyCheck;
+  if (!rc) return;
+  clearTimeout(rc.timer);
+  lobby.readyCheck = null;
+  if (reason) systemMessage(lobby, reason);
+  io.to(lobbyRoom(lobby.id)).emit('lobby:readyCancel', { reason: reason || null });
+  broadcastLobby(lobby);
+}
+
+function startReadyCheck(lobby, starterKey) {
+  const accepted = new Set([starterKey]);
+  for (const s of lobby.slots) if (s && isBot(s.key)) accepted.add(s.key);
+  lobby.readyCheck = { accepted, deadline: Date.now() + READY_CHECK_MS, timer: null };
+  if (lobby.slots.every((s) => !s || accepted.has(s.key))) {
+    lobby.readyCheck = null;
+    return launchGame(lobby);
+  }
+  lobby.readyCheck.timer = setTimeout(() => {
+    const missing = lobby.slots.filter((s) => s && !lobby.readyCheck?.accepted.has(s.key)).map((s) => users.get(s.key)?.name);
+    cancelReadyCheck(lobby, `${missing.join(', ')} n’${missing.length > 1 ? 'ont' : 'a'} pas accepté à temps : partie annulée.`);
+  }, READY_CHECK_MS);
+  io.to(lobbyRoom(lobby.id)).emit('lobby:readyCheck', serializeReadyCheck(lobby));
+  broadcastLobby(lobby);
+}
+
+function respondReadyCheck(lobby, user, accept) {
+  const rc = lobby.readyCheck;
+  if (!rc) return { ok: false, error: 'Aucune partie à accepter.' };
+  if (!accept) {
+    cancelReadyCheck(lobby, `${user.name} a refusé la partie : retour au salon.`);
+    return { ok: true };
+  }
+  rc.accepted.add(user.key);
+  if (lobby.slots.every((s) => !s || rc.accepted.has(s.key))) {
+    clearTimeout(rc.timer);
+    lobby.readyCheck = null;
+    launchGame(lobby);
+  } else {
+    io.to(lobbyRoom(lobby.id)).emit('lobby:readyCheck', serializeReadyCheck(lobby));
+  }
+  return { ok: true };
+}
+
+/** Tout le monde a accepté : la partie est créée. */
+function launchGame(lobby) {
+  const players = lobby.slots.filter(Boolean);
+  lobby.status = 'in-game';
+  lobby.paused = null;
+  lobby.invites.clear();
+  // Ordre de jeu : l'ordre visuel des colonnes (slots), le chef en premier
+  let order = [...players].sort((a, b) => (a.key === lobby.ownerKey ? -1 : b.key === lobby.ownerKey ? 1 : 0));
+  if (lobby.rules.teams) {
+    // 2 contre 2 : équipes équilibrées, et on alterne les équipes à chaque tour
+    balanceTeams(lobby);
+    const first = order[0].team;
+    const mine = order.filter((s) => s.team === first);
+    const theirs = order.filter((s) => s.team !== first);
+    order = [mine[0], theirs[0], mine[1], theirs[1]];
+  }
+  lobby.game = new Game(order.map((s) => {
+    const u = users.get(s.key);
+    return { key: u.key, name: u.name, icon: u.icon, pawn: s.pawn, role: s.role, spells: s.spells, skin: s.skin, bot: u.bot || null, team: s.team };
+  }), { rules: lobby.rules, seed: crypto.randomInt(2 ** 31 - 1) });
+  systemMessage(lobby, 'Partie trouvée ! Chargement de la Faille…');
+  broadcastLobby(lobby);
+  broadcastLobbyPresence(lobby);
+  io.to(lobbyRoom(lobby.id)).emit('lobby:matchFound', {
+    lobbyId: lobby.id,
+    players: players.map((s) => ({ name: users.get(s.key).name, role: s.role })),
+  });
+  broadcastGame(lobby);
 }
 
 function createLobby(ownerKey) {
@@ -387,6 +510,7 @@ function removeFromLobby(user, reason = 'left') {
 
   const index = lobby.slots.findIndex((s) => s && s.key === user.key);
   if (index !== -1) lobby.slots[index] = null;
+  if (lobby.readyCheck) cancelReadyCheck(lobby, `${user.name} a quitté le salon : partie annulée.`);
 
   // Quitter le salon pendant une partie = abandon
   if (lobby.game && lobby.status === 'in-game' && lobby.game.player(user.key)) {
@@ -402,6 +526,7 @@ function removeFromLobby(user, reason = 'left') {
   if (!remaining.some((s) => !isBot(s.key))) {
     // plus aucun humain : on ferme le salon et ses bots
     clearTimeout(lobby.autoplayTimer);
+    clearTimeout(lobby.readyCheck?.timer);
     for (const s of remaining) users.delete(s.key);
     deleteLobby(lobby);
     return;
@@ -568,9 +693,23 @@ function broadcastGame(lobby) {
       if (!u) continue;
       const won = p.key === game.winner || Boolean(game.winnerTeam && p.team === game.winnerTeam);
       const vsAi = humans.length === 1; // seul humain : partie contre l'IA (gains réduits)
-      const gain = Profile.reward(u, { place: game.stats[p.key]?.place, won, vsAi });
+      const st = game.stats[p.key] || {};
+      const gain = Profile.reward(u, {
+        place: st.place,
+        won,
+        vsAi,
+        board: game.rules.board,
+        pawn: p.pawn,
+        team: Boolean(game.rules.teams),
+        bestRent: st.bestRent || 0,
+        rentEarned: st.rentEarned || 0,
+        rounds: game.round,
+        players: game.players.filter((q) => q.key !== p.key).map((q) => q.name),
+      });
       sendProfile(u);
       notify(u.key, 'success', `Récompense : +${gain.essence} Essence bleue, +${gain.xp} XP${gain.levelUp ? ` — niveau ${gain.level} !` : ''}`);
+      // les amis qui ne jouaient pas sont prévenus
+      tellFriends(u, { type: 'gameOver', won, place: st.place ?? null }, new Set(game.players.map((q) => q.key)));
     }
     broadcastLobby(lobby);
     broadcastLobbyPresence(lobby);
@@ -670,6 +809,7 @@ io.on('connection', (socket) => {
 
     let user = users.get(key);
     if (user && user.socketId) return fail(ack, 'Ce pseudo est déjà connecté.');
+    const freshLogin = !user || !user.disconnectTimer; // F5 ou micro-coupure : pas de notification
 
     if (!user) {
       user = {
@@ -710,6 +850,11 @@ io.on('connection', (socket) => {
 
     reply(ack, { ok: true, user: { name: user.name, icon: user.icon }, roles: ROLES, profile: Profile.profileOf(user), catalog: Profile.CATALOG });
     sendFriendList(key);
+    if (freshLogin) tellFriends(user, { type: 'online' });
+    // messages reçus hors ligne
+    const unread = Object.values(user.unread).reduce((a, b) => a + b, 0);
+    if (unread && freshLogin) notify(key, 'info', `Tu as ${unread} message${unread > 1 ? 's' : ''} privé${unread > 1 ? 's' : ''} non lu${unread > 1 ? 's' : ''}.`);
+    if (lobby?.readyCheck) socket.emit('lobby:readyCheck', serializeReadyCheck(lobby));
 
     // Partie en cours : l'état part après la confirmation, pour que le client sache déjà qui il est
     if (lobby && lobby.game && lobby.status === 'in-game') {
@@ -774,8 +919,94 @@ io.on('connection', (socket) => {
     if (!target) return fail(ack, 'Invocateur introuvable.');
     me.friends.delete(target.key);
     target.friends.delete(me.key);
+    // plus amis : plus de non-lus ni de dossier l'un pour l'autre
+    for (const [a, b] of [[me, target], [target, me]]) {
+      if (a.unread) delete a.unread[b.key];
+      if (a.folders) delete a.folders[b.key];
+    }
     sendFriendList(me.key);
     sendFriendList(target.key);
+    reply(ack, { ok: true });
+  }));
+
+  // Dossiers d'amis (rangement personnel, invisible pour les autres)
+  socket.on('friends:setFolder', authed(({ name, folder }, ack) => {
+    const target = users.get(keyOf(name));
+    if (!target || !me.friends.has(target.key)) return fail(ack, 'Ami introuvable.');
+    const clean = String(folder || '').replace(/\s+/g, ' ').trim();
+    if (!clean) delete me.folders[target.key];
+    else if (!FOLDER_NAME.test(clean)) return fail(ack, 'Nom de dossier invalide (1 à 16 caractères).');
+    else me.folders[target.key] = clean;
+    sendFriendList(me.key);
+    reply(ack, { ok: true });
+  }));
+
+  // --- Messages privés -----------------------------------------------------------
+
+  socket.on('dm:send', authed(({ to, text }, ack) => {
+    const target = users.get(keyOf(to));
+    if (!target || !me.friends.has(target.key)) return fail(ack, 'Tu ne peux écrire qu’à tes amis.');
+    const clean = String(text || '').replace(/\s+/g, ' ').trim().slice(0, CHAT_MAX_LENGTH);
+    if (!clean) return fail(ack, 'Message vide.');
+    const now = Date.now();
+    me.chatTimestamps = me.chatTimestamps.filter((t) => now - t < CHAT_RATE_LIMIT.windowMs);
+    if (me.chatTimestamps.length >= CHAT_RATE_LIMIT.max) return fail(ack, 'Doucement ! Tu envoies trop de messages.');
+    me.chatTimestamps.push(now);
+
+    const key = dmKey(me.key, target.key);
+    const list = dms.get(key) || [];
+    const entry = { id: crypto.randomUUID(), from: me.key, text: clean, ts: now };
+    list.push(entry);
+    if (list.length > DM_HISTORY_SIZE) list.splice(0, list.length - DM_HISTORY_SIZE);
+    dms.set(key, list);
+    target.unread[me.key] = (target.unread[me.key] || 0) + 1; // lu quand il ouvre la conversation
+    const message = serializeDm(entry);
+    io.to(userRoom(target.key)).emit('dm:message', { with: me.name, message });
+    io.to(userRoom(me.key)).emit('dm:message', { with: target.name, message });
+    sendFriendList(target.key);
+    reply(ack, { ok: true, message });
+  }));
+
+  socket.on('dm:history', authed(({ with: other }, ack) => {
+    const target = users.get(keyOf(other));
+    if (!target || !me.friends.has(target.key)) return fail(ack, 'Ami introuvable.');
+    const hadUnread = Boolean(me.unread[target.key]);
+    delete me.unread[target.key];
+    if (hadUnread) sendFriendList(me.key);
+    reply(ack, { ok: true, with: target.name, messages: (dms.get(dmKey(me.key, target.key)) || []).map(serializeDm) });
+  }));
+
+  socket.on('dm:read', authed(({ with: other }, ack) => {
+    const target = users.get(keyOf(other));
+    if (target && me.unread[target.key]) {
+      delete me.unread[target.key];
+      sendFriendList(me.key);
+    }
+    reply(ack, { ok: true });
+  }));
+
+  // --- Profil détaillé (soi-même et ses amis) -------------------------------------
+
+  socket.on('profile:get', authed(({ name }, ack) => {
+    const target = name ? users.get(keyOf(name)) : me;
+    if (!target || target.bot) return fail(ack, 'Invocateur introuvable.');
+    if (target.key !== me.key && !me.friends.has(target.key)) return fail(ack, 'Seuls tes amis peuvent voir ce profil.');
+    reply(ack, { ok: true, profile: { ...Profile.profileCard(target), self: target.key === me.key, presence: presenceOf(target) } });
+  }));
+
+  // --- Préréglages de règles ---------------------------------------------------
+
+  socket.on('presets:save', authed(({ name, rules }, ack) => {
+    const res = Profile.savePreset(me, name, rules);
+    if (!res.ok) return fail(ack, res.error);
+    sendProfile(me);
+    reply(ack, { ok: true, preset: res.preset });
+  }));
+
+  socket.on('presets:delete', authed(({ name }, ack) => {
+    const res = Profile.deletePreset(me, String(name || ''));
+    if (!res.ok) return fail(ack, res.error);
+    sendProfile(me);
     reply(ack, { ok: true });
   }));
 
@@ -793,6 +1024,7 @@ io.on('connection', (socket) => {
     if (lobby.id === me.lobbyId) return fail(ack, 'Tu es déjà dans ce salon.');
     if (!lobby.open) return fail(ack, 'Ce salon est fermé : demande une invitation au chef.');
     if (lobby.status !== 'lobby') return fail(ack, 'Ce salon est déjà en partie.');
+    if (lobby.readyCheck) return fail(ack, 'Ce salon est en train de lancer une partie.');
     if (!lobby.slots.includes(null)) return fail(ack, 'Ce salon est complet.');
 
     removeFromLobby(me);
@@ -851,7 +1083,7 @@ io.on('connection', (socket) => {
       broadcastLobby(lobby);
       return reply(ack, { ok: true });
     }
-    if (lobby.status !== 'lobby' || !lobby.slots.includes(null)) {
+    if (lobby.status !== 'lobby' || lobby.readyCheck || !lobby.slots.includes(null)) {
       broadcastLobby(lobby);
       return fail(ack, 'Le salon n’est plus disponible.');
     }
@@ -903,6 +1135,7 @@ io.on('connection', (socket) => {
     if (!lobby) return fail(ack, 'Aucun salon.');
     if (lobby.ownerKey !== me.key) return fail(ack, 'Seul le chef du salon règle la partie.');
     if (lobby.status !== 'lobby') return fail(ack, 'La partie est déjà lancée.');
+    if (lobby.readyCheck) return fail(ack, 'Attends la fin de l’acceptation.');
     lobby.rules = sanitizeRules({ ...lobby.rules, ...(rules || {}) });
     if (lobby.rules.teams) balanceTeams(lobby);
     broadcastLobby(lobby);
@@ -973,6 +1206,7 @@ io.on('connection', (socket) => {
     if (!lobby || lobby.ownerKey !== me.key) return fail(ack, 'Seul le chef du salon ajoute des bots.');
     if (lobby.status !== 'lobby') return fail(ack, 'La partie est déjà lancée.');
     if (!BOT_LEVELS[level]) return fail(ack, 'Niveau inconnu.');
+    if (lobby.readyCheck) return fail(ack, 'Attends la fin de l’acceptation.');
     const index = Number.isInteger(slot) && lobby.slots[slot] === null ? slot : lobby.slots.indexOf(null);
     if (index === -1) return fail(ack, 'Le salon est complet.');
     const bot = addBot(lobby, level, index);
@@ -1013,32 +1247,30 @@ io.on('connection', (socket) => {
       return fail(ack, `Il faut au moins ${MIN_PLAYERS_TO_START} invocateurs pour lancer.`);
     }
     if (lobby.rules.teams && players.length !== 4) return fail(ack, 'Le mode 2 contre 2 se joue à 4 (ajoute des bots si besoin).');
+    if (lobby.readyCheck) return fail(ack, 'La partie attend déjà que tout le monde accepte.');
+    startReadyCheck(lobby, me.key);
+    reply(ack, { ok: true });
+  }));
 
-    lobby.status = 'in-game';
-    lobby.paused = null;
-    lobby.invites.clear();
-    // Ordre de jeu : l'ordre visuel des colonnes (slots), le chef en premier
-    let order = [...players].sort((a, b) => (a.key === lobby.ownerKey ? -1 : b.key === lobby.ownerKey ? 1 : 0));
-    if (lobby.rules.teams) {
-      // 2 contre 2 : équipes équilibrées, et on alterne les équipes à chaque tour
-      balanceTeams(lobby);
-      const first = order[0].team;
-      const mine = order.filter((s) => s.team === first);
-      const theirs = order.filter((s) => s.team !== first);
-      order = [mine[0], theirs[0], mine[1], theirs[1]];
-    }
-    lobby.game = new Game(order.map((s) => {
-      const u = users.get(s.key);
-      return { key: u.key, name: u.name, icon: u.icon, pawn: s.pawn, role: s.role, spells: s.spells, skin: s.skin, bot: u.bot || null, team: s.team };
-    }), { rules: lobby.rules, seed: crypto.randomInt(2 ** 31 - 1) });
-    systemMessage(lobby, 'Partie trouvée ! Chargement de la Faille…');
+  socket.on('lobby:ready', authed(({ accept }, ack) => {
+    const lobby = currentLobby(me);
+    if (!lobby) return fail(ack, 'Aucun salon.');
+    const res = respondReadyCheck(lobby, me, Boolean(accept));
+    if (!res.ok) return fail(ack, res.error);
+    reply(ack, { ok: true });
+  }));
+
+  // Donner la couronne : le chef choisit un autre joueur (humain) du salon
+  socket.on('lobby:promote', authed(({ name }, ack) => {
+    const lobby = currentLobby(me);
+    if (!lobby || lobby.ownerKey !== me.key) return fail(ack, 'Seul le chef du salon peut donner la couronne.');
+    const target = users.get(keyOf(name));
+    if (!target || target.lobbyId !== lobby.id || target.key === me.key) return fail(ack, 'Joueur introuvable.');
+    if (target.bot) return fail(ack, 'Un bot ne peut pas être chef.');
+    lobby.ownerKey = target.key;
+    systemMessage(lobby, `${me.name} donne la couronne à ${target.name}.`);
+    notify(target.key, 'success', `${me.name} t’a donné la couronne : tu es le chef du salon.`);
     broadcastLobby(lobby);
-    broadcastLobbyPresence(lobby);
-    io.to(lobbyRoom(lobby.id)).emit('lobby:matchFound', {
-      lobbyId: lobby.id,
-      players: players.map((s) => ({ name: users.get(s.key).name, role: s.role })),
-    });
-    broadcastGame(lobby);
     reply(ack, { ok: true });
   }));
 
@@ -1230,11 +1462,15 @@ function snapshot() {
       collection: u.collection || null,
       banner: u.banner || 'default',
       replays: u.replays || [],
+      presets: u.presets || [],
+      folders: u.folders || {},
+      unread: u.unread || {},
       lobbyId: u.lobbyId,
       friends: [...u.friends],
       incomingRequests: [...u.incomingRequests],
     })),
     replays: [...replays.values()],
+    dms: [...dms.entries()],
     lobbies: [...lobbies.values()].map((l) => ({
       id: l.id,
       code: l.code,
@@ -1245,6 +1481,7 @@ function snapshot() {
       chat: l.chat,
       rules: l.rules,
       paused: l.paused || null,
+      readyCheck: null,
       game: l.game ? l.game.toJSON() : null,
     })),
   });
@@ -1281,6 +1518,7 @@ function loadSave() {
       lobbyCodes.set(lobby.code, lobby.id);
     }
     for (const r of data.replays || []) replays.set(r.id, r);
+    for (const [key, list] of data.dms || []) dms.set(key, list);
     for (const u of data.users || []) {
       const user = {
         key: u.key,
@@ -1293,6 +1531,9 @@ function loadSave() {
         collection: u.collection || undefined,
         banner: u.banner || 'default',
         replays: u.replays || [],
+        presets: u.presets || [],
+        folders: u.folders || {},
+        unread: u.unread || {},
         socketId: null,
         lobbyId: u.lobbyId && lobbies.has(u.lobbyId) ? u.lobbyId : null,
         friends: new Set(u.friends),

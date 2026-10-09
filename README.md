@@ -50,6 +50,26 @@ TEST_3D=1 npm run test:browser    # + chargement du plateau 3D (plus lent)
   dans la barre de l'accueil prépare le salon.
 - Valeurs dans `backend/profile.js`.
 
+## Salon et amis
+
+- **Partie trouvée** : quand le chef lance, chaque joueur a 10 s pour cliquer « Accepter ! » (les bots
+  acceptent toujours). Un refus ou un temps écoulé annule : tout le monde revient au salon, et le chat
+  dit qui n'a pas accepté.
+- **Musique et sons du client** : un thème calme dans le client (volume de la musique dans les
+  Paramètres), petits sons pour les clics, les arrivées dans le salon, les messages.
+- **Discussions** (bouton en bas du panneau social, double-clic ou clic droit sur un ami) : messages
+  privés entre amis, 50 derniers par conversation, gardés après un redémarrage ; les messages reçus
+  hors ligne sont livrés à la connexion avec un compteur de non-lus.
+- **Liste d'amis** : recherche (loupe), tri par statut, nom ou niveau, et dossiers (bouton dossier,
+  ou clic droit › Ranger dans un dossier).
+- **Notifications** : quand un ami se connecte ou termine une partie.
+- **Donner la couronne** : clic droit du chef sur un joueur du salon.
+- **Profil** (clic sur son icône en haut à droite, ou clic droit › Voir le profil sur un ami) :
+  parties, victoires par plateau, pion préféré, plus gros loyer, 10 dernières parties et succès.
+  Visible par soi et ses amis.
+- **Préréglages de règles** (fenêtre Règles) : Classique, ARAM rapide, Équipes 2v2, et jusqu'à 5
+  préréglages à soi, enregistrés dans le profil ; le chef les applique d'un clic.
+
 ## Bots, chrono, pouvoirs et événements
 
 - **Bots** : dans le salon, le chef remplit une place libre avec un bot **Facile**, **Normal** ou
