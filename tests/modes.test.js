@@ -106,3 +106,53 @@ test('historique : la valeur de chaque joueur est notée à chaque tour de table
   assert.deepEqual(Object.keys(g.history[0].worth), ['p0', 'p1']);
   assert.ok(g.serialize().history.length === g.history.length);
 });
+
+test('Abîme Hurlant : plateau de 28 cases, déplacements, Prison, cartes et parties entre bots', () => {
+  const g = new Game(players(2), { rules: { board: 'aram' }, seed: 5 });
+  assert.equal(g.size, 28);
+  assert.equal(g.board.length, 28);
+  assert.equal(g.serialize().boardId, 'aram');
+  assert.equal(g.board[g.layout.jail].type, 'jail');
+  assert.equal(g.layout.jail, 7);
+  assert.deepEqual(g.dragons, [5, 19]);
+  // un tour complet : passage par la Fontaine sur 28 cases
+  const p = g.players[0];
+  p.pos = 26;
+  g.moveBy(p, 3);
+  assert.equal(p.pos, 1);
+  assert.ok(p.gold >= 1700, 'bonus de la Fontaine');
+  // Grab de Blitzcrank (case 21) -> Prison (case 7)
+  p.pos = 20;
+  g.moveBy(p, 1);
+  assert.equal(p.pos, 7);
+  assert.equal(p.inJail, true);
+  // les cartes visent des cases de ce plateau
+  assert.equal(g.board[g.layout.targets.far].name, 'Veigar');
+  // groupes : la construction marche avec les groupes ARAM
+  const glacier = g.members('glacier');
+  assert.equal(glacier.length, 2);
+  glacier.forEach((i) => { g.props[i] = { owner: 'p1', level: 0, mortgaged: false }; });
+  g.current = 1;
+  g.phase = 'roll';
+  assert.equal(g.build('p1', glacier[0]).ok, true);
+  // la Faille reste le plateau par défaut
+  assert.equal(new Game(players(2)).size, 40);
+});
+
+test('Abîme Hurlant : 40 parties entre bots se terminent, et le replay reste identique', () => {
+  for (let n = 0; n < 40; n++) {
+    const g = new Game(players(3, (i) => ({ bot: ['easy', 'normal', 'hard'][i], pawn: ['poro', 'egg', 'ward'][i] })), { rules: { board: 'aram' }, seed: 100 + n });
+    let steps = 0;
+    while (g.phase !== 'over' && steps++ < 40000) {
+      if (g.round > 150) { g.endByRounds(); break; }
+      if (g.trade) botAnswerTrade(g, g.trade.to);
+      else assert.equal(botStep(g, g.currentPlayer.key).ok, true, `bot bloqué en ${g.phase}`);
+      for (const q of g.players) assert.ok(q.pos >= 0 && q.pos < 28);
+    }
+    assert.equal(g.phase, 'over');
+    if (n < 3) {
+      const copy = Game.replay(JSON.parse(JSON.stringify(g.record)), () => {});
+      assert.equal(JSON.stringify({ ...copy.toJSON(), record: null }), JSON.stringify({ ...g.toJSON(), record: null }));
+    }
+  }
+});

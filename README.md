@@ -65,6 +65,12 @@ TEST_3D=1 npm run test:browser    # + chargement du plateau 3D (plus lent)
   reprise dans le récapitulatif de fin.
 - **Musique dynamique** : plus intense quand le Baron ou l'Ancien sont en jeu, puis en fin de
   partie (joueur en danger, objectif presque atteint, derniers tours).
+- **Abîme Hurlant (ARAM)** : second plateau, 28 cases et 15 champions de Freljord, décor enneigé
+  (rivière gelée, pont unique, neige qui tombe) ; parties environ deux fois plus courtes. À choisir
+  dans « Règles » (Plateau).
+- **Pause** : le chef du salon met la partie en pause (⏸) et la reprend ; chrono et bots s'arrêtent.
+- **Raccourcis clavier** : Espace lancer les dés, A acheter, P passer, F fin du tour, D/S sorts,
+  E échange, Échap fermer, ? aide.
 - **Répliques des champions** : une bulle quand on achète une case ou qu'on paye un loyer.
   Pour les entendre, déposer des sons dans `frontend/assets/voices/` (voir `LISEZMOI.txt`).
 

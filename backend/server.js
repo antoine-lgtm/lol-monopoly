@@ -488,6 +488,7 @@ setInterval(() => {
 /** Chrono du tour : une nouvelle échéance à chaque nouveau tour de jeu. */
 function updateDeadline(lobby) {
   const game = lobby.game;
+  if (lobby.paused) return; // chrono figé pendant la pause
   const seconds = game.rules.turnTimer;
   const current = game.currentPlayer;
   if (!seconds || game.phase === 'over' || isBot(current.key)) {
@@ -507,6 +508,7 @@ function gameState(lobby, { keepFx = true } = {}) {
   const state = lobby.game.serialize();
   if (!keepFx) state.fx = [];
   state.timer = lobby.deadline ? { left: Math.max(0, lobby.deadline - Date.now()), total: lobby.game.rules.turnTimer * 1000 } : null;
+  state.paused = lobby.paused ? { by: lobby.paused.by } : null;
   return state;
 }
 
@@ -544,7 +546,7 @@ function scheduleAutoplay(lobby) {
   clearTimeout(lobby.autoplayTimer);
   lobby.autoplayTimer = null;
   const game = lobby.game;
-  if (!game || game.phase === 'over') return;
+  if (!game || game.phase === 'over' || lobby.paused) return; // en pause : personne ne joue
   const run = (delay, fn) => {
     lobby.autoplayTimer = setTimeout(() => {
       lobby.autoplayTimer = null;
@@ -954,6 +956,7 @@ io.on('connection', (socket) => {
     if (lobby.rules.teams && players.length !== 4) return fail(ack, 'Le mode 2 contre 2 se joue à 4 (ajoute des bots si besoin).');
 
     lobby.status = 'in-game';
+    lobby.paused = null;
     lobby.invites.clear();
     // Ordre de jeu : l'ordre visuel des colonnes (slots), le chef en premier
     let order = [...players].sort((a, b) => (a.key === lobby.ownerKey ? -1 : b.key === lobby.ownerKey ? 1 : 0));
@@ -1012,11 +1015,35 @@ io.on('connection', (socket) => {
       const lobby = currentLobby(me);
       const game = lobby && lobby.game;
       if (!game || lobby.status !== 'in-game') return fail(ack, 'Aucune partie en cours.');
+      if (lobby.paused) return fail(ack, 'La partie est en pause.');
       const result = action(game, payload);
       if (result.ok) broadcastGame(lobby);
       reply(ack, result);
     }));
   }
+
+  // Pause : le chef du salon fige la partie (chrono, bots, actions) et la reprend quand il veut
+  socket.on('game:pause', authed(({ paused }, ack) => {
+    const lobby = currentLobby(me);
+    if (!lobby || !lobby.game || lobby.status !== 'in-game') return fail(ack, 'Aucune partie en cours.');
+    if (lobby.ownerKey !== me.key) return fail(ack, 'Seul le chef du salon met la partie en pause.');
+    if (paused && !lobby.paused) {
+      lobby.paused = { by: me.name, left: lobby.deadline ? Math.max(0, lobby.deadline - Date.now()) : null };
+      lobby.deadline = null;
+      clearTimeout(lobby.autoplayTimer);
+      lobby.autoplayTimer = null;
+      systemMessage(lobby, `${me.name} met la partie en pause.`);
+    } else if (!paused && lobby.paused) {
+      const { left } = lobby.paused;
+      lobby.paused = null;
+      if (left !== null) lobby.deadline = Date.now() + left; // le chrono repart où il s'était arrêté
+      systemMessage(lobby, `${me.name} reprend la partie.`);
+    } else {
+      return reply(ack, { ok: true });
+    }
+    broadcastGame(lobby);
+    reply(ack, { ok: true });
+  }));
 
   socket.on('replay:list', authed((_payload, ack) => {
     const list = (me.replays || []).map((id) => replays.get(id)).filter(Boolean)
@@ -1154,6 +1181,7 @@ function snapshot() {
       slots: l.slots,
       chat: l.chat,
       rules: l.rules,
+      paused: l.paused || null,
       game: l.game ? l.game.toJSON() : null,
     })),
   });

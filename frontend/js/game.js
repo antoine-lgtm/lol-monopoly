@@ -12,10 +12,19 @@
 (() => {
   const { socket, $, $$ } = App;
 
-  // Géométrie du plateau (px, avant zoom) : coins = 1,6 case
+  // Géométrie du plateau (px, avant zoom) : coins = 1,6 case. SIDE = cases par côté (coin compris) :
+  // 10 sur la Faille (40 cases), 7 sur l'Abîme Hurlant (28 cases).
   const BOARD_PX = 900;
-  const UNIT = BOARD_PX / 12.2;
-  const CORNER = UNIT * 1.6;
+  let SIDE = 10;
+  let UNIT = BOARD_PX / 12.2;
+  let CORNER = UNIT * 1.6;
+  function setGeometry(count) {
+    SIDE = count / 4;
+    UNIT = BOARD_PX / (SIDE - 1 + 3.2);
+    CORNER = UNIT * 1.6;
+  }
+  const jailIndex = () => board.findIndex((sq) => sq.type === 'jail');
+  const baronIndex = () => board.findIndex((sq) => sq.type === 'baron');
 
   const view = $('#board-view');
   const scene = $('#gv-scene');
@@ -47,16 +56,18 @@
   // ---------------------------------------------------------------------------
 
   function cellOf(i) {
-    if (i <= 10) return { row: 11, col: 11 - i, side: i === 0 || i === 10 ? 'corner' : 's' };
-    if (i <= 20) return { row: 11 - (i - 10), col: 1, side: i === 20 ? 'corner' : 'w' };
-    if (i <= 30) return { row: 1, col: 1 + (i - 20), side: i === 30 ? 'corner' : 'n' };
-    return { row: 1 + (i - 30), col: 11, side: 'e' };
+    const n = SIDE;
+    const last = n + 1;
+    if (i <= n) return { row: last, col: last - i, side: i === 0 || i === n ? 'corner' : 's' };
+    if (i <= 2 * n) return { row: last - (i - n), col: 1, side: i === 2 * n ? 'corner' : 'w' };
+    if (i <= 3 * n) return { row: 1, col: 1 + (i - 2 * n), side: i === 3 * n ? 'corner' : 'n' };
+    return { row: 1 + (i - 3 * n), col: last, side: 'e' };
   }
 
   /** Début et taille (px) d'une ligne/colonne de la grille. */
   function track(n) {
     if (n === 1) return [0, CORNER];
-    if (n === 11) return [CORNER + 9 * UNIT, CORNER];
+    if (n === SIDE + 1) return [CORNER + (SIDE - 1) * UNIT, CORNER];
     return [CORNER + (n - 2) * UNIT, UNIT];
   }
 
@@ -395,6 +406,12 @@
   }
 
   function buildBoard() {
+    setGeometry(board.length);
+    boardEl.style.setProperty('--unit', `${UNIT}px`);
+    boardEl.style.setProperty('--cells', String(SIDE - 1));
+    view.dataset.board = state?.boardId || 'rift';
+    $('.gv-center', boardEl).style.gridArea = `2 / 2 / ${SIDE + 1} / ${SIDE + 1}`;
+    $('.gv-center__sub', boardEl).textContent = state?.boardId === 'aram' ? 'Abîme Hurlant' : 'Faille de l’Invocateur';
     $$('.gv-sq', boardEl).forEach((el) => el.remove());
     squares.length = 0;
     board.forEach((sq, i) => {
@@ -502,7 +519,8 @@
         container: scene,
         board,
         groups,
-        geo: { cellOf, track, CORNER, UNIT },
+        geo: { cellOf, track, CORNER, UNIT, side: SIDE },
+        boardId: state?.boardId || 'rift',
         squareArt,
         priceLabel,
         quality: App.settings?.quality || 'auto',
@@ -546,7 +564,7 @@
     if (!el) return;
     const p = state.players.find((q) => q.key === key);
     const same = [...shownPos.entries()].filter(([k, i]) => i === index && k !== key).length;
-    const inJail = index === 10 && p?.inJail;
+    const inJail = index === jailIndex() && p?.inJail;
     const { x, y } = centerOf(index, inJail ? 0.7 : 0);
     const angle = (same * 2.1) + (key.length * 0.7);
     const r = same ? 22 : 0;
@@ -633,7 +651,7 @@
     // Baron Nashor dans sa fosse
     $$('.gv-baron', piecesEl).forEach((el) => el.remove());
     if (!state.baron.taken) {
-      const { x, y } = centerOf(20, 0.9);
+      const { x, y } = centerOf(baronIndex(), 0.9);
       const el = standing('gv-baron', x, y);
       el.classList.toggle('is-active', state.baron.active);
       piecesEl.append(el);
@@ -653,7 +671,7 @@
       else for (let t = 0; t < st.level; t++) towers.push({ ...bandPoint(index, st.level === 1 ? 0.5 : t / (st.level - 1)), color, slot: t, count: st.level });
       flags.push({ ...flagPoint(index), color, mortgaged: st.mortgaged });
     }
-    const baron = state.baron.taken ? null : { ...centerOf(20, 0.9), active: state.baron.active };
+    const baron = state.baron.taken ? null : { ...centerOf(baronIndex(), 0.9), active: state.baron.active };
     return { towers, inhibs, flags, baron };
   }
 
@@ -738,7 +756,7 @@
     const dir = fx.steps > 0 ? 1 : -1;
     let pos = fx.from;
     for (let s = 0; s < Math.abs(fx.steps); s++) {
-      pos = (pos + dir + 40) % 40;
+      pos = (pos + dir + board.length) % board.length;
       placePawn(fx.key, pos, { hop: true });
       sfx('step');
       await sleep(200);
@@ -1355,6 +1373,7 @@
     b.type = 'button';
     b.className = `gv-btn${primary ? ' gv-btn--primary' : ''}`;
     b.textContent = label;
+    b.dataset.action = action;
     b.disabled = disabled;
     if (hint) b.title = hint;
     b.addEventListener('click', () => send(action, payload));
@@ -2437,6 +2456,123 @@
     return 0;
   }
 
+  // ---------------------------------------------------------------------------
+  // Pause : le chef du salon fige la partie et la reprend
+  // ---------------------------------------------------------------------------
+
+  const isLobbyOwner = () => Boolean(App.lobby && App.me && App.lobby.owner === App.me.name);
+  function renderPause() {
+    const btn = $('#gv-pause-btn');
+    const box = $('#gv-pause');
+    const paused = Boolean(state.paused) && !replay;
+    btn.hidden = replay || !isLobbyOwner() || state.phase === 'over';
+    btn.textContent = paused ? '▶' : '⏸';
+    btn.title = paused ? 'Reprendre la partie' : 'Mettre la partie en pause';
+    view.classList.toggle('is-paused', paused);
+    box.hidden = !paused;
+    if (!paused) return;
+    box.replaceChildren();
+    const panel = el('div', 'gv-pause__panel');
+    panel.append(el('p', 'gv-pause__title', 'Partie en pause'), el('p', 'gv-pause__sub', `Mise en pause par ${state.paused.by}. Le chrono et les bots sont arrêtés ; la partie est sauvegardée.`));
+    if (isLobbyOwner()) {
+      const resume = el('button', 'gv-btn gv-btn--primary', 'Reprendre la partie');
+      resume.type = 'button';
+      resume.addEventListener('click', () => send('game:pause', { paused: false }));
+      panel.append(resume);
+    } else {
+      panel.append(el('p', 'gv-pause__sub', 'Le chef du salon reprendra la partie.'));
+    }
+    box.append(panel);
+  }
+  $('#gv-pause-btn').addEventListener('click', () => send('game:pause', { paused: !state?.paused }));
+  $('#gv-keys-btn').addEventListener('click', () => toggleShortcutHelp());
+
+  // ---------------------------------------------------------------------------
+  // Raccourcis clavier : Espace lancer, A acheter, P passer, F fin du tour, D/S sorts,
+  // E échange, Échap fermer, ? aide
+  // ---------------------------------------------------------------------------
+
+  const SHORTCUTS = [
+    ['Espace', 'Lancer les dés'],
+    ['A', 'Acheter la case'],
+    ['P', 'Passer (ne pas acheter)'],
+    ['F', 'Fin du tour'],
+    ['D', 'Sort 1'],
+    ['S', 'Sort 2'],
+    ['E', 'Proposer un échange'],
+    ['Alt + clic', 'Ping sur une case'],
+    ['Échap', 'Fermer la fenêtre ouverte'],
+    ['?', 'Afficher cette aide'],
+  ];
+  function toggleShortcutHelp(force) {
+    const box = $('#gv-keys');
+    const open = force ?? box.hidden;
+    box.hidden = !open;
+    if (!open) return;
+    const list = el('dl', 'gv-keys__list');
+    for (const [key, label] of SHORTCUTS) list.append(el('dt', '', key), el('dd', '', label));
+    box.replaceChildren(el('p', 'gv-keys__title', 'Raccourcis clavier'), list);
+  }
+  const clickAction = (action) => {
+    const b = $(`#gv-buttons button[data-action="${action}"]:not([disabled])`);
+    if (!b) return false;
+    b.click();
+    return true;
+  };
+  document.addEventListener('keydown', (event) => {
+    if (view.hidden || !state || event.ctrlKey || event.metaKey || event.altKey) return;
+    const t = event.target;
+    if (t && (t.closest('input, textarea, select, [contenteditable="true"]'))) return;
+    if (document.querySelector('dialog[open]')) return;
+    const key = event.key;
+    if (key === 'Escape') {
+      toggleShortcutHelp(false);
+      closeInspect();
+      closeShop();
+      closeKitPop();
+      $('#gv-emotes').hidden = true;
+      return;
+    }
+    if (key === '?') {
+      toggleShortcutHelp();
+      event.preventDefault();
+      return;
+    }
+    if (replay) {
+      if (key === ' ') {
+        $('[data-replay="toggle"]', replayBar)?.click();
+        event.preventDefault();
+      }
+      return;
+    }
+    let done = false;
+    switch (key.toLowerCase()) {
+      case ' ': done = clickAction('game:roll'); break;
+      case 'a': done = clickAction('game:buy'); break;
+      case 'p': done = clickAction('game:skip'); break;
+      case 'f': done = clickAction('game:end'); break;
+      case 'd':
+      case 's': {
+        const spell = $$('#gv-kit .gv-kit__btn--spell')[key.toLowerCase() === 'd' ? 0 : 1];
+        if (spell && !spell.disabled) {
+          spell.click();
+          done = true;
+        }
+        break;
+      }
+      case 'e': {
+        const trade = $('.gv-btn--trade:not([disabled])');
+        if (trade) {
+          trade.click();
+          done = true;
+        }
+        break;
+      }
+      default:
+    }
+    if (done || key === ' ') event.preventDefault(); // Espace ne fait pas défiler la page
+  });
+
   function renderAll() {
     window.LolMusic?.setIntensity?.(musicIntensity());
     cueSounds();
@@ -2452,6 +2588,7 @@
     renderShop();
     renderTrade();
     renderStats();
+    renderPause();
     renderOver();
     if (inspected !== null && state.phase !== 'buy') openInspect(inspected);
     if (state.phase !== 'buy' && inspected === state.pendingIndex) closeInspect();

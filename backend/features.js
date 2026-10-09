@@ -113,6 +113,7 @@ const DEFAULT_RULES = {
   herald: true,
   passives: true, // pouvoir de chaque pion
   events: true, // événements de la Faille
+  board: 'rift', // plateau : rift (Faille, 40 cases) ou aram (Abîme Hurlant, 28 cases)
   teams: false, // 2 contre 2 (4 joueurs)
   objective: false, // victoire immédiate avec 3 groupes complets
   startGold: 1500,
@@ -130,6 +131,7 @@ function sanitizeRules(raw = {}) {
   if ([1000, 1500, 2000].includes(raw.startGold)) rules.startGold = raw.startGold;
   if ([0, 20].includes(raw.maxRounds)) rules.maxRounds = raw.maxRounds;
   if ([0, 30, 60, 90].includes(raw.turnTimer)) rules.turnTimer = raw.turnTimer;
+  if (raw.board === 'rift' || raw.board === 'aram') rules.board = raw.board;
   return rules;
 }
 

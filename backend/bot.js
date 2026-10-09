@@ -8,7 +8,7 @@
  * pour que les joueurs voient le bot jouer. `botAnswerTrade` répond à un échange.
  */
 
-const { BOARD, GROUPS, MAX_LEVEL } = require('./game');
+const { MAX_LEVEL } = require('./game');
 const { ITEMS } = require('./features');
 
 const LEVELS = {
@@ -18,16 +18,15 @@ const LEVELS = {
 };
 
 const levelOf = (p) => LEVELS[p.bot] || LEVELS.normal;
-const members = (group) => BOARD.map((s, i) => (s.group === group ? i : -1)).filter((i) => i >= 0);
 
 /** Achète-t-on la case en attente ? */
 function wantsToBuy(game, p, lv) {
   const index = game.pendingIndex;
-  const sq = BOARD[index];
+  const sq = game.board[index];
   if (p.gold < sq.price) return false;
   const left = p.gold - sq.price;
   if (sq.group) {
-    const group = members(sq.group);
+    const group = game.members(sq.group);
     const mine = group.filter((i) => game.props[i]?.owner === p.key).length;
     const theirs = group.filter((i) => game.props[i] && game.props[i].owner !== p.key);
     // compléter son groupe : presque toujours
@@ -43,11 +42,11 @@ function wantsToBuy(game, p, lv) {
 function buildTarget(game, p, lv) {
   // les bots tirent leur hasard à part : les tirages de la partie restent rejouables
   if (Math.random() > lv.build) return null;
-  const groups = new Set(game.ownedBy(p.key).map((i) => BOARD[i].group).filter(Boolean));
+  const groups = new Set(game.ownedBy(p.key).map((i) => game.board[i].group).filter(Boolean));
   const options = [];
   for (const group of groups) {
     if (!game.controlsGroup(p.key, group)) continue;
-    const idx = members(group);
+    const idx = game.members(group);
     if (idx.some((i) => game.props[i].mortgaged)) continue;
     const min = Math.min(...idx.map((i) => game.props[i].level));
     if (min >= MAX_LEVEL) continue;
@@ -56,7 +55,7 @@ function buildTarget(game, p, lv) {
     // on vise d'abord le palier T3 (le plus rentable), puis les groupes les plus chers
     const target = idx.find((i) => game.props[i].level === min && game.props[i].owner === p.key);
     if (target === undefined) continue; // la case la moins construite est à son partenaire
-    options.push({ index: target, score: (min < 3 ? 10 : 0) + GROUPS[group].house / 50 });
+    options.push({ index: target, score: (min < 3 ? 10 : 0) + game.groups[group].house / 50 });
   }
   options.sort((a, b) => b.score - a.score);
   return options[0]?.index ?? null;
@@ -103,7 +102,7 @@ function unmortgageAction(game, p, lv) {
   if (lv === LEVELS.easy) return null;
   const i = game.ownedBy(p.key).find((j) => game.props[j].mortgaged);
   if (i === undefined) return null;
-  if (p.gold - Math.ceil((BOARD[i].price / 2) * 1.1) < lv.reserve + 200) return null;
+  if (p.gold - Math.ceil((game.board[i].price / 2) * 1.1) < lv.reserve + 200) return null;
   return game.unmortgage(p.key, i);
 }
 
@@ -118,8 +117,8 @@ function tradeAction(game, p, lv) {
   if (memo && memo.turnId === game.turnId) return null;
   tradeMemo.set(game, { turnId: game.turnId, sentAt: Date.now() });
   const tradable = (owner, i) => !game.tradableProps(owner, [i]);
-  for (const group of Object.keys(GROUPS)) {
-    const idx = members(group);
+  for (const group of Object.keys(game.groups)) {
+    const idx = game.members(group);
     const missing = idx.filter((i) => game.props[i]?.owner !== p.key);
     if (missing.length !== 1) continue;
     const want = missing[0];
@@ -128,15 +127,15 @@ function tradeAction(game, p, lv) {
     const other = game.player(st.owner);
     // une de mes cases qui complète un groupe de l'autre : échange gagnant-gagnant
     const swap = game.ownedBy(p.key).find((i) => {
-      const g2 = BOARD[i].group;
+      const g2 = game.board[i].group;
       if (!g2 || g2 === group || !tradable(p.key, i)) return false;
-      return members(g2).every((j) => j === i || game.props[j]?.owner === other.key);
+      return game.members(g2).every((j) => j === i || game.props[j]?.owner === other.key);
     });
     if (swap !== undefined) {
       const res = game.proposeTrade(p.key, { to: other.key, giveProps: [swap], getProps: [want] });
       if (res.ok) return res;
     }
-    const offer = Math.round(BOARD[want].price * 2.6 * (lv === LEVELS.hard ? 1.1 : 1));
+    const offer = Math.round(game.board[want].price * 2.6 * (lv === LEVELS.hard ? 1.1 : 1));
     if (p.gold - offer >= lv.reserve) {
       const res = game.proposeTrade(p.key, { to: other.key, getProps: [want], giveGold: offer });
       if (res.ok) return res;
@@ -210,10 +209,10 @@ function botStep(game, key) {
 function lotValue(game, props, who) {
   let value = 0;
   for (const i of props) {
-    const sq = BOARD[i];
+    const sq = game.board[i];
     value += sq.price;
     if (sq.group) {
-      const group = members(sq.group);
+      const group = game.members(sq.group);
       const after = group.filter((j) => j === i || game.props[j]?.owner === who || props.includes(j)).length;
       if (after === group.length) value += sq.price * 1.5;
     }

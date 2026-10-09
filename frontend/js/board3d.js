@@ -85,14 +85,17 @@ function wrapText(ctx, text, maxWidth) {
 /**
  * @param {object} opts
  * @param {HTMLElement} opts.container   élément qui reçoit le canvas
- * @param {Array} opts.board             les 40 cases
+ * @param {Array} opts.board             les cases (40 sur la Faille, 28 sur l'Abîme Hurlant)
+ * @param {string} [opts.boardId]        'rift' ou 'aram' (décor enneigé, une seule voie)
  * @param {object} opts.groups
  * @param {object} opts.geo              { cellOf, track, CORNER, UNIT }
  * @param {(sq, i) => string[]|null} opts.squareArt   sources d'image d'une case
  * @param {(sq) => string} opts.priceLabel
  */
-export async function createBoard3D({ container, board, groups, geo, squareArt, priceLabel, sideSpace = () => ({ left: 0, right: 0, bottom: 0 }), quality: initialQuality = 'auto' }) {
+export async function createBoard3D({ container, board, groups, geo, boardId = 'rift', squareArt, priceLabel, sideSpace = () => ({ left: 0, right: 0, bottom: 0 }), quality: initialQuality = 'auto' }) {
   const { cellOf, track, CORNER, UNIT } = geo;
+  const SIDE = geo.side || board.length / 4; // cases par côté : 10 (Faille) ou 7 (Abîme)
+  const ARAM = boardId === 'aram';
 
   // --- Rendu ----------------------------------------------------------------
   // modèles 3D des pions (s'il y en a) : chargés pendant que la scène se construit
@@ -116,16 +119,17 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   let bloomOn = true;
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x08121e, 20, 62); // un peu de brume au loin : profondeur
+  scene.fog = ARAM ? new THREE.Fog(0x2c3e52, 30, 85) : new THREE.Fog(0x08121e, 20, 62); // un peu de brume au loin : profondeur
   // Fond : halo bleu nuit derrière le plateau, bords sombres (vignette)
   {
     const cv = document.createElement('canvas');
     cv.width = cv.height = 512;
     const g = cv.getContext('2d');
     const grad = g.createRadialGradient(256, 230, 20, 256, 256, 360);
-    grad.addColorStop(0, '#1b2f44');
-    grad.addColorStop(0.45, '#0c1726');
-    grad.addColorStop(1, '#03060b');
+    // Abîme Hurlant : ciel d'hiver, plus clair et bleuté
+    grad.addColorStop(0, ARAM ? '#5d7fa0' : '#1b2f44');
+    grad.addColorStop(0.45, ARAM ? '#22354a' : '#0c1726');
+    grad.addColorStop(1, ARAM ? '#060a10' : '#03060b');
     g.fillStyle = grad;
     g.fillRect(0, 0, 512, 512);
     const bg = new THREE.CanvasTexture(cv);
@@ -188,7 +192,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   }
 
   const ROT = { s: 0, w: Math.PI / 2, n: Math.PI, e: -Math.PI / 2 };
-  const CORNER_ROT = { 0: -Math.PI / 4, 10: Math.PI / 4, 20: (3 * Math.PI) / 4, 30: (-3 * Math.PI) / 4 };
+  const CORNER_ROT = { 0: -Math.PI / 4, [SIDE]: Math.PI / 4, [2 * SIDE]: (3 * Math.PI) / 4, [3 * SIDE]: (-3 * Math.PI) / 4 };
   const SPECIAL_BG = {
     go: ['#0a3a5a', '#0a1a2c'], jail: ['#262b31', '#11151a'], baron: ['#2c1350', '#120a22'],
     gotojail: ['#3a2c0c', '#16110a'], chance: ['#3d3410', '#151a14'], chest: ['#0b4148', '#0b1a22'],
@@ -479,6 +483,95 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     ctx.strokeRect(x0 * K, y0 * K, w * K, h * K);
   }
 
+  /** Carte de l'Abîme Hurlant vue du dessus : neige, glace et un pont de pierre unique. */
+  function drawAramMap() {
+    const N = 1024;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = N;
+    const g = cv.getContext('2d');
+    const snowGrad = g.createLinearGradient(0, 0, N, N);
+    snowGrad.addColorStop(0, '#b9cada');
+    snowGrad.addColorStop(0.5, '#9fb4c8');
+    snowGrad.addColorStop(1, '#b6c8d8');
+    g.fillStyle = snowGrad;
+    g.fillRect(0, 0, N, N);
+    const r = (() => { let seed = 11; return () => ((seed = (seed * 16807) % 2147483647) / 2147483647); })();
+    // congères et reflets
+    for (let k = 0; k < 140; k++) {
+      const x = r() * N;
+      const y = r() * N;
+      const rad = 20 + r() * 90;
+      const drift = g.createRadialGradient(x, y, 0, x, y, rad);
+      drift.addColorStop(0, `rgba(235,244,252,${0.15 + r() * 0.25})`);
+      drift.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = drift;
+      g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+    }
+    // falaises de glace sur les bords
+    g.strokeStyle = 'rgba(90,130,170,0.35)';
+    g.lineWidth = 3;
+    for (let k = 0; k < 60; k++) {
+      g.beginPath();
+      const x = r() * N;
+      const y = r() * N;
+      g.moveTo(x, y);
+      g.lineTo(x + (r() - 0.5) * 80, y + (r() - 0.5) * 80);
+      g.stroke();
+    }
+    // le pont : de la base bleue (bas-gauche) à la base rouge (haut-droite)
+    g.save();
+    g.translate(N / 2, N / 2);
+    g.rotate(-Math.PI / 4);
+    const L = N * 1.3;
+    const W = N * 0.17;
+    g.fillStyle = '#7b8794';
+    g.fillRect(-L / 2, -W / 2, L, W);
+    g.fillStyle = '#9aa6b2';
+    for (let x = -L / 2; x < L / 2; x += 46) g.fillRect(x + 2, -W / 2 + 6, 40, W - 12); // dalles
+    g.fillStyle = '#4c5866';
+    g.fillRect(-L / 2, -W / 2 - 10, L, 10); // parapets
+    g.fillRect(-L / 2, W / 2, L, 10);
+    g.fillStyle = 'rgba(255,255,255,0.55)';
+    for (let x = -L / 2; x < L / 2; x += 120) g.fillRect(x, -W / 2 - 12, 30, 6); // neige sur les parapets
+    g.restore();
+    // plateformes des deux Nexus
+    for (const [x, y, c] of [[N * 0.12, N * 0.88, '#3a8ae8'], [N * 0.88, N * 0.12, '#e0483c']]) {
+      g.beginPath();
+      g.arc(x, y, N * 0.1, 0, Math.PI * 2);
+      g.fillStyle = '#8a96a3';
+      g.fill();
+      g.lineWidth = 8;
+      g.strokeStyle = c;
+      g.stroke();
+    }
+    return cv;
+  }
+
+  /** Sous le plateau de l'Abîme : un champ de neige et des pics de glace tout autour. */
+  function buildSnowField() {
+    const group = new THREE.Group();
+    const ground = new THREE.Mesh(
+      new THREE.CircleGeometry(42, 48),
+      new THREE.MeshStandardMaterial({ color: 0x7e93a8, roughness: 0.95 }),
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    group.add(ground);
+    const iceMat = new THREE.MeshStandardMaterial({ color: 0x7fa6c4, roughness: 0.35, metalness: 0.05, flatShading: true });
+    const snowMat = new THREE.MeshStandardMaterial({ color: 0xa9bccd, roughness: 0.9, flatShading: true });
+    const r = (() => { let seed = 23; return () => ((seed = (seed * 16807) % 2147483647) / 2147483647); })();
+    for (let k = 0; k < 46; k++) {
+      const a = (k / 46) * Math.PI * 2 + r() * 0.2;
+      const dist = 13 + r() * 18;
+      const h = 2.5 + r() * 7;
+      const peak = new THREE.Mesh(new THREE.ConeGeometry(1 + r() * 2.6, h, 6 + Math.floor(r() * 3)), r() < 0.4 ? iceMat : snowMat);
+      peak.position.set(Math.cos(a) * dist, h / 2 - 0.2, Math.sin(a) * dist);
+      peak.rotation.y = r() * Math.PI;
+      group.add(peak);
+    }
+    return group;
+  }
+
   function drawTop() {
     ctx.fillStyle = '#0a1a24';
     ctx.fillRect(0, 0, TEX, TEX);
@@ -500,7 +593,8 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   };
 
   // Chargement des images (cases et carte), redessin au fur et à mesure
-  loadImage('/assets/board/rift-map.svg').then((img) => { riftMap = img; scheduleRedraw(); });
+  if (ARAM) riftMap = drawAramMap();
+  else loadImage('/assets/board/rift-map.svg').then((img) => { riftMap = img; scheduleRedraw(); });
   board.forEach((sq, i) => {
     const sources = squareArt(sq, i);
     if (!sources) return;
@@ -767,13 +861,17 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     const tex = new THREE.CanvasTexture(cv);
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
     tex.colorSpace = THREE.SRGBColorSpace;
-    const water = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    const water = new THREE.Mesh(geo, new THREE.MeshStandardMaterial(ARAM ? {
+      // Abîme Hurlant : rivière gelée, glace lisse et brillante
+      map: tex, color: 0xd8f0ff, transparent: true, opacity: 0.92, roughness: 0.04, metalness: 0.1,
+      emissive: 0x2a5a70, emissiveIntensity: 0.25, side: THREE.DoubleSide,
+    } : {
       map: tex, transparent: true, opacity: 0.82, roughness: 0.08, metalness: 0.25,
       emissive: 0x0a3a50, emissiveIntensity: 0.6, side: THREE.DoubleSide,
     }));
     water.receiveShadow = true;
     scene.add(water);
-    ambient.push((t) => { tex.offset.y = -t * 0.25; });
+    if (!ARAM) ambient.push((t) => { tex.offset.y = -t * 0.25; });
   }
 
   // Fosses du Baron (violette) et du Dragon (orange), creusées dans le sol
@@ -955,7 +1053,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
         g.stroke();
       }
       // texte le long du cercle
-      const text = 'LEAGUE OF MONOPOLY  ✦  FAILLE DE L’INVOCATEUR  ✦  ';
+      const text = `LEAGUE OF MONOPOLY  ✦  ${ARAM ? 'ABÎME HURLANT' : 'FAILLE DE L’INVOCATEUR'}  ✦  `;
       const radius = ((R_IN + R_OUT) / 2) * px - 34;
       g.font = '700 118px Cinzel, Georgia, serif';
       g.textAlign = 'center';
@@ -1070,7 +1168,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   // Prison : socle de pierre, cage en fer forgé (les prisonniers se tiennent dedans), toit à pointe,
   // chaînes et lanterne qui vacille
   {
-    const c = cornerAt(10, 0.06);
+    const c = cornerAt(SIDE, 0.06);
     const iron = new THREE.MeshStandardMaterial({ color: 0x3a3e44, metalness: 0.7, roughness: 0.45 });
     const stone = new THREE.MeshStandardMaterial({ color: 0x6a6e78, roughness: 0.85, flatShading: true });
     const cage = new THREE.Group();
@@ -1141,7 +1239,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   }
   // Grab de Blitzcrank : le golem à vapeur en personne
   {
-    const c = cornerAt(30, -0.05);
+    const c = cornerAt(3 * SIDE, -0.05);
     const yellow = new THREE.MeshStandardMaterial({ color: 0xe6b422, metalness: 0.6, roughness: 0.35 });
     const dark = new THREE.MeshStandardMaterial({ color: 0x3a3226, metalness: 0.6, roughness: 0.5 });
     const g = new THREE.Group();
@@ -1239,9 +1337,9 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   let world = null;
   const buildWorld = () => {
     if (world) return;
-    world = buildRuneterra();
+    world = ARAM ? buildSnowField() : buildRuneterra();
     world.position.y = -5;
-    world.scale.set(0.8, 0.7, 0.8);
+    if (!ARAM) world.scale.set(0.8, 0.7, 0.8);
     world.visible = QUALITY[quality].world;
     scene.add(world);
   };
@@ -1254,7 +1352,8 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
       [[12, 86], [11.5, 60], [11.5, 11.5], [60, 11.5], [86, 12]], // haut
       [[18, 92], [32, 72], [27, 50], [33, 33], [50, 27], [72, 32], [92, 18]], // milieu : contourne l'autel
       [[16, 89], [40, 88.5], [88.5, 88.5], [88.5, 40], [89, 16]], // bas
-    ].map((pts) => {
+    ].filter((_, k) => !ARAM || k === 1) // Abîme Hurlant : une seule voie
+      .map((pts) => {
       const world = pts.map(([x, y]) => toRift(x, y, 0));
       const lens = [0];
       for (let k = 1; k < world.length; k++) lens.push(lens[k - 1] + world[k].distanceTo(world[k - 1]));
@@ -1334,11 +1433,12 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     const seeds = [];
     const teal = new THREE.Color(0x7fe9f0);
     const gold = new THREE.Color(0xf0c860);
+    const snow = new THREE.Color(0xf4faff);
     for (let k = 0; k < N; k++) {
       const a = rand() * Math.PI * 2;
-      const r = 2 + rand() * 6.5;
-      seeds.push({ x: Math.cos(a) * r, z: Math.sin(a) * r, y: rand() * 3.2, speed: 0.08 + rand() * 0.14, phase: rand() * 6 });
-      (rand() < 0.65 ? teal : gold).toArray(colors, k * 3);
+      const r = (ARAM ? 0.5 : 2) + rand() * (ARAM ? 8 : 6.5);
+      seeds.push({ x: Math.cos(a) * r, z: Math.sin(a) * r, y: rand() * 3.2, speed: (ARAM ? 0.18 : 0.08) + rand() * 0.14, phase: rand() * 6 });
+      (ARAM ? snow : rand() < 0.65 ? teal : gold).toArray(colors, k * 3);
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -1353,8 +1453,8 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
     g.fillStyle = grad;
     g.fillRect(0, 0, 64, 64);
     dust = new THREE.Points(geo, new THREE.PointsMaterial({
-      size: 0.1, map: new THREE.CanvasTexture(cv), vertexColors: true, transparent: true,
-      depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.85,
+      size: ARAM ? 0.075 : 0.1, map: new THREE.CanvasTexture(cv), vertexColors: true, transparent: true,
+      depthWrite: false, blending: ARAM ? THREE.NormalBlending : THREE.AdditiveBlending, opacity: ARAM ? 0.95 : 0.85,
     }));
     dust.frustumCulled = false;
     scene.add(dust);
@@ -1362,7 +1462,8 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
       if (!dust.visible) return;
       seeds.forEach((s, k) => {
         positions[k * 3] = s.x + Math.sin(t * 0.4 + s.phase) * 0.25;
-        positions[k * 3 + 1] = -0.2 + ((s.y + t * s.speed) % 3.2);
+        // poussière qui monte doucement ; sur l'Abîme Hurlant, flocons qui tombent
+        positions[k * 3 + 1] = ARAM ? 3 - ((s.y + t * s.speed) % 3.2) : -0.2 + ((s.y + t * s.speed) % 3.2);
         positions[k * 3 + 2] = s.z + Math.cos(t * 0.35 + s.phase) * 0.25;
       });
       geo.attributes.position.needsUpdate = true;
@@ -1491,7 +1592,7 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   function setObjectives({ herald: heraldActive = false, elder = false } = {}) {
     herald.visible = Boolean(heraldActive);
     if (heraldActive) {
-      const c = cornerAt(20, 0.25);
+      const c = cornerAt(2 * SIDE, 0.25);
       herald.position.set(c.x, c.y, c.z);
       herald.rotation.y = Math.atan2(-c.x, -c.z);
     }
@@ -1693,8 +1794,8 @@ export async function createBoard3D({ container, board, groups, geo, squareArt, 
   }
 
   // --- Ambiance : le jour tombe au fil des tours, le Baron et l'Ancien teintent la lumière ---
-  const DAY = { sun: new THREE.Color(0xffe6c0), sunI: 2.1, sky: new THREE.Color(0xcfe4ff), skyI: 1.05, exposure: 1.05, bg: 1, fog: new THREE.Color(0x08121e), nexus: 1 };
-  const NIGHT = { sun: new THREE.Color(0x7f98ff), sunI: 0.5, sky: new THREE.Color(0x4a62a8), skyI: 0.42, exposure: 0.82, bg: 0.4, fog: new THREE.Color(0x03050a), nexus: 1.8 };
+  const DAY = { sun: new THREE.Color(0xffe6c0), sunI: 2.1, sky: new THREE.Color(0xcfe4ff), skyI: 1.05, exposure: 1.05, bg: 1, fog: new THREE.Color(ARAM ? 0x2c3e52 : 0x08121e), nexus: 1 };
+  const NIGHT = { sun: new THREE.Color(0x7f98ff), sunI: 0.5, sky: new THREE.Color(0x4a62a8), skyI: 0.42, exposure: 0.82, bg: 0.4, fog: new THREE.Color(ARAM ? 0x0e1520 : 0x03050a), nexus: 1.8 };
   const BARON_TINT = new THREE.Color(0xb27cff);
   const ELDER_TINT = new THREE.Color(0x9fe8ff);
   const atmo = { night: 0, tNight: 0, baron: 0, tBaron: 0, elder: 0, tElder: 0 };

@@ -193,6 +193,36 @@ test.describe('dans le navigateur', { skip }, () => {
     noErrors(a);
   });
 
+  test('Abîme Hurlant, raccourcis clavier et pause du chef', async () => {
+    const a = await openPlayer(PORT, 'Nami');
+    const b = await openPlayer(PORT, 'Olaf');
+    await login(a, 'Nami', 0);
+    await login(b, 'Olaf', 4);
+    await a.click('#home-confirm');
+    await a.waitForFunction(() => /^[A-Z0-9]{6}$/.test(document.querySelector('#tab-room-code').textContent));
+    await a.evaluate(() => new Promise((r) => App.socket.emit('lobby:setRules', { rules: { board: 'aram' } }, r)));
+    const code = await a.textContent('#tab-room-code');
+    await b.click('.mode-card[data-mode="join"]');
+    await b.fill('#join-lobby-code', code);
+    await b.click('#home-confirm');
+    await a.waitForSelector('.banner--filled[data-name="Olaf"]');
+    await a.click('#find-match');
+    await a.waitForSelector('#board-view:not([hidden])');
+    assert.equal(await a.$$eval('.gv-sq', (els) => els.length), 28, 'plateau de 28 cases');
+    // Espace : lancer les dés
+    await a.waitForSelector('#gv-buttons [data-action="game:roll"]');
+    await a.keyboard.press('Space');
+    await a.waitForFunction(() => [...document.querySelectorAll('#gv-log li')].some((l) => /Nami lance les dés/.test(l.textContent)));
+    // pause par le chef : l'autre joueur voit la pause, les actions sont refusées
+    await a.click('#gv-pause-btn');
+    await b.waitForSelector('#gv-pause:not([hidden])');
+    const res = await a.evaluate(() => new Promise((r) => App.socket.emit('game:end', {}, r)));
+    assert.equal(res.ok, false);
+    await a.click('.gv-pause .gv-btn--primary');
+    await b.waitForSelector('#gv-pause', { state: 'hidden' });
+    noErrors(a, b);
+  });
+
   test('sauvegarde : la partie reprend après un redémarrage du serveur', async () => {
     const port = 3192;
     const save = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'lolm-')), 'save.json');

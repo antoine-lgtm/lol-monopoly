@@ -2701,7 +2701,7 @@ button.window-controls__btn:hover {
 /* Résumé de la partie, sous le code */
 .room-rules {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   margin-top: 8px;
 }
@@ -3932,3 +3932,7 @@ img[data-skin="infernal"] { filter: sepia(1) saturate(5) hue-rotate(-25deg) drop
 .history-item__players { display: flex; flex-wrap: wrap; gap: 4px; }
 .history-item__chip { padding: 1px 7px; font-size: 11px; color: #f0e6d2; border-left: 3px solid var(--c); background: rgba(240, 230, 210, 0.06); }
 .square-btn--stats:not(:disabled) { cursor: pointer; }
+.room-rules__item--board::before {
+  background: #9fd8f0;
+  --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1 1h5v5H1zM10 1h5v5h-5zM1 10h5v5H1zM10 10h5v5h-5z' opacity='.85'/%3E%3Cpath d='M6 3h4v1H6zM6 12h4v1H6zM3 6h1v4H3zM12 6h1v4h-1z'/%3E%3C/svg%3E");
+}

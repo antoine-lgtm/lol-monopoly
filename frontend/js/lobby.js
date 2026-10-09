@@ -182,6 +182,9 @@
     $('#lobby-code-value').textContent = lobby.code;
     $('#tab-room-code').textContent = lobby.code;
     $('#room-players').textContent = `${players(lobby).length}/${lobby.maxPlayers}`;
+    $('#room-gold').textContent = new Intl.NumberFormat('fr-FR').format(lobby.rules?.startGold ?? 1500);
+    $('#room-board').textContent = lobby.rules?.board === 'aram' ? 'Abîme' : 'Faille';
+    $('#room-board').title = lobby.rules?.board === 'aram' ? 'Abîme Hurlant (ARAM) : 28 cases' : 'Faille de l’Invocateur : 40 cases';
     const toggle = $('#lobby-open');
     toggle.checked = lobby.open;
     toggle.disabled = !isOwner();
@@ -712,6 +715,10 @@
       ...section('Quêtes de rôle', Object.entries(lobby.quests || {}).map(([role, q]) => [`${ROLE_LABELS[role]} — ${q.name}`, `${q.text}. Récompense : ${q.reward}.`])),
       ...section('Objets (3 au maximum, achetés à la Fontaine ou à la Boutique)', Object.values(lobby.items || {}).map((it) => [`${it.name} (${it.price} PO${it.tier === 'late' ? ', fin de partie' : ''})`, it.text])),
       ...(lobby.rules?.passives !== false ? section('Pouvoirs des pions', Object.entries(lobby.passives || {}).map(([id, pv]) => [`${PAWN_LABELS[id]} — ${pv.name}`, pv.text])) : []),
+      ...section('Plateaux', [
+        ['Faille de l’Invocateur', '40 cases, 8 groupes de champions, 4 Dragons : la partie classique.'],
+        ['Abîme Hurlant (ARAM)', '28 cases, 6 groupes de champions de Freljord, 2 Dragons (l’Âme du Dragon s’obtient avec les deux), décor enneigé : parties environ deux fois plus rapides.'],
+      ]),
       ...section('Modes', [
         ['Équipes 2 contre 2', 'À 4 joueurs : pas de loyer entre partenaires, un groupe se complète avec les cases du partenaire pour construire, dons de PO possibles. L’équipe gagne quand les deux adversaires sont éliminés.'],
         ['Victoire à l’objectif', 'Le premier (ou la première équipe) à tenir 3 groupes complets sans hypothèque détruit le Nexus et gagne aussitôt.'],
@@ -740,6 +747,7 @@
       herald: el.herald.checked,
       passives: el.passives.checked,
       events: el.events.checked,
+      board: el.board.value,
       teams: el.teams.checked,
       objective: el.objective.checked,
       fountainDouble: el.fountainDouble.checked,

@@ -314,8 +314,8 @@
   width: 900px;
   height: 900px;
   display: grid;
-  grid-template-columns: var(--corner) repeat(9, var(--unit)) var(--corner);
-  grid-template-rows: var(--corner) repeat(9, var(--unit)) var(--corner);
+  grid-template-columns: var(--corner) repeat(var(--cells, 9), var(--unit)) var(--corner);
+  grid-template-rows: var(--corner) repeat(var(--cells, 9), var(--unit)) var(--corner);
   transform-style: preserve-3d;
   background:
     radial-gradient(circle at 50% 50%, #12303a 0%, #0a1c26 55%, #07121b 100%);
@@ -2807,3 +2807,62 @@ body.reduce-motion .gv-pawn.is-current .gv-standee__body {
 @media (max-width: 760px) {
   .gv-replay { bottom: 70px; flex-wrap: wrap; justify-content: center; width: calc(100% - 16px); }
 }
+
+/* ---------- Abîme Hurlant (ARAM) : plateau plat enneigé ---------- */
+.board-view[data-board="aram"] .gv-center {
+  background:
+    linear-gradient(135deg, transparent 43%, #6f7c89 43%, #8e9aa6 46%, #8e9aa6 54%, #6f7c89 57%, transparent 57%),
+    radial-gradient(circle at 10% 90%, rgba(58, 138, 232, 0.55), transparent 22%),
+    radial-gradient(circle at 90% 10%, rgba(224, 72, 60, 0.5), transparent 22%),
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.35), transparent 30%),
+    radial-gradient(circle at 70% 70%, rgba(255, 255, 255, 0.3), transparent 28%),
+    linear-gradient(135deg, #dbe7f1, #b9cde0);
+}
+.board-view[data-board="aram"] .gv-center__league,
+.board-view[data-board="aram"] .gv-center__sub { color: #2a4a66; text-shadow: none; }
+.board-view[data-board="aram"] .gv-bg { filter: hue-rotate(10deg) saturate(0.6) brightness(1.15); }
+
+/* ---------- Pause ---------- */
+.gv-pause {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  background: rgba(1, 10, 19, 0.62);
+  backdrop-filter: blur(2px) grayscale(0.5);
+}
+.gv-pause[hidden] { display: none; }
+.gv-pause__panel {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  max-width: min(440px, calc(100% - 32px));
+  padding: 22px 28px;
+  text-align: center;
+  background: rgba(1, 10, 19, 0.94);
+  border: 1px solid #c8aa6e;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.7);
+}
+.gv-pause__title { margin: 0; font-family: var(--font-display); font-size: 28px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #f0e6d2; }
+.gv-pause__sub { margin: 0; font-size: 14px; color: #a09b8c; }
+.board-view.is-paused #gv-timer { opacity: 0.4; }
+
+/* ---------- Raccourcis clavier ---------- */
+.gv-keys {
+  position: absolute;
+  top: 60px;
+  right: 16px;
+  z-index: 9;
+  width: 280px;
+  padding: 12px 16px;
+  background: rgba(1, 10, 19, 0.95);
+  border: 1px solid #785a28;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.7);
+}
+.gv-keys[hidden] { display: none; }
+.gv-keys__title { margin: 0 0 8px; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: #c8aa6e; }
+.gv-keys__list { display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; margin: 0; font-size: 13px; }
+.gv-keys__list dt { justify-self: start; padding: 1px 7px; font-weight: 700; color: #f0e6d2; background: #1e2328; border: 1px solid #5b5a56; border-bottom-width: 2px; border-radius: 4px; font-size: 12px; }
+.gv-keys__list dd { margin: 0; align-self: center; color: #a09b8c; }
+@media (hover: none) { #gv-keys-btn { display: none; } }

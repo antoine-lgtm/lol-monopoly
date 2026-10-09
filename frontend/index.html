@@ -431,7 +431,11 @@
               <ul class="room-rules" aria-label="Règles de la partie">
                 <li class="room-rules__item room-rules__item--gold">
                   <span class="room-rules__label">PO initiales</span>
-                  <span class="room-rules__value">1 500</span>
+                  <span class="room-rules__value" id="room-gold">1 500</span>
+                </li>
+                <li class="room-rules__item room-rules__item--board">
+                  <span class="room-rules__label">Plateau</span>
+                  <span class="room-rules__value" id="room-board">Faille</span>
                 </li>
                 <li class="room-rules__item room-rules__item--baron">
                   <span class="room-rules__label">Baron</span>
@@ -637,6 +641,9 @@
         <label class="field field--inline"><span class="field__label">Chrono par tour</span>
           <select class="field__select" name="turnTimer"><option value="0">Pas de chrono</option><option value="30">30 secondes</option><option value="60">60 secondes</option><option value="90">90 secondes</option></select>
         </label>
+        <label class="field field--inline"><span class="field__label">Plateau</span>
+          <select class="field__select" name="board"><option value="rift">Faille de l'Invocateur (40 cases)</option><option value="aram">Abîme Hurlant — ARAM (28 cases, plus rapide)</option></select>
+        </label>
         <label class="field field--inline"><span class="field__label">PO de départ</span>
           <select class="field__select" name="startGold"><option value="1000">1 000 PO</option><option value="1500">1 500 PO</option><option value="2000">2 000 PO</option></select>
         </label>
@@ -727,6 +734,8 @@
         <span class="gv-pill gv-pill--timer" id="gv-timer" hidden></span>
       </div>
       <div class="gv-top__tools">
+        <button class="gv-icon-btn" type="button" id="gv-pause-btn" title="Mettre la partie en pause" aria-label="Pause" hidden>⏸</button>
+        <button class="gv-icon-btn" type="button" id="gv-keys-btn" title="Raccourcis clavier (?)" aria-label="Raccourcis clavier">⌨</button>
         <button class="gv-icon-btn" type="button" id="gv-emote" title="Emotes et pings" aria-label="Emotes et pings">☺</button>
         <button class="gv-icon-btn" type="button" id="gv-ping" title="Ping sur une case (ou Alt + clic)" aria-label="Ping" aria-pressed="false">!</button>
         <button class="gv-icon-btn" type="button" id="gv-music" title="Musique" aria-pressed="true" aria-label="Musique">♪</button>
@@ -796,6 +805,8 @@
     <div class="gv-inspect" id="gv-inspect" hidden></div>
     <div class="gv-cardfx" id="gv-cardfx" hidden></div>
     <div class="gv-over" id="gv-over" hidden></div>
+    <div class="gv-pause" id="gv-pause" hidden></div>
+    <div class="gv-keys" id="gv-keys" hidden></div>
     <!-- Lecteur de replay (partie terminée revue coup par coup) -->
     <div class="gv-replay" id="gv-replay" hidden>
       <span class="gv-replay__badge">Replay</span>

@@ -20,8 +20,6 @@ const {
 const START_GOLD = 1500;
 const GO_BONUS = 200;
 const JAIL_FINE = 50;
-const JAIL_INDEX = 10;
-const BARON_INDEX = 20;
 const BARON_ROUND = 3; // le Baron apparaît au 3e tour de table
 const BARON_GO_BONUS = 300;
 const BARON_RENT_MULT = 1.5;
@@ -94,9 +92,67 @@ const BOARD = [
   prop('Yasuo', 'bleu', 400, [50, 200, 600, 1400, 1700, 2000]),
 ];
 
-const DRAGON_INDEXES = BOARD.map((s, i) => (s.type === 'dragon' ? i : -1)).filter((i) => i >= 0);
+// ---------------------------------------------------------------------------
+// Abîme Hurlant (ARAM) : plateau plus court de 28 cases, champions de Freljord
+// ---------------------------------------------------------------------------
+
+const ARAM_GROUPS = {
+  glacier: { label: 'Glacier', color: '#8fd3f0', house: 50 },
+  griffes: { label: 'Griffes-d’hiver', color: '#8a5a3c', house: 50 },
+  avarosa: { label: 'Avarosans', color: '#2f7fd6', house: 100 },
+  givre: { label: 'Garde de Givre', color: '#7a55d0', house: 100 },
+  ursins: { label: 'Ursins', color: '#d8343f', house: 150 },
+  abime: { label: 'Abîme Hurlant', color: '#e6c440', house: 200 },
+};
+
+/** Les 28 cases de l'Abîme Hurlant (7 par côté, coins compris). */
+const ARAM_BOARD = [
+  { type: 'go', name: 'Fontaine' },
+  prop('Nunu', 'glacier', 60, [2, 10, 30, 90, 160, 250]),
+  { type: 'chest', name: 'Coffre Hextech' },
+  prop('Gnar', 'glacier', 60, [4, 20, 60, 180, 320, 450]),
+  { type: 'tax', name: 'Sbires', kind: 'sbires' },
+  dragon('Océan', 'ocean'),
+  prop('Olaf', 'griffes', 100, [6, 30, 90, 270, 400, 550]),
+  { type: 'jail', name: 'Prison' },
+  prop('Trundle', 'griffes', 100, [6, 30, 90, 270, 400, 550]),
+  { type: 'chance', name: 'Ping SS' },
+  prop('Udyr', 'griffes', 120, [8, 40, 100, 300, 450, 600]),
+  potion('Potion de vie', 'hp'),
+  prop('Ashe', 'avarosa', 140, [10, 50, 150, 450, 625, 750]),
+  prop('Braum', 'avarosa', 140, [10, 50, 150, 450, 625, 750]),
+  { type: 'baron', name: 'Baron Nashor' },
+  prop('Tryndamere', 'avarosa', 160, [12, 60, 180, 500, 700, 900]),
+  { type: 'chance', name: 'Ping SS' },
+  prop('Lissandra', 'givre', 180, [14, 70, 200, 550, 750, 950]),
+  prop('Sejuani', 'givre', 200, [16, 80, 220, 600, 800, 1000]),
+  dragon('Infernal', 'infernal'),
+  potion('Potion de mana', 'mana'),
+  { type: 'gotojail', name: 'Grab de Blitzcrank' },
+  prop('Volibear', 'ursins', 220, [18, 90, 250, 700, 875, 1050]),
+  prop('Ornn', 'ursins', 220, [18, 90, 250, 700, 875, 1050]),
+  prop('Gragas', 'ursins', 240, [20, 100, 300, 750, 925, 1100]),
+  { type: 'tax', name: 'Boutique', kind: 'boutique', amount: 75 },
+  prop('Ziggs', 'abime', 350, [35, 175, 500, 1100, 1300, 1500]),
+  prop('Veigar', 'abime', 400, [50, 200, 600, 1400, 1700, 2000]),
+];
+
+/** Plateaux jouables. targets : cases visées par les cartes (fin de plateau, milieu, début). */
+const LAYOUTS = {
+  rift: { id: 'rift', name: 'Faille de l’Invocateur', board: BOARD, groups: GROUPS, targets: { far: 39, mid: 21, early: 11 } },
+  aram: { id: 'aram', name: 'Abîme Hurlant', board: ARAM_BOARD, groups: ARAM_GROUPS, targets: { far: 27, mid: 15, early: 8 } },
+};
+for (const layout of Object.values(LAYOUTS)) {
+  const { board } = layout;
+  if (board.length % 4) throw new Error(`plateau ${layout.id} : le nombre de cases doit être un multiple de 4`);
+  layout.size = board.length;
+  layout.side = board.length / 4;
+  layout.jail = board.findIndex((sq) => sq.type === 'jail');
+  layout.dragons = board.map((sq, i) => (sq.type === 'dragon' ? i : -1)).filter((i) => i >= 0);
+  layout.members = Object.fromEntries(Object.keys(layout.groups).map((g) => [g, board.map((sq, i) => (sq.group === g ? i : -1)).filter((i) => i >= 0)]));
+}
+
 const BUYABLE = new Set(['property', 'dragon', 'potion']);
-const groupMembers = (group) => BOARD.map((s, i) => (s.group === group ? i : -1)).filter((i) => i >= 0);
 
 // ---------------------------------------------------------------------------
 // Cartes
@@ -104,12 +160,12 @@ const groupMembers = (group) => BOARD.map((s, i) => (s.group === group ? i : -1)
 
 /** Ping SS (Chance) */
 const CHANCE_CARDS = [
-  { text: 'Téléportation ! Va sur le Dragon le plus proche.', act: (g, p) => g.moveTo(p, g.nextIndexOf(p.pos, DRAGON_INDEXES)) },
+  { text: 'Téléportation ! Va sur le Dragon le plus proche.', act: (g, p) => g.moveTo(p, g.nextIndexOf(p.pos, g.dragons)) },
   { text: 'Ekko remonte le temps : recule de 3 cases.', act: (g, p) => g.moveBy(p, -3, { direct: true }) },
   { text: 'Flash vers la Fontaine ! Reçois 200 PO.', act: (g, p) => g.moveTo(p, 0) },
-  { text: 'Tu pars farmer chez Yasuo.', act: (g, p) => g.moveTo(p, 39) },
-  { text: 'Roaming bot : va sur Sion. Si tu passes par la Fontaine, reçois 200 PO.', act: (g, p) => g.moveTo(p, 21) },
-  { text: 'Gank réussi chez Shen : avance jusqu’à lui.', act: (g, p) => g.moveTo(p, 11) },
+  { text: (g) => `Tu pars farmer chez ${g.board[g.layout.targets.far].name}.`, act: (g, p) => g.moveTo(p, g.layout.targets.far) },
+  { text: (g) => `Roaming bot : va sur ${g.board[g.layout.targets.mid].name}. Si tu passes par la Fontaine, reçois 200 PO.`, act: (g, p) => g.moveTo(p, g.layout.targets.mid) },
+  { text: (g) => `Gank réussi chez ${g.board[g.layout.targets.early].name} : avance jusqu’à lui.`, act: (g, p) => g.moveTo(p, g.layout.targets.early) },
   { bad: true, text: 'Blitzcrank t’attrape ! Va directement en Prison.', act: (g, p) => g.sendToJail(p) },
   { text: 'First Blood ! Reçois 150 PO.', act: (g, p) => g.gain(p, 150) },
   { text: 'Tu voles le buff bleu adverse : reçois 50 PO.', act: (g, p) => g.gain(p, 50) },
@@ -265,7 +321,7 @@ class Game {
   /** Le groupe est-il tenu par ce joueur (ou par son équipe, en 2 contre 2) ? */
   controlsGroup(key, group) {
     const p = this.player(key);
-    return groupMembers(group).every((i) => {
+    return this.members(group).every((i) => {
       const owner = this.props[i]?.owner;
       return owner === key || (owner && this.sameTeam(p, this.player(owner)));
     });
@@ -273,7 +329,7 @@ class Game {
 
   /** Groupes complets et sans hypothèque (victoire à l'objectif). */
   objectiveCount(p) {
-    return Object.keys(GROUPS).filter((g) => this.controlsGroup(p.key, g) && groupMembers(g).every((i) => !this.props[i].mortgaged)).length;
+    return Object.keys(this.groups).filter((g) => this.controlsGroup(p.key, g) && this.members(g).every((i) => !this.props[i].mortgaged)).length;
   }
 
   /** Victoire à l'objectif : 3 groupes complets = Nexus détruit. */
@@ -327,6 +383,32 @@ class Game {
     return { ok: true };
   }
 
+  // --- Plateau de la partie (Faille de l'Invocateur ou Abîme Hurlant) ---------
+
+  get layout() {
+    return LAYOUTS[this.rules.board] || LAYOUTS.rift;
+  }
+
+  get board() {
+    return this.layout.board;
+  }
+
+  get groups() {
+    return this.layout.groups;
+  }
+
+  get dragons() {
+    return this.layout.dragons;
+  }
+
+  get size() {
+    return this.layout.size;
+  }
+
+  members(group) {
+    return this.layout.members[group] || [];
+  }
+
   // --- Lecture ---------------------------------------------------------------
 
   player(key) {
@@ -346,22 +428,22 @@ class Game {
   }
 
   ownsGroup(key, group) {
-    return groupMembers(group).every((i) => this.props[i]?.owner === key);
+    return this.members(group).every((i) => this.props[i]?.owner === key);
   }
 
   netWorth(p) {
     let total = p.gold;
     for (const i of this.ownedBy(p.key)) {
-      const sq = BOARD[i];
+      const sq = this.board[i];
       const st = this.props[i];
       total += st.mortgaged ? sq.price / 2 : sq.price;
-      if (st.level) total += st.level * GROUPS[sq.group].house;
+      if (st.level) total += st.level * this.groups[sq.group].house;
     }
     return total;
   }
 
   rentFor(index, diceTotal) {
-    const sq = BOARD[index];
+    const sq = this.board[index];
     const st = this.props[index];
     if (!st || st.mortgaged) return 0;
     const owner = this.player(st.owner);
@@ -370,10 +452,10 @@ class Game {
       rent = sq.rent[st.level];
       if (st.level === 0 && this.controlsGroup(st.owner, sq.group)) rent *= 2;
     } else if (sq.type === 'dragon') {
-      const count = DRAGON_INDEXES.filter((i) => this.props[i]?.owner === st.owner).length;
+      const count = this.dragons.filter((i) => this.props[i]?.owner === st.owner).length;
       rent = 25 * 2 ** (count - 1);
     } else if (sq.type === 'potion') {
-      const both = BOARD.every((s, i) => s.type !== 'potion' || this.props[i]?.owner === st.owner);
+      const both = this.board.every((s, i) => s.type !== 'potion' || this.props[i]?.owner === st.owner);
       rent = (diceTotal || 7) * (both ? 10 : 4);
     }
     if (owner?.baron) rent *= BARON_RENT_MULT;
@@ -408,7 +490,7 @@ class Game {
 
   /** Prix d'une construction : Tibbers −10 %, Soldes −25 %. */
   buildCost(p, group) {
-    let cost = GROUPS[group].house;
+    let cost = this.groups[group].house;
     if (this.hasPassive(p, 'tibbers')) cost *= 1 - PASSIVES.tibbers.discount;
     if (p.perks.mid) cost *= 1 - MID_BUILD_DISCOUNT;
     if (this.eventIs('sale')) cost *= 0.75;
@@ -421,7 +503,7 @@ class Game {
 
   /** Le joueur paye le loyer d'une case : réductions, Embrasement et Barrière compris. */
   payRent(p, owner, index) {
-    const sq = BOARD[index];
+    const sq = this.board[index];
     let rent = this.rentFor(index, this.dice ? this.dice[0] + this.dice[1] : 7);
     let cut = 0;
     if (p.perks.support) cut += SUPPORT_CUT;
@@ -471,7 +553,7 @@ class Game {
     switch (q.id) {
       case 'TOP': return q.progress; // passages par la Fontaine (compté dans passGo)
       case 'JGL': {
-        const owned = BOARD.filter((sq, i) => QUESTS.JGL.types.includes(sq.type) && this.props[i]?.owner === p.key).length;
+        const owned = this.board.filter((sq, i) => QUESTS.JGL.types.includes(sq.type) && this.props[i]?.owner === p.key).length;
         return Math.max(owned, Math.floor(((q.camps || 0) * QUESTS.JGL.goal) / QUESTS.JGL.alt));
       }
       case 'MID': return this.ownedBy(p.key).length;
@@ -505,7 +587,7 @@ class Game {
   /** Âme du Dragon : le premier joueur qui possède les 4 Dragons. */
   checkSoul(p) {
     if (!this.rules.dragons || this.soulTaken || p.bankrupt) return;
-    if (!DRAGON_INDEXES.every((i) => this.props[i]?.owner === p.key)) return;
+    if (!this.dragons.every((i) => this.props[i]?.owner === p.key)) return;
     this.soulTaken = p.key;
     p.soulUntil = this.round + BUFF_ROUNDS;
     this.effect({ type: 'soul', key: p.key });
@@ -607,8 +689,8 @@ class Game {
   // --- Déplacements ------------------------------------------------------------
 
   nextIndexOf(from, targets) {
-    for (let step = 1; step <= 40; step++) {
-      const i = (from + step) % 40;
+    for (let step = 1; step <= this.size; step++) {
+      const i = (from + step) % this.size;
       if (targets.includes(i)) return i;
     }
     return from;
@@ -639,8 +721,8 @@ class Game {
   /** Avance (ou recule) de `steps` cases puis résout la case d'arrivée. */
   moveBy(p, steps, { direct = false } = {}) {
     const from = p.pos;
-    const to = (((from + steps) % 40) + 40) % 40;
-    if (steps > 0 && from + steps >= 40) this.passGo(p);
+    const to = (((from + steps) % this.size) + this.size) % this.size;
+    if (steps > 0 && from + steps >= this.size) this.passGo(p);
     if (steps > 0 && to === 0 && this.rules.fountainDouble) {
       this.gain(p, GO_BONUS);
       this.say(`${p.name} s’arrête pile sur la Fontaine : +${GO_BONUS} PO de plus !`);
@@ -648,7 +730,7 @@ class Game {
     if (steps > 0 && p.perks.jungle) {
       // quête Jungle : des PO par case Dragon traversée (ou atteinte)
       let crossed = 0;
-      for (let k = 1; k <= steps; k++) if (DRAGON_INDEXES.includes((from + k) % 40)) crossed += 1;
+      for (let k = 1; k <= steps; k++) if (this.dragons.includes((from + k) % this.size)) crossed += 1;
       if (crossed) this.gain(p, JUNGLE_GOLD * crossed);
     }
     p.pos = to;
@@ -658,24 +740,24 @@ class Game {
 
   /** Avance jusqu'à une case précise (toujours vers l'avant, bonus Fontaine compris). */
   moveTo(p, index) {
-    const steps = (index - p.pos + 40) % 40;
+    const steps = (index - p.pos + this.size) % this.size;
     if (steps === 0) return this.land(p);
     this.moveBy(p, steps, { direct: true });
   }
 
   sendToJail(p) {
     const from = p.pos;
-    p.pos = JAIL_INDEX;
+    p.pos = this.layout.jail;
     p.inJail = true;
     p.jailTurns = 0;
     this.rollAgain = false;
-    this.effect({ type: 'move', key: p.key, from, to: JAIL_INDEX, steps: 0, direct: true });
+    this.effect({ type: 'move', key: p.key, from, to: this.layout.jail, steps: 0, direct: true });
     this.say(`${p.name} est envoyé en Prison.`);
   }
 
   land(p) {
     const index = p.pos;
-    const sq = BOARD[index];
+    const sq = this.board[index];
     if (p.quest?.id === 'JGL' && !p.quest.done && QUESTS.JGL.types.includes(sq.type)) {
       p.quest.camps = (p.quest.camps || 0) + 1; // quête Jungle : un arrêt sur un camp
       this.checkQuest(p);
@@ -750,7 +832,8 @@ class Game {
   drawCard(p, deckName) {
     const deck = this.decks[deckName];
     const cards = deckName === 'chance' ? CHANCE_CARDS : CHEST_CARDS;
-    const card = cards[deck.order[deck.next]];
+    const raw = cards[deck.order[deck.next]];
+    const card = { ...raw, text: typeof raw.text === 'function' ? raw.text(this) : raw.text };
     deck.next = (deck.next + 1) % deck.order.length;
     const title = deckName === 'chance' ? 'Ping SS' : 'Coffre Hextech';
     this.effect({ type: 'card', key: p.key, deck: deckName, title, text: card.text });
@@ -890,7 +973,7 @@ class Game {
     const error = this.guard(key, ['buy']);
     if (error) return { ok: false, error };
     const p = this.currentPlayer;
-    const sq = BOARD[this.pendingIndex];
+    const sq = this.board[this.pendingIndex];
     if (p.gold < sq.price) return { ok: false, error: 'Pas assez de PO.' };
     p.gold -= sq.price;
     this.effect({ type: 'gold', key, amount: -sq.price });
@@ -911,7 +994,7 @@ class Game {
   skipBuy(key) {
     const error = this.guard(key, ['buy']);
     if (error) return { ok: false, error };
-    this.say(`${this.currentPlayer.name} laisse ${BOARD[this.pendingIndex].name} à la banque.`);
+    this.say(`${this.currentPlayer.name} laisse ${this.board[this.pendingIndex].name} à la banque.`);
     this.pendingIndex = null;
     this.phase = 'end';
     this.settle();
@@ -1218,14 +1301,14 @@ class Game {
     p.herald -= 1;
     this.effect({ type: 'build', key: st.owner, index, level: st.level });
     this.effect({ type: 'herald-charge', key, index });
-    this.say(`Le Héraut de ${p.name} charge ${BOARD[index].name} : ${victim.name} perd une construction !`);
+    this.say(`Le Héraut de ${p.name} charge ${this.board[index].name} : ${victim.name} perd une construction !`);
     return { ok: true };
   }
 
   // --- Constructions & hypothèques --------------------------------------------
 
   ownProperty(key, index, types = ['property']) {
-    const sq = BOARD[index];
+    const sq = this.board[index];
     const st = this.props[index];
     if (!sq || !types.includes(sq.type)) return 'Case invalide.';
     if (!st || st.owner !== key) return 'Cette case ne t’appartient pas.';
@@ -1236,11 +1319,11 @@ class Game {
     const error = this.guard(key, ['roll', 'end']) || this.ownProperty(key, index);
     if (error) return { ok: false, error };
     const p = this.currentPlayer;
-    const sq = BOARD[index];
+    const sq = this.board[index];
     const st = this.props[index];
-    const members = groupMembers(sq.group);
+    const members = this.members(sq.group);
     if (!this.controlsGroup(key, sq.group)) {
-      return { ok: false, error: `Il te faut toutes les cases ${GROUPS[sq.group].label}${this.rules.teams ? ' (avec ton partenaire)' : ''}.` };
+      return { ok: false, error: `Il te faut toutes les cases ${this.groups[sq.group].label}${this.rules.teams ? ' (avec ton partenaire)' : ''}.` };
     }
     if (members.some((i) => this.props[i].mortgaged)) return { ok: false, error: 'Une case du groupe est hypothéquée.' };
     if (st.level >= MAX_LEVEL) return { ok: false, error: 'Inhibiteur déjà construit.' };
@@ -1270,7 +1353,7 @@ class Game {
   }
 
   sellLevel(p, index) {
-    const sq = BOARD[index];
+    const sq = this.board[index];
     const st = this.props[index];
     let removed = 1;
     if (st.level === MAX_LEVEL) {
@@ -1282,7 +1365,7 @@ class Game {
     } else {
       this.supply.towers += 1;
     }
-    const refund = (GROUPS[sq.group].house / 2) * removed;
+    const refund = (this.groups[sq.group].house / 2) * removed;
     st.level -= removed;
     p.gold += refund;
     this.effect({ type: 'gold', key: p.key, amount: refund });
@@ -1293,10 +1376,10 @@ class Game {
   sell(key, index) {
     const error = this.guard(key, ['roll', 'end', 'debt']) || this.ownProperty(key, index);
     if (error) return { ok: false, error };
-    const sq = BOARD[index];
+    const sq = this.board[index];
     const st = this.props[index];
     if (st.level === 0) return { ok: false, error: 'Aucune structure à vendre.' };
-    const maxLevel = Math.max(...groupMembers(sq.group).map((i) => this.props[i].level));
+    const maxLevel = Math.max(...this.members(sq.group).map((i) => this.props[i].level));
     if (st.level < maxLevel) return { ok: false, error: 'Vends d’abord sur les cases les plus construites.' };
     this.sellLevel(this.currentPlayer, index);
     this.checkDebt();
@@ -1304,7 +1387,7 @@ class Game {
   }
 
   doMortgage(p, index) {
-    const sq = BOARD[index];
+    const sq = this.board[index];
     this.props[index].mortgaged = true;
     const value = sq.price / 2;
     p.gold += value;
@@ -1315,10 +1398,10 @@ class Game {
   mortgage(key, index) {
     const error = this.guard(key, ['roll', 'end', 'debt']) || this.ownProperty(key, index, [...BUYABLE]);
     if (error) return { ok: false, error };
-    const sq = BOARD[index];
+    const sq = this.board[index];
     const st = this.props[index];
     if (st.mortgaged) return { ok: false, error: 'Déjà hypothéquée.' };
-    if (sq.group && groupMembers(sq.group).some((i) => this.props[i]?.level > 0)) {
+    if (sq.group && this.members(sq.group).some((i) => this.props[i]?.level > 0)) {
       return { ok: false, error: 'Vends d’abord les structures du groupe.' };
     }
     this.doMortgage(this.currentPlayer, index);
@@ -1330,7 +1413,7 @@ class Game {
     const error = this.guard(key, ['roll', 'end']) || this.ownProperty(key, index, [...BUYABLE]);
     if (error) return { ok: false, error };
     const p = this.currentPlayer;
-    const sq = BOARD[index];
+    const sq = this.board[index];
     const st = this.props[index];
     if (!st.mortgaged) return { ok: false, error: 'Cette case n’est pas hypothéquée.' };
     const cost = Math.ceil((sq.price / 2) * 1.1);
@@ -1362,10 +1445,10 @@ class Game {
       const i = Number(raw);
       if (!Number.isInteger(i) || seen.has(i)) return 'Échange invalide.';
       seen.add(i);
-      const sq = BOARD[i];
+      const sq = this.board[i];
       if (!sq || !BUYABLE.has(sq.type) || this.props[i]?.owner !== owner) return 'Une des cases n’appartient plus à ce joueur.';
-      if (sq.group && groupMembers(sq.group).some((j) => this.props[j]?.level > 0)) {
-        return `Vends d’abord les tours du groupe ${GROUPS[sq.group].label} (${sq.name}).`;
+      if (sq.group && this.members(sq.group).some((j) => this.props[j]?.level > 0)) {
+        return `Vends d’abord les tours du groupe ${this.groups[sq.group].label} (${sq.name}).`;
       }
     }
     return null;
@@ -1436,7 +1519,7 @@ class Game {
       this.checkObjective(q);
     }
     this.effect({ type: 'trade-done', accepted: true, from: t.from, to: t.to, give: t.give, get: t.get });
-    const part = ({ gold, props }) => [...props.map((i) => BOARD[i].name), ...(gold ? [`${gold} PO`] : [])].join(', ') || 'rien';
+    const part = ({ gold, props }) => [...props.map((i) => this.board[i].name), ...(gold ? [`${gold} PO`] : [])].join(', ') || 'rien';
     this.say(`Échange conclu : ${from.name} donne ${part(t.give)} à ${to.name} contre ${part(t.get)}.`);
     this.checkDebt();
     return { ok: true };
@@ -1667,8 +1750,9 @@ class Game {
       props: this.props,
       rents: Object.fromEntries(Object.keys(this.props).map((i) => [i, this.rentFor(Number(i))])),
       taxPercent: Math.round(this.netWorth(this.currentPlayer) * 0.1),
-      board: BOARD,
-      groups: GROUPS,
+      board: this.board,
+      groups: this.groups,
+      boardId: this.layout.id,
       log: this.log.slice(-30),
       fx: this.fx,
     };
@@ -1708,4 +1792,4 @@ Game.replay = function replay(record, onFrame) {
   return game;
 };
 
-module.exports = { Game, BOARD, GROUPS, START_GOLD, GO_BONUS, JAIL_FINE, BARON_ROUND, MAX_LEVEL, TEAM_NAMES, OBJECTIVE_GROUPS };
+module.exports = { Game, BOARD, GROUPS, ARAM_BOARD, ARAM_GROUPS, LAYOUTS, START_GOLD, GO_BONUS, JAIL_FINE, BARON_ROUND, MAX_LEVEL, TEAM_NAMES, OBJECTIVE_GROUPS };
