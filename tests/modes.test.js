@@ -143,14 +143,19 @@ test('Abîme Hurlant : 40 parties entre bots se terminent, et le replay reste id
   for (let n = 0; n < 40; n++) {
     const g = new Game(players(3, (i) => ({ bot: ['easy', 'normal', 'hard'][i], pawn: ['poro', 'egg', 'ward'][i] })), { rules: { board: 'aram' }, seed: 100 + n });
     let steps = 0;
+    let forced = false;
     while (g.phase !== 'over' && steps++ < 40000) {
-      if (g.round > 150) { g.endByRounds(); break; }
+      if (g.round > 150) {
+        g.endByRounds(); // arrêt forcé par le test : pas une action de la partie, donc pas dans le replay
+        forced = true;
+        break;
+      }
       if (g.trade) botAnswerTrade(g, g.trade.to);
       else assert.equal(botStep(g, g.currentPlayer.key).ok, true, `bot bloqué en ${g.phase}`);
       for (const q of g.players) assert.ok(q.pos >= 0 && q.pos < 28);
     }
     assert.equal(g.phase, 'over');
-    if (n < 3) {
+    if (n < 6 && !forced) {
       const copy = Game.replay(JSON.parse(JSON.stringify(g.record)), () => {});
       assert.equal(JSON.stringify({ ...copy.toJSON(), record: null }), JSON.stringify({ ...g.toJSON(), record: null }));
     }
