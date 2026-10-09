@@ -319,6 +319,33 @@ test.describe('dans le navigateur', { skip }, () => {
     noErrors(a, b);
   });
 
+  test('paramètres : changer la touche pour lancer les dés', async () => {
+    const a = await openPlayer(PORT, 'Rakan');
+    await login(a, 'Rakan', 1);
+    await a.click('[data-action="settings"]');
+    await a.click('[data-key-action="roll"]');
+    await a.keyboard.press('r');
+    assert.equal(await a.textContent('[data-key-action="roll"]'), 'R');
+    // F est déjà pris (fin du tour) : les deux actions échangent leurs touches
+    await a.click('[data-key-action="roll"]');
+    await a.keyboard.press('f');
+    assert.equal(await a.textContent('[data-key-action="roll"]'), 'F');
+    assert.equal(await a.textContent('[data-key-action="end"]'), 'R');
+    await a.click('#settings-form button[value="confirm"]');
+    await a.reload();
+    await a.waitForFunction(() => document.querySelector('#profile-name').textContent === 'Rakan');
+    assert.equal(await a.evaluate(() => App.settings.keys.roll), 'f', 'gardé après rechargement');
+    await a.evaluate(() => new Promise((r) => App.socket.emit('lobby:quick', { mode: 'practice' }, r)));
+    await a.click('#find-match');
+    await a.waitForSelector('#gv-buttons [data-action="game:roll"]');
+    await a.keyboard.press(' ');
+    await sleep(500);
+    assert.equal(await a.evaluate(() => [...document.querySelectorAll('#gv-log li')].some((l) => /Rakan lance les dés/.test(l.textContent))), false, 'Espace ne lance plus');
+    await a.keyboard.press('f');
+    await a.waitForFunction(() => [...document.querySelectorAll('#gv-log li')].some((l) => /Rakan lance les dés/.test(l.textContent)));
+    noErrors(a);
+  });
+
   test('sauvegarde : la partie reprend après un redémarrage du serveur', async () => {
     const port = 3192;
     const save = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'lolm-')), 'save.json');

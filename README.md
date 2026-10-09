@@ -103,7 +103,8 @@ TEST_3D=1 npm run test:browser    # + chargement du plateau 3D (plus lent)
   dans « Règles » (Plateau).
 - **Pause** : le chef du salon met la partie en pause (⏸) et la reprend ; chrono et bots s'arrêtent.
 - **Raccourcis clavier** : Espace lancer les dés, A acheter, P passer, F fin du tour, D/S sorts,
-  E échange, Échap fermer, ? aide.
+  E échange, Échap fermer, ? aide. Les touches se changent dans Paramètres › Raccourcis en partie
+  (clic sur la touche puis appui sur la nouvelle ; une touche déjà prise est échangée).
 - **Répliques des champions** : une bulle quand on achète une case ou qu'on paye un loyer.
   Pour les entendre, déposer des sons dans `frontend/assets/voices/` (voir `LISEZMOI.txt`).
 

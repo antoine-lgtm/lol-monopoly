@@ -15,6 +15,18 @@
   const ICON_COUNT = 30; // même valeur que le serveur
   const STORAGE_SESSION = 'lolm.session';
   const STORAGE_SETTINGS = 'lolm.settings';
+  // Raccourcis du plateau, modifiables dans les Paramètres (touche en minuscules, ' ' = Espace)
+  const KEY_ACTIONS = [
+    { id: 'roll', label: 'Lancer les dés', key: ' ' },
+    { id: 'buy', label: 'Acheter la case', key: 'a' },
+    { id: 'skip', label: 'Passer (ne pas acheter)', key: 'p' },
+    { id: 'end', label: 'Fin du tour', key: 'f' },
+    { id: 'spell1', label: 'Sort 1', key: 'd' },
+    { id: 'spell2', label: 'Sort 2', key: 's' },
+    { id: 'trade', label: 'Proposer un échange', key: 'e' },
+  ];
+  const DEFAULT_KEYS = Object.fromEntries(KEY_ACTIONS.map((a) => [a.id, a.key]));
+  const RESERVED_KEYS = new Set(['escape', '?', 'alt', 'control', 'meta', 'shift', 'tab', 'capslock']);
   const DEFAULT_SETTINGS = { volume: 60, music: 35, quality: 'auto', chatTimestamps: true, inviteSound: true, reduceMotion: false };
 
   // Le stockage local peut être indisponible (navigation privée…) : on ne plante jamais dessus.
@@ -45,9 +57,17 @@
     lobby: null, // dernier `lobby:state` reçu (rempli par lobby.js)
     friends: [],
     settings: { ...DEFAULT_SETTINGS, ...store.get(STORAGE_SETTINGS, {}) },
+    KEY_ACTIONS,
     view: 'home',
   };
   window.App = App;
+  App.settings.keys = { ...DEFAULT_KEYS, ...(App.settings.keys || {}) };
+  /** Nom lisible d'une touche (Espace, Entrée, ↑, F…). */
+  App.keyLabel = (key) => {
+    const names = { ' ': 'Espace', enter: 'Entrée', backspace: 'Retour', delete: 'Suppr', arrowup: '↑', arrowdown: '↓', arrowleft: '←', arrowright: '→', home: 'Début', end: 'Fin', pageup: 'Page ↑', pagedown: 'Page ↓', insert: 'Inser' };
+    if (!key) return '—';
+    return names[key] || (key.length === 1 ? key.toUpperCase() : key[0].toUpperCase() + key.slice(1));
+  };
 
   // ---------------------------------------------------------------------------
   // Icônes d'invocateur (générées en SVG : aucun fichier à charger)
@@ -279,8 +299,65 @@
     form.elements.chatTimestamps.checked = App.settings.chatTimestamps;
     form.elements.inviteSound.checked = App.settings.inviteSound;
     form.elements.reduceMotion.checked = App.settings.reduceMotion;
+    draftKeys = { ...App.settings.keys };
+    renderKeyBindings();
     App.openModal('modal-settings');
   }
+
+  // Raccourcis du plateau : clic sur une touche, puis appui sur la nouvelle touche
+  let draftKeys = { ...App.settings.keys };
+  let capturing = null; // action en attente d'une touche
+  function renderKeyBindings() {
+    const list = $('#key-bindings');
+    list.replaceChildren(...KEY_ACTIONS.map((action) => {
+      const row = document.createElement('div');
+      row.className = 'keybind';
+      const label = document.createElement('span');
+      label.textContent = action.label;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `keybind__key${capturing === action.id ? ' is-capturing' : ''}`;
+      btn.dataset.keyAction = action.id;
+      btn.textContent = capturing === action.id ? 'Appuie sur une touche…' : App.keyLabel(draftKeys[action.id]);
+      btn.title = 'Cliquer puis appuyer sur la nouvelle touche (Échap pour annuler)';
+      row.append(label, btn);
+      return row;
+    }));
+  }
+  $('#key-bindings').addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-key-action]');
+    if (!btn) return;
+    capturing = capturing === btn.dataset.keyAction ? null : btn.dataset.keyAction;
+    renderKeyBindings();
+    if (capturing) $(`[data-key-action="${capturing}"]`).focus();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (!capturing) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const key = event.key.toLowerCase();
+    if (key === 'escape') {
+      capturing = null;
+      return renderKeyBindings();
+    }
+    if (RESERVED_KEYS.has(key)) return App.toast(`La touche ${App.keyLabel(key)} est réservée.`, 'info', 2000);
+    // touche déjà prise : les deux actions échangent leurs touches
+    const other = Object.keys(draftKeys).find((id) => id !== capturing && draftKeys[id] === key);
+    if (other) draftKeys[other] = draftKeys[capturing];
+    draftKeys[capturing] = key;
+    capturing = null;
+    renderKeyBindings();
+  }, true);
+  // Échap pendant la saisie d'une touche : on annule la saisie, pas la fenêtre
+  $('#modal-settings').addEventListener('cancel', (event) => {
+    if (capturing) event.preventDefault();
+  });
+  $('#modal-settings').addEventListener('close', () => { capturing = null; });
+  $('#keys-reset').addEventListener('click', () => {
+    draftKeys = { ...DEFAULT_KEYS };
+    capturing = null;
+    renderKeyBindings();
+  });
 
   $('#settings-form').addEventListener('submit', (event) => {
     const form = event.currentTarget;
@@ -291,6 +368,7 @@
       chatTimestamps: form.elements.chatTimestamps.checked,
       inviteSound: form.elements.inviteSound.checked,
       reduceMotion: form.elements.reduceMotion.checked,
+      keys: { ...draftKeys },
     };
     store.set(STORAGE_SETTINGS, App.settings);
     applySettings();

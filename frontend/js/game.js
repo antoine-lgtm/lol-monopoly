@@ -2488,18 +2488,13 @@
   $('#gv-keys-btn').addEventListener('click', () => toggleShortcutHelp());
 
   // ---------------------------------------------------------------------------
-  // Raccourcis clavier : Espace lancer, A acheter, P passer, F fin du tour, D/S sorts,
-  // E échange, Échap fermer, ? aide
+  // Raccourcis clavier (modifiables dans les Paramètres) : Espace lancer, A acheter, P passer,
+  // F fin du tour, D/S sorts, E échange ; Échap fermer, ? aide
   // ---------------------------------------------------------------------------
 
-  const SHORTCUTS = [
-    ['Espace', 'Lancer les dés'],
-    ['A', 'Acheter la case'],
-    ['P', 'Passer (ne pas acheter)'],
-    ['F', 'Fin du tour'],
-    ['D', 'Sort 1'],
-    ['S', 'Sort 2'],
-    ['E', 'Proposer un échange'],
+  // touches choisies dans les Paramètres (App.settings.keys)
+  const shortcuts = () => [
+    ...(App.KEY_ACTIONS || []).map((a) => [App.keyLabel(App.settings.keys?.[a.id]), a.label]),
     ['Alt + clic', 'Ping sur une case'],
     ['Échap', 'Fermer la fenêtre ouverte'],
     ['?', 'Afficher cette aide'],
@@ -2510,7 +2505,7 @@
     box.hidden = !open;
     if (!open) return;
     const list = el('dl', 'gv-keys__list');
-    for (const [key, label] of SHORTCUTS) list.append(el('dt', '', key), el('dd', '', label));
+    for (const [key, label] of shortcuts()) list.append(el('dt', '', key), el('dd', '', label));
     box.replaceChildren(el('p', 'gv-keys__title', 'Raccourcis clavier'), list);
   }
   const clickAction = (action) => {
@@ -2546,21 +2541,23 @@
       return;
     }
     let done = false;
-    switch (key.toLowerCase()) {
-      case ' ': done = clickAction('game:roll'); break;
-      case 'a': done = clickAction('game:buy'); break;
-      case 'p': done = clickAction('game:skip'); break;
-      case 'f': done = clickAction('game:end'); break;
-      case 'd':
-      case 's': {
-        const spell = $$('#gv-kit .gv-kit__btn--spell')[key.toLowerCase() === 'd' ? 0 : 1];
+    const keys = App.settings.keys || {};
+    const bound = Object.keys(keys).find((id) => keys[id] === key.toLowerCase());
+    switch (bound) {
+      case 'roll': done = clickAction('game:roll'); break;
+      case 'buy': done = clickAction('game:buy'); break;
+      case 'skip': done = clickAction('game:skip'); break;
+      case 'end': done = clickAction('game:end'); break;
+      case 'spell1':
+      case 'spell2': {
+        const spell = $$('#gv-kit .gv-kit__btn--spell')[bound === 'spell1' ? 0 : 1];
         if (spell && !spell.disabled) {
           spell.click();
           done = true;
         }
         break;
       }
-      case 'e': {
+      case 'trade': {
         const trade = $('.gv-btn--trade:not([disabled])');
         if (trade) {
           trade.click();
@@ -2570,7 +2567,7 @@
       }
       default:
     }
-    if (done || key === ' ') event.preventDefault(); // Espace ne fait pas défiler la page
+    if (done || bound) event.preventDefault(); // une touche de raccourci ne fait pas défiler la page
   });
 
   function renderAll() {
@@ -2855,13 +2852,6 @@
   document.addEventListener('keydown', (event) => {
     if (view.hidden) return;
     if (event.key === 'Escape') closeInspect();
-    if (event.key === ' ' && isMyTurn() && document.activeElement?.tagName !== 'INPUT') {
-      const primary = $('#gv-buttons .gv-btn--primary:not(:disabled)');
-      if (primary) {
-        event.preventDefault();
-        primary.click();
-      }
-    }
   });
 
   // ---------------------------------------------------------------------------
